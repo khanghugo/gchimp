@@ -1,3 +1,5 @@
+use std::fs::OpenOptions;
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use glam::{DVec2, DVec3};
@@ -12,33 +14,33 @@ use nom::{
 };
 type IResult<'a, T> = _IResult<&'a str, T>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     pub id: i32,
     pub bone_name: String,
     pub parent: i32,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Skeleton {
     pub time: i32,
     pub bones: Vec<BonePos>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BonePos {
     pub id: i32,
     pub pos: DVec3,
     pub rot: DVec3,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Triangle {
     pub material: String,
     pub vertices: Vec<Vertex>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Vertex {
     pub parent: i32,
     pub pos: DVec3,
@@ -47,33 +49,41 @@ pub struct Vertex {
     pub source: Option<VertexSourceInfo>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VertexSourceInfo {
     pub links: i32,
     pub bone: i32,
     pub weight: f64,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VertexAnim {
     pub time: i32,
     pub vertices: Vec<VertexAnimPos>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct VertexAnimPos {
     pub id: i32,
     pub pos: DVec3,
     pub norm: DVec3,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Smd {
     pub version: i32,
     pub nodes: Vec<Node>,
     pub skeleton: Vec<Skeleton>,
     pub triangles: Vec<Triangle>,
     pub vertex_anim: Option<Vec<VertexAnim>>,
+}
+
+macro_rules! write_dvec {
+    ($buff:ident, $dvec:expr) => {{
+        for e in $dvec.to_array() {
+            $buff.write_all(format!("{} ", e).as_bytes())?;
+        }
+    }};
 }
 
 impl Smd {
@@ -88,6 +98,79 @@ impl Smd {
         } else {
             panic!("Cannot open file.")
         }
+    }
+
+    pub fn write(&self, file_name: &str) -> io::Result<()> {
+        let path = Path::new(file_name);
+
+        let file = OpenOptions::new().create(true).write(true).open(path)?;
+
+        let mut file = BufWriter::new(file);
+
+        file.write_all(format!("version {}\n", self.version).as_bytes())?;
+
+        // nodes
+        file.write_all("nodes\n".as_bytes())?;
+        for node in &self.nodes {
+            file.write_all(
+                format!("{} \"{}\" {}\n", node.id, node.bone_name, node.parent).as_bytes(),
+            )?
+        }
+        file.write_all("end\n".as_bytes())?;
+
+        // skeleton
+        file.write_all("skeleton\n".as_bytes())?;
+        for skeleton in &self.skeleton {
+            file.write_all(format!("time {}\n", skeleton.time).as_bytes())?;
+
+            for bone in &skeleton.bones {
+                file.write_all(format!("{} ", bone.id).as_bytes())?;
+                write_dvec!(file, bone.pos);
+                write_dvec!(file, bone.rot);
+                file.write_all("\n".as_bytes())?;
+            }
+        }
+        file.write_all("end\n".as_bytes())?;
+
+        // triangles
+        file.write_all("triangles\n".as_bytes())?;
+        for triangle in &self.triangles {
+            file.write_all(format!("{}\n", triangle.material).as_bytes())?;
+
+            for vertex in &triangle.vertices {
+                file.write_all(format!("{} ", vertex.parent).as_bytes())?;
+                write_dvec!(file, vertex.pos);
+                write_dvec!(file, vertex.norm);
+                write_dvec!(file, vertex.uv);
+
+                if let Some(source) = &vertex.source {
+                    file.write_all(
+                        format!("{} {} {}", source.links, source.bone, source.weight).as_bytes(),
+                    )?
+                }
+
+                file.write_all("\n".as_bytes())?;
+            }
+        }
+        file.write_all("end\n".as_bytes())?;
+
+        if let Some(vertex_anim) = &self.vertex_anim {
+            // skeleton
+            file.write_all("vertexanim\n".as_bytes())?;
+            for single in vertex_anim {
+                file.write_all(format!("time {}\n", single.time).as_bytes())?;
+
+                for vertex in &single.vertices {
+                    file.write_all(format!("{} ", vertex.id).as_bytes())?;
+                    write_dvec!(file, vertex.pos);
+                    write_dvec!(file, vertex.norm);
+                    file.write_all("\n".as_bytes())?;
+                }
+            }
+            file.write_all("end\n".as_bytes())?;
+        }
+
+        Ok(())
     }
 }
 
@@ -523,5 +606,36 @@ end
     #[test]
     fn goldsrc_file_read() {
         Smd::new("./test/cyberwave_goldsrc.smd");
+    }
+
+    #[test]
+    fn goldsrc_file_read_write() {
+        let file = Smd::new("./test/cyberwave_goldsrc.smd");
+
+        file.write("./test/out/cyberwave_goldsrc_read_write.smd")
+            .unwrap();
+    }
+
+    #[test]
+    fn source_file_read_write() {
+        let file = Smd::new("./test/s1_r05_ref.smd");
+
+        file.write("./test/out/s1_r05_ref_read_write.smd").unwrap();
+    }
+
+    #[test]
+    fn goldsrc_file_read_write_read() {
+        let file = Smd::new("./test/cyberwave_goldsrc.smd");
+        let file2 = Smd::new("./test/out/cyberwave_goldsrc_read_write.smd");
+
+        assert_eq!(file, file2);
+    }
+
+    #[test]
+    fn source_file_read_write_read() {
+        let file = Smd::new("./test/s1_r05_ref.smd");
+        let file2 = Smd::new("./test/out/s1_r05_ref_read_write.smd");
+
+        assert_eq!(file, file2);
     }
 }
