@@ -50,7 +50,7 @@ impl Map {
     pub fn new(map_file: &str) -> Self {
         let path = Path::new(map_file);
 
-        if let Ok(file) = std::fs::read_to_string(&path) {
+        if let Ok(file) = std::fs::read_to_string(path) {
             match parse_map(&file) {
                 Ok((_, res)) => res,
                 Err(err) => panic!("Cannot read file. {}", err),
@@ -179,7 +179,7 @@ fn parse_attribute(i: &str) -> IResult<(&str, &str)> {
 fn parse_attributes(i: &str) -> IResult<Attributes> {
     fold_many1(
         terminated(parse_attribute, multispace0),
-        || Attributes::new(),
+        Attributes::new,
         |mut acc: Attributes, (key, value)| {
             acc.insert(key.to_owned(), value.to_owned());
             acc
@@ -328,9 +328,12 @@ a
         assert_eq!(a.entities.len(), 1);
 
         let ent = &a.entities[0];
-        
+
         assert_eq!(ent.attributes.len(), 4);
-        assert_eq!(ent.attributes.get("_tb_mod").unwrap(), "cstrike;cstrike_downloads");
+        assert_eq!(
+            ent.attributes.get("_tb_mod").unwrap(),
+            "cstrike;cstrike_downloads"
+        );
 
         assert!(ent.brushes.is_some());
 
