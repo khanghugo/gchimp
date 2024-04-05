@@ -5,7 +5,7 @@ use nom::{
     bytes::complete::{tag, take_till},
     character::complete::{multispace0, space0},
     combinator::{all_consuming, map, opt, recognize},
-    multi::{self, fold_many1, many0, many1},
+    multi::{fold_many1, many0, many1},
     number::complete::double as _double,
     sequence::{delimited, preceded, terminated, tuple},
     IResult as _IResult,
@@ -65,12 +65,14 @@ type IResult<'a, T> = _IResult<&'a str, T>;
 
 // TODO: make it not discard
 // Many 0 because it doesn't necessary have it every time.
-fn discard_comment_lines(i: &str) -> IResult<&str> {
-    let discard_comment_line = terminated(
+fn discard_comment_line(i: &str) -> IResult<&str> {
+    terminated(
         preceded(tuple((space0, tag("//"))), take_till(|c| c == '\n')),
         multispace0,
-    );
+    )(i)
+}
 
+fn discard_comment_lines(i: &str) -> IResult<&str> {
     map(many0(discard_comment_line), |_| "")(i)
 }
 
@@ -154,14 +156,14 @@ fn parse_brush_plane(i: &str) -> IResult<BrushPlane> {
     )(i)
 }
 
-fn parse_brushes(i: &str) -> IResult<Vec<Brush>> {
-    let parse_brush = move |i| {
-        map(
-            many1(terminated(parse_brush_plane, multispace0)),
-            |planes| Brush { planes },
-        )(i)
-    };
+fn parse_brush(i: &str) -> IResult<Brush> {
+    map(
+        many1(terminated(parse_brush_plane, multispace0)),
+        |planes| Brush { planes },
+    )(i)
+}
 
+fn parse_brushes(i: &str) -> IResult<Vec<Brush>> {
     many1(delimited(
         discard_comment_lines,
         between_line_bracket(parse_brush),
@@ -170,9 +172,11 @@ fn parse_brushes(i: &str) -> IResult<Vec<Brush>> {
 }
 
 // For attributes
-fn parse_attributes(i: &str) -> IResult<Attributes> {
-    let parse_attribute = move |i| tuple((quoted_text, preceded(space0, quoted_text)))(i);
+fn parse_attribute(i: &str) -> IResult<(&str, &str)> {
+    tuple((quoted_text, preceded(space0, quoted_text)))(i)
+}
 
+fn parse_attributes(i: &str) -> IResult<Attributes> {
     fold_many1(
         terminated(parse_attribute, multispace0),
         || Attributes::new(),
@@ -184,17 +188,17 @@ fn parse_attributes(i: &str) -> IResult<Attributes> {
 }
 
 // For map
-fn parse_entities(i: &str) -> IResult<Vec<Entity>> {
-    let parse_entity = move |i| {
-        map(
-            tuple((parse_attributes, opt(parse_brushes))),
-            |(attributes, brushes)| Entity {
-                attributes,
-                brushes,
-            },
-        )(i)
-    };
+fn parse_entity(i: &str) -> IResult<Entity> {
+    map(
+        tuple((parse_attributes, opt(parse_brushes))),
+        |(attributes, brushes)| Entity {
+            attributes,
+            brushes,
+        },
+    )(i)
+}
 
+fn parse_entities(i: &str) -> IResult<Vec<Entity>> {
     many1(delimited(
         discard_comment_lines,
         between_line_bracket(parse_entity),
@@ -290,7 +294,7 @@ a
 // {} 
 // \"\"";
 
-        let (rest, a) = discard_comment_lines(i).unwrap();
+        let (rest, _) = discard_comment_lines(i).unwrap();
         assert!(rest.is_empty());
     }
 
