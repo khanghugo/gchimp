@@ -12,38 +12,38 @@ use nom::{
 };
 
 #[derive(Debug)]
-struct BrushPlane {
-    p1: DVec3,
-    p2: DVec3,
-    p3: DVec3,
-    texture_name: String,
+pub struct BrushPlane {
+    pub p1: DVec3,
+    pub p2: DVec3,
+    pub p3: DVec3,
+    pub texture_name: String,
     /// Ux Uy Uz Uoffset
-    u: DVec4,
+    pub u: DVec4,
     /// Vx Vy Vz Voffset
-    v: DVec4,
-    rotation: f64,
-    u_scale: f64,
-    v_scale: f64,
+    pub v: DVec4,
+    pub rotation: f64,
+    pub u_scale: f64,
+    pub v_scale: f64,
 }
 
 #[derive(Debug)]
-struct Brush {
-    planes: Vec<BrushPlane>,
+pub struct Brush {
+    pub planes: Vec<BrushPlane>,
 }
 
 // #[derive(Debug)]
 type Attributes = HashMap<String, String>;
 
 #[derive(Debug)]
-struct Entity {
+pub struct Entity {
     // All entities have attributes.
-    attributes: Attributes,
-    brushes: Option<Vec<Brush>>,
+    pub attributes: Attributes,
+    pub brushes: Option<Vec<Brush>>,
 }
 
 #[derive(Debug)]
 pub struct Map {
-    entities: Vec<Entity>,
+    pub entities: Vec<Entity>,
 }
 
 impl Map {
