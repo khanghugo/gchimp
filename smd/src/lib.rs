@@ -100,7 +100,7 @@ impl Smd {
         }
     }
 
-    pub fn write(&self, file_name: &str) -> io::Result<()> {
+    pub fn write(self, file_name: &str) -> io::Result<()> {
         let path = Path::new(file_name);
 
         let file = OpenOptions::new().create(true).write(true).open(path)?;
@@ -111,7 +111,7 @@ impl Smd {
 
         // nodes
         file.write_all("nodes\n".as_bytes())?;
-        for node in &self.nodes {
+        for node in self.nodes {
             file.write_all(
                 format!("{} \"{}\" {}\n", node.id, node.bone_name, node.parent).as_bytes(),
             )?
@@ -120,10 +120,10 @@ impl Smd {
 
         // skeleton
         file.write_all("skeleton\n".as_bytes())?;
-        for skeleton in &self.skeleton {
+        for skeleton in self.skeleton {
             file.write_all(format!("time {}\n", skeleton.time).as_bytes())?;
 
-            for bone in &skeleton.bones {
+            for bone in skeleton.bones {
                 file.write_all(format!("{} ", bone.id).as_bytes())?;
                 write_dvec!(file, bone.pos);
                 write_dvec!(file, bone.rot);
@@ -134,16 +134,16 @@ impl Smd {
 
         // triangles
         file.write_all("triangles\n".as_bytes())?;
-        for triangle in &self.triangles {
+        for triangle in self.triangles {
             file.write_all(format!("{}\n", triangle.material).as_bytes())?;
 
-            for vertex in &triangle.vertices {
+            for vertex in triangle.vertices {
                 file.write_all(format!("{} ", vertex.parent).as_bytes())?;
                 write_dvec!(file, vertex.pos);
                 write_dvec!(file, vertex.norm);
                 write_dvec!(file, vertex.uv);
 
-                if let Some(source) = &vertex.source {
+                if let Some(source) = vertex.source {
                     file.write_all(
                         format!("{} {} {}", source.links, source.bone, source.weight).as_bytes(),
                     )?
@@ -154,13 +154,13 @@ impl Smd {
         }
         file.write_all("end\n".as_bytes())?;
 
-        if let Some(vertex_anim) = &self.vertex_anim {
+        if let Some(vertex_anim) = self.vertex_anim {
             // skeleton
             file.write_all("vertexanim\n".as_bytes())?;
             for single in vertex_anim {
                 file.write_all(format!("time {}\n", single.time).as_bytes())?;
 
-                for vertex in &single.vertices {
+                for vertex in single.vertices {
                     file.write_all(format!("{} ", vertex.id).as_bytes())?;
                     write_dvec!(file, vertex.pos);
                     write_dvec!(file, vertex.norm);
