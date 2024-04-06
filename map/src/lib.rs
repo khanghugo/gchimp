@@ -347,7 +347,7 @@ a
         assert_eq!(brush.planes[3].texture_name, "__TB_empty");
         assert_eq!(brush.planes[3].u.x, 1.);
     }
-    
+
     #[test]
     fn file_read() {
         Map::new("./test/sky_vis.map");

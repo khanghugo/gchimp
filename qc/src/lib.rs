@@ -1,3 +1,5 @@
+use std::fs::OpenOptions;
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use bitflags::bitflags;
@@ -7,7 +9,7 @@ use nom::bytes::complete::take_till;
 use nom::character::complete::{digit1, multispace0, space0};
 use nom::combinator::{all_consuming, map, map_res, opt, recognize};
 use nom::multi::many0;
-use nom::sequence::{terminated, tuple};
+use nom::sequence::{delimited, terminated, tuple};
 use nom::{
     bytes::complete::tag, number::complete::double as _double, sequence::preceded,
     IResult as _IResult,
@@ -76,7 +78,6 @@ bitflags! {
         const NoShadeLight = 1 << 8;
         const ComplexCollision = 1 << 9;
         const ForceSkylight = 1 << 10;
-
     }
 }
 
@@ -239,6 +240,20 @@ impl Qc {
             panic!("Cannot open file.")
         }
     }
+
+    pub fn write(self, file_name: &str) -> io::Result<()> {
+        let path = Path::new(file_name);
+
+        let file = OpenOptions::new().create(true).write(true).open(path)?;
+
+        let mut file = BufWriter::new(file);
+
+        for command in self.commands {
+            file.write_all(&write_qc_command(command))?;
+        }
+
+        Ok(())
+    }
 }
 
 fn _number(i: &str) -> IResult<i32> {
@@ -280,6 +295,18 @@ fn between_space(i: &str) -> IResult<&str> {
 fn name_string(i: &str) -> IResult<&str> {
     alt((quoted_text, between_space))(i)
 }
+
+fn discard_comment_line(i: &str) -> IResult<&str> {
+    terminated(
+        preceded(tuple((space0, tag("//"))), take_till(|c| c == '\n')),
+        multispace0,
+    )(i)
+}
+
+fn discard_comment_lines(i: &str) -> IResult<&str> {
+    map(many0(discard_comment_line), |_| "")(i)
+}
+
 // Main commands
 fn command<'a, T>(
     s: &'a str,
@@ -427,11 +454,102 @@ fn parse_qc_command(i: &str) -> CResult {
 }
 
 fn parse_qc_commands(i: &str) -> IResult<Vec<QcCommand>> {
-    many0(parse_qc_command)(i)
+    many0(delimited(
+        discard_comment_lines,
+        parse_qc_command,
+        discard_comment_lines,
+    ))(i)
 }
 
 fn parse_qc(i: &str) -> IResult<Qc> {
     map(all_consuming(parse_qc_commands), |commands| Qc { commands })(i)
+}
+
+// Remember to add new line
+// Without quotation mark works just fine.
+fn write_qc_command(i: QcCommand) -> Vec<u8> {
+    match i {
+        QcCommand::ModelName(x) => format!("$modelname {}\n", x).into_bytes(),
+        QcCommand::Body(Body {
+            name,
+            mesh,
+            reverse,
+            scale,
+        }) => format!(
+            "$body {} {} {} {}\n",
+            name,
+            mesh,
+            if reverse { "reverse" } else { "" },
+            if let Some(scale) = scale {
+                scale.to_string()
+            } else {
+                "".to_string()
+            }
+        )
+        .into_bytes(),
+        QcCommand::Cd(x) => format!("$cd {}\n", x).into_bytes(),
+        QcCommand::CdTexture(x) => format!("$cdtexture {}\n", x).into_bytes(),
+        QcCommand::ClipToTextures => "$cliptotexture \n".to_string().into_bytes(),
+        QcCommand::Scale(x) => format!("$scale {}\n", x).into_bytes(),
+        QcCommand::TextureRenderMode(TextureRenderMode { texture, render }) => format!(
+            "$texrendermode {} {}\n",
+            texture,
+            match render {
+                RenderMode::Masked => "masked",
+                RenderMode::Additive => "additive",
+                RenderMode::FlatShade => "flatshade",
+                RenderMode::FullBright => "fullbright",
+            }
+        )
+        .into_bytes(),
+        QcCommand::Gamma(x) => format!("$gamma {}\n", x).into_bytes(),
+        QcCommand::Origin(Origin { origin, rotation }) => format!(
+            "$origin {} {} {} {}\n",
+            origin.x,
+            origin.y,
+            origin.z,
+            if let Some(rotation) = rotation {
+                rotation.to_string()
+            } else {
+                "".to_string()
+            }
+        )
+        .into_bytes(),
+        QcCommand::BBox(BBox { mins, maxs }) => format!(
+            "$bbox {} {} {} {} {} {}\n",
+            mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
+        )
+        .into_bytes(),
+        QcCommand::CBox(BBox { mins, maxs }) => format!(
+            "$cbox {} {} {} {} {} {}\n",
+            mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
+        )
+        .into_bytes(),
+        QcCommand::Flags(Flags(x)) => format!("$flags {}\n", x).into_bytes(),
+        QcCommand::HBox(HBox {
+            group,
+            bone_name,
+            mins,
+            maxs,
+        }) => format!(
+            "$hbox {} {} {} {} {} {} {} {}\n",
+            group, bone_name, mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
+        )
+        .into_bytes(),
+        QcCommand::Sequence(Sequence { name, mode }) => {
+            let mut res = format!("$sequence {} ", name);
+
+            match mode {
+                SequenceMode::Immedidate(SequenceImmediate { smd, rest }) => {
+                    res += format!("{} {}\n", smd, rest).as_str()
+                }
+                SequenceMode::Intermediate(_) => todo!(),
+            }
+
+            res.into_bytes()
+        }
+        _ => unimplemented!("Currently not supported. Too much work. Go ask me. I will do it."),
+    }
 }
 
 #[cfg(test)]
@@ -602,9 +720,49 @@ $texrendermode \"mefl2_02_dark.bmp\" flatshade
     }
 
     #[test]
+    fn commands_parse2() {
+        let i = "\
+// hello
+$modelname \"/home/khang/map_compiler/model_tools/S2GConverter/test/s1_r012-goldsrc.mdl\"
+// //
+// I am n idiotot
+$cd \".\"
+$cdtexture \".\"
+$scale 1.0
+$texrendermode \"metal_light_01_dark.bmp\" fullbright // here
+$texrendermode \"metal_light_01_dark.bmp\" flatshade 
+// yes?
+$texrendermode \"mefl2_02_dark.bmp\" fullbright 
+$texrendermode \"mefl2_02_dark.bmp\" flatshade 
+// good night
+        ";
+
+        let (rest, qc) = parse_qc_commands(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert_eq!(qc.len(), 8);
+
+        let qc1 = &qc[1];
+
+        if let QcCommand::Cd(path) = qc1 {
+            assert_eq!(path, ".");
+        } else {
+            unreachable!()
+        }
+    }
+
+    #[test]
     fn read_goldsrc() {
         Qc::new("./test/s1_r012-goldsrc.qc");
     }
 
     // TODO: test source file
+
+    #[test]
+    fn write_goldsrc() {
+        let file = Qc::new("./test/s1_r012-goldsrc.qc");
+
+        file.write("./test/out/s1_r012-goldsrc_out.qc").unwrap();
+    }
+
 }
