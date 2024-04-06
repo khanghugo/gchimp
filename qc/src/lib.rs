@@ -252,6 +252,8 @@ impl Qc {
             file.write_all(&write_qc_command(command))?;
         }
 
+        file.flush()?;
+
         Ok(())
     }
 }

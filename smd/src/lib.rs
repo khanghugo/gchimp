@@ -170,6 +170,8 @@ impl Smd {
             file.write_all("end\n".as_bytes())?;
         }
 
+        file.flush()?;
+
         Ok(())
     }
 }
