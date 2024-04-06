@@ -2,10 +2,12 @@ use rayon::prelude::*;
 
 use map::Map;
 
+use crate::types::*;
+
 /// Scale all texture by a scalar.
 ///
 /// Mutate the input map data.
-pub fn texture_scaler(map: &mut Map, scalar: f64) {
+pub fn texture_scale(map: &mut Map, scalar: f64) {
     map.entities.par_iter_mut().for_each(|entity| {
         if let Some(brushes) = &mut entity.brushes {
             brushes.par_iter_mut().for_each(|brush| {
@@ -27,4 +29,45 @@ pub fn texture_scaler(map: &mut Map, scalar: f64) {
             });
         }
     });
+}
+
+pub struct TextureScale;
+impl Cli for TextureScale {
+    fn name(&self) -> &'static str {
+        "texture_scale"
+    }
+
+    // In, Out, Scale
+    fn cli(&self) {
+        let args: Vec<String> = std::env::args().skip(2).collect();
+
+        if args.len() < 3 {
+            self.cli_help();
+            return;
+        }
+
+        let scalar = args[2].parse::<f64>();
+
+        if scalar.is_err() {
+            println!("Cannot parse scalar.");
+            self.cli_help();
+            return;
+        }
+
+        let mut map = Map::new(&args[0]);
+
+        texture_scale(&mut map, scalar.unwrap());
+
+        map.write(&args[1]).unwrap();
+    }
+
+    fn cli_help(&self) {
+        println!(
+            "\
+Texture scale
+
+<.map> <output .map> <scalar>
+"
+        )
+    }
 }
