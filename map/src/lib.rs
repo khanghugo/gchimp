@@ -69,7 +69,7 @@ impl Map {
     pub fn write(self, file_name: &str) -> io::Result<()> {
         let path = Path::new(file_name);
 
-        let file = OpenOptions::new().create(true).write(true).open(path)?;
+        let file = OpenOptions::new().create(true).write(true).truncate(true).open(path)?;
 
         let mut file = BufWriter::new(file);
 
