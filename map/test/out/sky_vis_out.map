@@ -1,8 +1,10 @@
+// Game: Half-Life
+// Format: Valve
 // entity 0
 {
-"classname" "worldspawn"
-"mapversion" "220"
 "_tb_mod" "cstrike;cstrike_downloads"
+"mapversion" "220"
+"classname" "worldspawn"
 "wad" "/home/khang/map_compiler/sdhlt.wad;/home/khang/map_compiler/devtextures.wad"
 // brush 0
 {

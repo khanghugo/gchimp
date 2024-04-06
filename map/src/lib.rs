@@ -10,7 +10,7 @@ use nom::{
     bytes::complete::{tag, take_till},
     character::complete::{multispace0, space0},
     combinator::{all_consuming, map, opt, recognize},
-    multi::{fold_many1, many0, many1},
+    multi::{fold_many1, many0, many1, many_m_n},
     number::complete::double as _double,
     sequence::{delimited, preceded, terminated, tuple},
     IResult as _IResult,
@@ -48,6 +48,7 @@ pub struct Entity {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Map {
+    pub tb_header: Option<Vec<String>>,
     pub entities: Vec<Entity>,
 }
 
@@ -71,6 +72,14 @@ impl Map {
         let file = OpenOptions::new().create(true).write(true).open(path)?;
 
         let mut file = BufWriter::new(file);
+
+        if let Some(tb_header) = self.tb_header {
+            for s in tb_header {
+                file.write_all("//".as_bytes())?;
+                file.write_all(s.as_bytes())?;
+                file.write_all("\n".as_bytes())?;
+            }
+        }
 
         for (entity_index, entities) in self.entities.iter().enumerate() {
             file.write_all(format!("// entity {}\n", entity_index).as_bytes())?;
@@ -111,17 +120,21 @@ impl Map {
 
 type IResult<'a, T> = _IResult<&'a str, T>;
 
-// TODO: make it not discard
-// Many 0 because it doesn't necessary have it every time.
-fn discard_comment_line(i: &str) -> IResult<&str> {
+fn take_comment_line(i: &str) -> IResult<&str> {
     terminated(
         preceded(tuple((space0, tag("//"))), take_till(|c| c == '\n')),
         multispace0,
     )(i)
 }
 
+fn take_tb_header(i: &str) -> IResult<Vec<String>> {
+    many_m_n(0, 2, map(take_comment_line, |i| i.to_string()))(i)
+}
+
+// TODO: make it not discard
+// Many 0 because it doesn't necessary have it every time.
 fn discard_comment_lines(i: &str) -> IResult<&str> {
-    map(many0(discard_comment_line), |_| "")(i)
+    map(many0(take_comment_line), |_| "")(i)
 }
 
 fn signed_double(i: &str) -> IResult<f64> {
@@ -255,7 +268,13 @@ fn parse_entities(i: &str) -> IResult<Vec<Entity>> {
 }
 
 fn parse_map(i: &str) -> IResult<Map> {
-    map(all_consuming(parse_entities), |entities| Map { entities })(i)
+    map(
+        all_consuming(tuple((opt(take_tb_header), parse_entities))),
+        |(tb_header, entities)| Map {
+            tb_header,
+            entities,
+        },
+    )(i)
 }
 
 #[cfg(test)]
