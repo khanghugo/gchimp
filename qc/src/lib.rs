@@ -766,5 +766,4 @@ $texrendermode \"mefl2_02_dark.bmp\" flatshade
 
         file.write("./test/out/s1_r012-goldsrc_out.qc").unwrap();
     }
-
 }
