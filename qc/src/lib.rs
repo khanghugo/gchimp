@@ -125,6 +125,7 @@ pub struct Sequence {
     pub mode: SequenceMode,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum SequenceSimpleOption {
     Frame(i32, i32),
     Origin(DVec3),
@@ -155,11 +156,14 @@ pub enum SequenceSimpleOption {
     NumFrames(i32),
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct SequenceOptionLocalHierarchy {
     pub bone: String,
     pub new_parent: String,
     pub range: Option<(i32, i32, i32, i32)>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct SequenceOptionBlendLayer {
     pub other: String,
     pub startframe: i32,
@@ -169,6 +173,7 @@ pub struct SequenceOptionBlendLayer {
     pub options: Vec<SequenceOptionBlendLayerOption>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum SequenceOptionBlendLayerOption {
     Spline,
     Xfade,
@@ -223,6 +228,7 @@ pub enum QcCommand {
     Sequence(Sequence),
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Qc {
     pub commands: Vec<QcCommand>,
 }
