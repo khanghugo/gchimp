@@ -1,4 +1,9 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    fs::OpenOptions,
+    io::{self, BufWriter, Write},
+    path::Path,
+};
 
 use glam::{DVec3, DVec4};
 use nom::{
@@ -11,7 +16,7 @@ use nom::{
     IResult as _IResult,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BrushPlane {
     pub p1: DVec3,
     pub p2: DVec3,
@@ -26,22 +31,22 @@ pub struct BrushPlane {
     pub v_scale: f64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Brush {
     pub planes: Vec<BrushPlane>,
 }
 
-// #[derive(Debug)]
+// #[derive(Debug, Clone, PartialEq)]
 type Attributes = HashMap<String, String>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Entity {
     // All entities have attributes.
     pub attributes: Attributes,
     pub brushes: Option<Vec<Brush>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Map {
     pub entities: Vec<Entity>,
 }
@@ -58,6 +63,49 @@ impl Map {
         } else {
             panic!("Cannot open file.")
         }
+    }
+
+    pub fn write(self, file_name: &str) -> io::Result<()> {
+        let path = Path::new(file_name);
+
+        let file = OpenOptions::new().create(true).write(true).open(path)?;
+
+        let mut file = BufWriter::new(file);
+
+        for (entity_index, entities) in self.entities.iter().enumerate() {
+            file.write_all(format!("// entity {}\n", entity_index).as_bytes())?;
+
+            file.write_all("{\n".as_bytes())?;
+
+            for (key, value) in &entities.attributes {
+                file.write_all(format!("\"{}\" \"{}\"\n", key, value).as_bytes())?;
+            }
+
+            if let Some(brushes) = &entities.brushes {
+                for (brush_entity, brush) in brushes.iter().enumerate() {
+                    file.write_all(format!("// brush {}\n", brush_entity).as_bytes())?;
+                    file.write_all("{\n".as_bytes())?;
+
+                    for plane in &brush.planes {
+                        file.write_all(format!("( {} {} {} ) ( {} {} {} ) ( {} {} {} ) {} [ {} {} {} {} ] [ {} {} {} {} ] {} {} {}\n", 
+                    plane.p1.x,plane.p1.y,plane.p1.z,
+                    plane.p2.x,plane.p2.y,plane.p2.z,
+                    plane.p3.x,plane.p3.y,plane.p3.z,
+                    plane.texture_name,
+                    plane.u.x,plane.u.y,plane.u.z,plane.u.w,
+                    plane.v.x,plane.v.y,plane.v.z,plane.v.w,
+                    plane.rotation, plane.u_scale, plane.v_scale,
+
+                ).as_bytes())?;
+                    }
+                    file.write_all("}\n".as_bytes())?;
+                }
+            }
+
+            file.write_all("}\n".as_bytes())?;
+        }
+
+        Ok(())
     }
 }
 
@@ -351,5 +399,19 @@ a
     #[test]
     fn file_read() {
         Map::new("./test/sky_vis.map");
+    }
+
+    #[test]
+    fn file_write() {
+        let i = Map::new("./test/sky_vis.map");
+        i.write("./test/out/sky_vis_out.map").unwrap();
+    }
+
+    #[test]
+    fn file_write_read() {
+        let i = Map::new("./test/sky_vis.map");
+        let j = Map::new("./test/out/sky_vis_out.map");
+
+        assert_eq!(i, j);
     }
 }
