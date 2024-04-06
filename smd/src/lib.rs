@@ -225,6 +225,9 @@ fn between_space_and_endline<'a, T>(
     terminated(preceded(multispace0, f), multispace0)
 }
 
+// Beware of the usage. If parsing to end of file,
+// it should pair with many_till and eof
+// many_till(take_line, eof)
 fn take_line(i: &str) -> IResult<&str> {
     terminated(not_line_ending, multispace0)(i)
 }
@@ -373,6 +376,8 @@ fn parse_smd(i: &str) -> IResult<Smd> {
 
 #[cfg(test)]
 mod test {
+    use nom::{combinator::eof, multi::many_till};
+
     use super::*;
 
     #[test]
@@ -411,7 +416,7 @@ ccc
 
 /
 ";
-        let (rest, _) = many0(take_line)(i).unwrap();
+        let (rest, _) = many_till(take_line, eof)(i).unwrap();
 
         assert!(rest.is_empty());
     }
