@@ -114,6 +114,8 @@ impl Map {
             file.write_all("}\n".as_bytes())?;
         }
 
+        file.flush()?;
+
         Ok(())
     }
 }
