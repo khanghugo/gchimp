@@ -16,7 +16,7 @@ fn light_scale(map: &mut map::Map, r: f64, g: f64, b: f64, brightness: f64) {
     light_scale::light_scale(map, (r, g, b, brightness))
 }
 
-fn light_scale_int(map: &mut map::Map, r: i32, g: i32, b: i32, brightness: i32) {
+fn light_scale_int(map: &mut map::Map, r: i64, g: i64, b: i64, brightness: i64) {
     light_scale::light_scale(map, (r as f64, g as f64, b as f64, brightness as f64))
 }
 
@@ -24,7 +24,7 @@ fn light_scale_brightness(map: &mut map::Map, brightness: f64) {
     light_scale(map, 1., 1., 1., brightness);
 }
 
-fn light_scale_brightness_int(map: &mut map::Map, brightness: i32) {
+fn light_scale_brightness_int(map: &mut map::Map, brightness: i64) {
     light_scale(map, 1., 1., 1., brightness as f64);
 }
 
@@ -32,7 +32,7 @@ fn texture_scale(map: &mut map::Map, scalar: f64) {
     texture_scale::texture_scale(map, scalar);
 }
 
-fn texture_scale_int(map: &mut map::Map, scalar: i32) {
+fn texture_scale_int(map: &mut map::Map, scalar: i64) {
     texture_scale(map, scalar as f64);
 }
 
