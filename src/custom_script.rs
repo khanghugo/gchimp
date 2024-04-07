@@ -2,8 +2,40 @@ use std::{fs::OpenOptions, io::Read, path::Path};
 
 use rhai::Engine;
 
-use crate::texture_scale::texture_scale;
-use crate::{light_scale, rotate_prop_static, types::Cli};
+use crate::{light_scale, rotate_prop_static, texture_scale, types::Cli};
+
+fn rotate_prop_static_single(map: &mut map::Map) {
+    rotate_prop_static::rotate_prop_static(map, None);
+}
+
+fn rotate_prop_static(map: &mut map::Map, new: &str) {
+    rotate_prop_static::rotate_prop_static(map, Some(new));
+}
+
+fn light_scale(map: &mut map::Map, r: f64, g: f64, b: f64, brightness: f64) {
+    light_scale::light_scale(map, (r, g, b, brightness))
+}
+
+fn light_scale_int(map: &mut map::Map, r: i32, g: i32, b: i32, brightness: i32) {
+    light_scale::light_scale(map, (r as f64, g as f64, b as f64, brightness as f64))
+}
+
+fn light_scale_brightness(map: &mut map::Map, brightness: f64) {
+    light_scale(map, 1., 1., 1., brightness);
+}
+
+fn light_scale_brightness_int(map: &mut map::Map, brightness: i32) {
+    light_scale(map, 1., 1., 1., brightness as f64);
+}
+
+fn texture_scale(map: &mut map::Map, scalar: f64) {
+    texture_scale::texture_scale(map, scalar);
+}
+
+fn texture_scale_int(map: &mut map::Map, scalar: i32) {
+    texture_scale(map, scalar as f64);
+}
+
 pub struct CustomScript;
 impl Cli for CustomScript {
     fn name(&self) -> &'static str {
@@ -19,13 +51,36 @@ impl Cli for CustomScript {
             return;
         }
 
+        if args[0] == "--help" {
+            println!(
+                "\
+List of functions:
+light_scale(map, brightness)
+light_scale(map, r, g, b, brightness)
+
+rotate_prop_static(map)
+rotate_prop_static(map, new prop_static name)
+
+texture_scale(map, scalar)
+"
+            );
+        }
+
         // Rhai engine part
         let mut engine = Engine::new();
 
         engine
-            .register_fn("light_scale", light_scale::light_scale)
-            .register_fn("rotate_prop_static", rotate_prop_static::rotate_prop_static)
-            .register_fn("texture_scale", texture_scale);
+            // light_scale
+            .register_fn("light_scale", light_scale)
+            .register_fn("light_scale", light_scale_int)
+            .register_fn("light_scale", light_scale_brightness)
+            .register_fn("light_scale", light_scale_brightness_int)
+            // rotate_prop_static
+            .register_fn("rotate_prop_static", rotate_prop_static)
+            .register_fn("rotate_prop_static", rotate_prop_static_single)
+            // texture_scale
+            .register_fn("texture_scale", texture_scale)
+            .register_fn("texture_scale", texture_scale_int);
 
         // For write functions. Need to ignore Result.
         engine
@@ -75,7 +130,7 @@ impl Cli for CustomScript {
     fn cli_help(&self) {
         println!(
             "\
-Run custom script. Refer to the list of available functions in the source code to better aid yourself.
+Run custom script. Refer to the list of available functions by having `--help` instead of .rhai file name.
 
 Here is an example.
 
