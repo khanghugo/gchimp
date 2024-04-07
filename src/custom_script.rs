@@ -81,9 +81,13 @@ Here is an example.
 
 ```example.rhai
 let x = new_map(path_to_map);
-light_scale(x, (1, 1, 1, 0.5));
+light_scale(x, (1., 1., 1., 0.5));
 x.write(path_to_new_map);
 ```
+
+MAKE SURE YOU ADD `.` AT THE END OF THE NUMBER WHEN IT IS FLOAT.
+
+\"10 -> 10.\"
 
 <.rhai file>
 "
