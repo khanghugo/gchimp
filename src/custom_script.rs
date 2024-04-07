@@ -55,6 +55,9 @@ impl Cli for CustomScript {
             println!(
                 "\
 List of functions:
+
+Make sure that the type is consistent. If you have decimal then they all will have at least 1 decimal place.
+
 light_scale(map, brightness)
 light_scale(map, r, g, b, brightness)
 
@@ -62,6 +65,12 @@ rotate_prop_static(map)
 rotate_prop_static(map, new prop_static name)
 
 texture_scale(map, scalar)
+
+let x = new_map(file_name)
+x.write(file_name)
+
+new_qc(file_name) -> x.write(file_name)
+new_smd(file_name) -> x.write(file_name)
 "
             );
         }
