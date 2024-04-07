@@ -62,7 +62,6 @@ impl Cli for LightScale {
                     .map_err(|_| {
                         println!("Cannot parse scalar.");
                         self.cli_help();
-                        return;
                     })
                     .unwrap()
             })
