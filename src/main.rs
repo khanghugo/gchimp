@@ -1,8 +1,10 @@
+use custom_script::CustomScript;
 use light_scale::LightScale;
 use rotate_prop_static::RotatePropStatic;
 use texture_scale::TextureScale;
 use types::Cli;
 
+mod custom_script;
 mod light_scale;
 mod rotate_prop_static;
 mod texture_scale;
@@ -21,7 +23,7 @@ fn main() {
 }
 
 fn main_cli() {
-    let modules: &[&dyn Cli] = &[&LightScale, &RotatePropStatic, &TextureScale];
+    let modules: &[&dyn Cli] = &[&CustomScript, &LightScale, &RotatePropStatic, &TextureScale];
 
     let args: Vec<String> = std::env::args().collect();
 
