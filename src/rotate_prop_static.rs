@@ -74,3 +74,14 @@ Can optionally change prop_static to a different entity through classname
         )
     }
 }
+
+pub trait RotatePropStaticImpl {
+    fn rotate_prop_static(&mut self, rename: Option<&str>) -> &mut Self;
+}
+
+impl RotatePropStaticImpl for Map {
+    fn rotate_prop_static(&mut self, rename: Option<&str>) -> &mut Self {
+        rotate_prop_static(self, rename);
+        self
+    }
+}

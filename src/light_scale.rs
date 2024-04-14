@@ -86,3 +86,14 @@ Multiplying every number in _light field with given scalars
         )
     }
 }
+
+pub trait LightScaleImpl {
+    fn light_scale(&mut self, scalar: (f64, f64, f64, f64)) -> &mut Self;
+}
+
+impl LightScaleImpl for Map {
+    fn light_scale(&mut self, scalar: (f64, f64, f64, f64)) -> &mut Self {
+        light_scale(self, scalar);
+        self
+    }
+}

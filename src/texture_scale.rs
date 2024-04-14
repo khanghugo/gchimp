@@ -71,3 +71,14 @@ Texture scale
         )
     }
 }
+
+pub trait TextureScaleImpl {
+    fn texture_scale(&mut self, scalar: f64) -> &mut Self;
+}
+
+impl TextureScaleImpl for Map {
+    fn texture_scale(&mut self, scalar: f64) -> &mut Self {
+        texture_scale(self, scalar);
+        self
+    }
+}
