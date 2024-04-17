@@ -1,55 +1,68 @@
-use custom_script::CustomScript;
-use light_scale::LightScale;
-use rotate_prop_static::RotatePropStatic;
-use texture_scale::TextureScale;
-use types::Cli;
+mod cli;
+mod modules;
 
-mod custom_script;
-mod light_scale;
-mod rotate_prop_static;
-mod texture_scale;
+// #![allow(non_snake_case)]
 
-mod types;
+use dioxus::prelude::*;
+use log::LevelFilter;
+
+#[derive(Clone, Routable, Debug, PartialEq)]
+enum Route {
+    #[route("/")]
+    Home {},
+    #[route("/blog/:id")]
+    Blog { id: i32 },
+}
 
 fn main() {
-    main_cli();
+    // Init debug
+    dioxus_logger::init(LevelFilter::Info).expect("failed to init logger");
 
-    // let mut map = Map::new("./examples/surf_raphaello.map");
-    // texture_scale::texture_scale(&mut map, 16.);
-    // rotate_prop_static::rotate_prop_static(&mut map, Some("remec_lit_model"));
-    // light_scale::light_scale(&mut map, (1., 1., 1., 0.25));
-
-    // map.write("./examples/out.map").unwrap();
+    dioxus::launch(App);
 }
 
-fn main_cli() {
-    let modules: &[&dyn Cli] = &[&CustomScript, &LightScale, &RotatePropStatic, &TextureScale];
-
-    let args: Vec<String> = std::env::args().collect();
-
-    let help = || {
-        println!(
-            "\
-map2prop-rs
-
-Available modules:"
-        );
-        for module in modules {
-            println!("{}", module.name());
-        }
-    };
-
-    if args.len() < 2 {
-        help();
-        return;
+#[component]
+fn App() -> Element {
+    rsx! {
+        Router::<Route> {}
     }
-
-    for module in modules {
-        if args[1] == module.name() {
-            module.cli();
-            return;
-        }
-    }
-
-    help();
 }
+
+#[component]
+fn Blog(id: i32) -> Element {
+    rsx! {
+        Link { to: Route::Home {}, "Go to counter" }
+        "Blog post {id}"
+    }
+}
+
+#[component]
+fn Home() -> Element {
+    let mut count = use_signal(|| 0);
+
+    rsx! {
+        Link {
+            to: Route::Blog {
+                id: count()
+            },
+            "Go to blog"
+        }
+        div {
+            h1 { "High-Five counter: {count}" }
+            button { onclick: move |_| count += 1, "Up high!" }
+            button { onclick: move |_| count -= 1, "Down low!" }
+        }
+    }
+}
+
+// fn main() {
+//     // main_cli();
+
+//     let mut map = map::Map::new("./examples/surf_raphaello.map");
+//     map.light_scale((1., 1., 1., 1.));
+//     // texture_scale::texture_scale(&mut map, 16.);
+//     // rotate_prop_static::rotate_prop_static(&mut map, Some("remec_lit_model"));
+//     // light_scale::light_scale(&mut map, (1., 1., 1., 0.25));
+
+//     // map.write("./examples/out.map").unwrap();
+// }

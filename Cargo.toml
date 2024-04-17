@@ -14,5 +14,11 @@ rayon = "1.10.0"
 rhai = "1.17.1"
 smd = { path = "smd" }
 
+dioxus = { version = "0.5", features = ["desktop", "router"] }
+
+# Debug
+log = "0.4.19"
+dioxus-logger = "0.4.1"
+
 [workspace]
 members = [".", "map", "smd", "qc" ]
