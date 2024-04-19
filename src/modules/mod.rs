@@ -1,3 +1,4 @@
+pub mod duplicate_triangle;
 pub mod light_scale;
 pub mod rotate_prop_static;
 pub mod texture_scale;
@@ -54,7 +55,13 @@ pub fn custom_script(rhai_file: &Path) {
         .register_fn("rotate_prop_static", rotate_prop_static_single)
         // texture_scale
         .register_fn("texture_scale", texture_scale)
-        .register_fn("texture_scale", texture_scale_int);
+        .register_fn("texture_scale", texture_scale_int)
+        // duplicate_triangle
+        .register_fn("duplicate_triangle", duplicate_triangle::duplicate_triangle)
+        .register_fn(
+            "mass_duplicate_triangle",
+            duplicate_triangle::mass_duplicate_triangle,
+        );
 
     // For write functions. Need to ignore Result.
     engine
@@ -76,7 +83,8 @@ pub fn custom_script(rhai_file: &Path) {
         .register_fn("new_smd", smd::Smd::new)
         .register_fn("write", |smd, out| {
             let _ = smd::Smd::write(smd, out);
-        });
+        })
+        .register_fn("duplicate_triangle", duplicate_triangle::duplicate_triangle);
 
     let file = OpenOptions::new().read(true).open(rhai_file);
 
