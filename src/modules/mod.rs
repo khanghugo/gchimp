@@ -69,7 +69,10 @@ pub fn custom_script(rhai_file: &Path) {
         .register_fn("new_map", |file_name| map::Map::new(file_name).unwrap())
         .register_fn("write", |map, out| {
             let _ = map::Map::write(map, out);
-        });
+        })
+        .register_fn("light_scale", light_scale::light_scale)
+        .register_fn("sexture_scale", texture_scale::texture_scale)
+        .register_fn("rotate_prop_static", rotate_prop_static::rotate_prop_static);
 
     engine
         .register_type_with_name::<qc::Qc>("Qc")
