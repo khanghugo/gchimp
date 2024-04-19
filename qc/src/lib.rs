@@ -18,6 +18,8 @@ use nom::{
 type IResult<'a, T> = _IResult<&'a str, T>;
 type CResult<'a> = IResult<'a, QcCommand>;
 
+use eyre::eyre;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Body {
     pub name: String,
@@ -234,16 +236,13 @@ pub struct Qc {
 }
 
 impl Qc {
-    pub fn new(file_name: &str) -> Self {
+    pub fn new(file_name: &str) -> eyre::Result<Self> {
         let path = Path::new(file_name);
+        let file = std::fs::read_to_string(path)?;
 
-        if let Ok(file) = std::fs::read_to_string(path) {
-            match parse_qc(&file) {
-                Ok((_, res)) => res,
-                Err(err) => panic!("Cannot read file. {}", err),
-            }
-        } else {
-            panic!("Cannot open file.")
+        match parse_qc(&file) {
+            Ok((_, res)) => Ok(res),
+            Err(_) => Err(eyre!("Cannot read file `{}`", file_name)),
         }
     }
 
@@ -274,9 +273,9 @@ fn _number(i: &str) -> IResult<i32> {
     })(i)
 }
 
-fn number(i: &str) -> IResult<i32> {
-    preceded(space0, _number)(i)
-}
+// fn number(i: &str) -> IResult<i32> {
+//     preceded(space0, _number)(i)
+// }
 
 fn signed_double(i: &str) -> IResult<f64> {
     map(recognize(preceded(opt(tag("-")), _double)), |what: &str| {
@@ -765,15 +764,22 @@ $texrendermode \"mefl2_02_dark.bmp\" flatshade
 
     #[test]
     fn read_goldsrc() {
-        Qc::new("./test/s1_r012-goldsrc.qc");
+        assert!(Qc::new("./test/s1_r012-goldsrc.qc").is_ok());
     }
 
     // TODO: test source file
 
     #[test]
     fn write_goldsrc() {
-        let file = Qc::new("./test/s1_r012-goldsrc.qc");
+        let file = Qc::new("./test/s1_r012-goldsrc.qc").unwrap();
 
         file.write("./test/out/s1_r012-goldsrc_out.qc").unwrap();
+    }
+
+    #[test]
+    fn fail_read() {
+        let file = Qc::new("./dunkin/do.nut");
+
+        assert!(file.is_err());
     }
 }

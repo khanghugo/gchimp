@@ -16,6 +16,8 @@ use nom::{
     IResult as _IResult,
 };
 
+use eyre::eyre;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct BrushPlane {
     pub p1: DVec3,
@@ -53,16 +55,13 @@ pub struct Map {
 }
 
 impl Map {
-    pub fn new(map_file: &str) -> Self {
-        let path = Path::new(map_file);
+    pub fn new(file_name: &str) -> eyre::Result<Self> {
+        let path = Path::new(file_name);
+        let file = std::fs::read_to_string(path)?;
 
-        if let Ok(file) = std::fs::read_to_string(path) {
-            match parse_map(&file) {
-                Ok((_, res)) => res,
-                Err(err) => panic!("Cannot read file. {}", err),
-            }
-        } else {
-            panic!("Cannot open file.")
+        match parse_map(&file) {
+            Ok((_, res)) => Ok(res),
+            Err(_) => Err(eyre!("Cannot read file `{}`", file_name)),
         }
     }
 
@@ -423,20 +422,24 @@ a
 
     #[test]
     fn file_read() {
-        Map::new("./test/sky_vis.map");
-    }
-
-    #[test]
-    fn file_write() {
-        let i = Map::new("./test/sky_vis.map");
-        i.write("./test/out/sky_vis_out.map").unwrap();
+        assert!(Map::new("./test/sky_vis.map").is_ok());
     }
 
     #[test]
     fn file_write_read() {
-        let i = Map::new("./test/sky_vis.map");
-        let j = Map::new("./test/out/sky_vis_out.map");
+        let i = Map::new("./test/sky_vis.map").unwrap();
+        i.write("./test/out/sky_vis_out.map").unwrap();
+
+        let i = Map::new("./test/sky_vis.map").unwrap();
+        let j = Map::new("./test/out/sky_vis_out.map").unwrap();
 
         assert_eq!(i, j);
+    }
+
+    #[test]
+    fn fail_read() {
+        let file = Map::new("./dunkin/do.nut");
+
+        assert!(file.is_err());
     }
 }

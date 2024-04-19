@@ -76,7 +76,7 @@ impl Cli for LightScale {
             })
             .collect();
 
-        let mut map = Map::new(&args[0]);
+        let mut map = Map::new(&args[0]).unwrap();
 
         light_scale(&mut map, (scalars[0], scalars[1], scalars[2], scalars[3]));
 
@@ -111,7 +111,7 @@ impl Cli for RotatePropStatic {
             return;
         }
 
-        let mut map = Map::new(&args[0]);
+        let mut map = Map::new(&args[0]).unwrap();
 
         rotate_prop_static(&mut map, if args.len() > 2 { Some(&args[2]) } else { None });
 
@@ -153,7 +153,7 @@ impl Cli for TextureScale {
             return;
         }
 
-        let mut map = Map::new(&args[0]);
+        let mut map = Map::new(&args[0]).unwrap();
 
         texture_scale(&mut map, scalar.unwrap());
 

@@ -14,6 +14,8 @@ use nom::{
 };
 type IResult<'a, T> = _IResult<&'a str, T>;
 
+use eyre::eyre;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     pub id: i32,
@@ -87,16 +89,13 @@ macro_rules! write_dvec {
 }
 
 impl Smd {
-    pub fn new(file_name: &str) -> Self {
+    pub fn new(file_name: &str) -> eyre::Result<Self> {
         let path = Path::new(file_name);
+        let file = std::fs::read_to_string(path)?;
 
-        if let Ok(file) = std::fs::read_to_string(path) {
-            match parse_smd(&file) {
-                Ok((_, res)) => res,
-                Err(err) => panic!("Cannot read file. {}", err),
-            }
-        } else {
-            panic!("Cannot open file.")
+        match parse_smd(&file) {
+            Ok((_, res)) => Ok(res),
+            Err(_) => Err(eyre!("Cannot read file `{}`", file_name)),
         }
     }
 
@@ -611,42 +610,43 @@ end
 
     #[test]
     fn source_file_read() {
-        Smd::new("./test/s1_r05_ref.smd");
+        assert!(Smd::new("./test/s1_r05_ref.smd").is_ok());
     }
 
     #[test]
     fn goldsrc_file_read() {
-        Smd::new("./test/cyberwave_goldsrc.smd");
+        assert!(Smd::new("./test/cyberwave_goldsrc.smd").is_ok());
     }
 
     #[test]
     fn goldsrc_file_read_write() {
-        let file = Smd::new("./test/cyberwave_goldsrc.smd");
+        let file = Smd::new("./test/cyberwave_goldsrc.smd").unwrap();
 
         file.write("./test/out/cyberwave_goldsrc_read_write.smd")
             .unwrap();
-    }
 
-    #[test]
-    fn source_file_read_write() {
-        let file = Smd::new("./test/s1_r05_ref.smd");
-
-        file.write("./test/out/s1_r05_ref_read_write.smd").unwrap();
-    }
-
-    #[test]
-    fn goldsrc_file_read_write_read() {
-        let file = Smd::new("./test/cyberwave_goldsrc.smd");
-        let file2 = Smd::new("./test/out/cyberwave_goldsrc_read_write.smd");
+        let file = Smd::new("./test/cyberwave_goldsrc.smd").unwrap();
+        let file2 = Smd::new("./test/out/cyberwave_goldsrc_read_write.smd").unwrap();
 
         assert_eq!(file, file2);
     }
 
     #[test]
     fn source_file_read_write_read() {
-        let file = Smd::new("./test/s1_r05_ref.smd");
-        let file2 = Smd::new("./test/out/s1_r05_ref_read_write.smd");
+        let file = Smd::new("./test/s1_r05_ref.smd").unwrap();
+
+        file.write("./test/out/s1_r05_ref_read_write.smd").unwrap();
+
+        let file = Smd::new("./test/s1_r05_ref.smd").unwrap();
+        let file2 = Smd::new("./test/out/s1_r05_ref_read_write.smd").unwrap();
 
         assert_eq!(file, file2);
+    }
+
+    #[test]
+    fn fail_read() {
+        let file = Smd::new("./dunkin/do.nut");
+
+        assert!(file.is_err());
     }
 }
