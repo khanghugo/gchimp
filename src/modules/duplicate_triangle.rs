@@ -14,7 +14,7 @@ pub fn duplicate_triangle(smd: &mut Smd, texture: &str, new_texture: &str) {
         // material might have .BMP at the end
         let mat = Path::new(&tri.material);
 
-        if mat.file_stem().unwrap().to_str().unwrap().to_owned() == texture {
+        if mat.file_stem().unwrap().to_str().unwrap() == texture {
             let mut our_tri = tri.clone();
 
             // strip .BMP just in case people forgot
@@ -44,9 +44,10 @@ pub fn mass_duplicate_triangle(folder: &str, texture: &str, new_texture: &str) {
     });
 
     smd_paths.for_each(|path| {
-        let mut smd = smd::Smd::new(path.to_str().unwrap());
-        smd.duplicate_triangle(texture, new_texture);
-        let _ = smd.write(path.to_str().unwrap());
+        if let Ok(mut smd) = smd::Smd::new(path.to_str().unwrap()) {
+            smd.duplicate_triangle(texture, new_texture);
+            let _ = smd.write(path.to_str().unwrap());
+        }
     });
 }
 
