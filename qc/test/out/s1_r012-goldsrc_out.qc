@@ -1,6 +1,6 @@
-$modelname /home/khang/map_compiler/model_tools/S2GConverter/test/s1_r012-goldsrc.mdl
-$cd .
-$cdtexture .
+$modelname "/home/khang/map_compiler/model_tools/S2GConverter/test/s1_r012-goldsrc.mdl"
+$cd "."
+$cdtexture "."
 $scale 1
 $texrendermode metal_light_01_dark.bmp fullbright
 $texrendermode metal_light_01_dark.bmp flatshade

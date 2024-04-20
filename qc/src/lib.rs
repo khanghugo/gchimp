@@ -5,9 +5,10 @@ use std::path::Path;
 use bitflags::bitflags;
 use glam::DVec3;
 use nom::branch::alt;
-use nom::bytes::complete::take_till;
+use nom::bytes::complete::{take, take_till};
 use nom::character::complete::{digit1, multispace0, space0};
-use nom::combinator::{all_consuming, map, map_res, opt, recognize};
+use nom::combinator::{all_consuming, fail, map, map_parser, map_res, opt, recognize};
+use nom::error::context;
 use nom::multi::many0;
 use nom::sequence::{delimited, terminated, tuple};
 use nom::{
@@ -17,6 +18,7 @@ use nom::{
 
 type IResult<'a, T> = _IResult<&'a str, T>;
 type CResult<'a> = IResult<'a, QcCommand>;
+type SResult<'a> = IResult<'a, SequenceOption>;
 
 use eyre::eyre;
 
@@ -37,13 +39,41 @@ pub struct TextureRenderMode {
     pub render: RenderMode,
 }
 
-// Note to self: add new variants to [`parse_rendermode`]
 #[derive(Debug, Clone, PartialEq)]
 pub enum RenderMode {
     Masked,
     Additive,
     FlatShade,
     FullBright,
+    Chrome,
+}
+
+impl RenderMode {
+    fn from(i: &str) -> Self {
+        match i {
+            "masked" => Self::Masked,
+            "additive" => Self::Additive,
+            "flatshade" => Self::FlatShade,
+            "fullbright" => Self::FullBright,
+            "chrome" => Self::Chrome,
+            _ => unreachable!(
+                "\
+Invalid string for conversion to RenderMode `{}`
+Check your QC file to make sure $texrendermode is correct.",
+                i
+            ),
+        }
+    }
+
+    fn to_string(self) -> String {
+        match self {
+            Self::Masked => "masked".to_string(),
+            Self::Additive => "additive".to_string(),
+            Self::FlatShade => "flatshade".to_string(),
+            Self::FullBright => "fullbright".to_string(),
+            Self::Chrome => "chrome".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -124,12 +154,16 @@ pub struct Controller {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sequence {
     pub name: String,
-    pub mode: SequenceMode,
+    pub skeletal: String,
+    pub options: Vec<SequenceOption>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum SequenceSimpleOption {
-    Frame(i32, i32),
+pub enum SequenceOption {
+    Frame {
+        start: i32,
+        end: i32,
+    },
     Origin(DVec3),
     Angles(DVec3),
     Rotate(f64),
@@ -139,8 +173,15 @@ pub enum SequenceSimpleOption {
     Hidden,
     NoAnimation,
     Fps(f64),
-    MotionExtractAxis(String),
-    Activity(String, f64),
+    MotionExtractAxis {
+        motion: String,
+        endframe: Option<i32>,
+        axis: String,
+    },
+    Activity {
+        name: String,
+        weight: f64,
+    },
     AutoPlay,
     AddLayer(String),
     BlendLayer(SequenceOptionBlendLayer),
@@ -273,9 +314,9 @@ fn _number(i: &str) -> IResult<i32> {
     })(i)
 }
 
-// fn number(i: &str) -> IResult<i32> {
-//     preceded(space0, _number)(i)
-// }
+fn number(i: &str) -> IResult<i32> {
+    preceded(space0, _number)(i)
+}
 
 fn signed_double(i: &str) -> IResult<f64> {
     map(recognize(preceded(opt(tag("-")), _double)), |what: &str| {
@@ -288,7 +329,7 @@ pub fn double(i: &str) -> IResult<f64> {
 }
 
 fn quoted_text(i: &str) -> IResult<&str> {
-    terminated(preceded(tag("\""), take_till(|c| c == '"')), tag("\""))(i)
+    terminated(preceded(tag("\""), take_till(|c| c == '\"')), tag("\""))(i)
 }
 
 fn dvec3(i: &str) -> IResult<DVec3> {
@@ -298,8 +339,15 @@ fn dvec3(i: &str) -> IResult<DVec3> {
 }
 
 // Do not consume space at the end because we don't know if we are at the end of line or not.
+// This is pretty dangerous and it might take braces or any kind of arbitrary delimiter.
 fn between_space(i: &str) -> IResult<&str> {
-    take_till(|c| c == ' ' || c == '\n')(i)
+    let (i, res) = take_till(|c| c == ' ' || c == '\n' || c == '\r')(i)?;
+
+    if res.is_empty() {
+        Ok(fail(i)?)
+    } else {
+        Ok((i, res))
+    }
 }
 
 // Filee name may or may not have quotation mark.
@@ -309,13 +357,27 @@ fn name_string(i: &str) -> IResult<&str> {
 
 fn discard_comment_line(i: &str) -> IResult<&str> {
     terminated(
-        preceded(tuple((space0, tag("//"))), take_till(|c| c == '\n')),
+        preceded(tuple((multispace0, tag("//"))), take_till(|c| c == '\n')),
         multispace0,
     )(i)
 }
 
 fn discard_comment_lines(i: &str) -> IResult<&str> {
     map(many0(discard_comment_line), |_| "")(i)
+}
+
+fn between_braces<'a, T>(
+    f: impl FnMut(&'a str) -> IResult<T>,
+) -> impl FnMut(&'a str) -> IResult<'a, T> {
+    // Look ahead approach to avoid using name_string / between_space
+    // between_space is very bad for things like this.
+    map_parser(
+        preceded(
+            tuple((multispace0, tag("{"), multispace0)),
+            terminated(take_till(|c| c == '}'), tuple((tag("}"), multispace0))),
+        ),
+        f,
+    )
 }
 
 // Main commands
@@ -335,17 +397,17 @@ fn qc_command<'a, T>(
 }
 
 fn parse_modelname(i: &str) -> CResult {
-    qc_command("$modelname", quoted_text, |modelname| {
+    qc_command("$modelname", name_string, |modelname| {
         QcCommand::ModelName(modelname.to_string())
     })(i)
 }
 
 fn parse_cd(i: &str) -> CResult {
-    qc_command("$cd", quoted_text, |cd| QcCommand::Cd(cd.to_string()))(i)
+    qc_command("$cd", name_string, |cd| QcCommand::Cd(cd.to_string()))(i)
 }
 
 fn parse_cd_texture(i: &str) -> CResult {
-    qc_command("$cdtexture", quoted_text, |cd_texture| {
+    qc_command("$cdtexture", name_string, |cd_texture| {
         QcCommand::CdTexture(cd_texture.to_string())
     })(i)
 }
@@ -354,23 +416,14 @@ fn parse_scale(i: &str) -> CResult {
     qc_command("$scale", double, QcCommand::Scale)(i)
 }
 
-fn parse_rendermode(i: &str) -> IResult<RenderMode> {
-    alt((
-        map(tag("masked"), |_| RenderMode::Masked),
-        map(tag("additive"), |_| RenderMode::Additive),
-        map(tag("flatshade"), |_| RenderMode::FlatShade),
-        map(tag("fullbright"), |_| RenderMode::FullBright),
-    ))(i)
-}
-
 fn parse_texrendermode(i: &str) -> CResult {
     qc_command(
         "$texrendermode",
-        tuple((quoted_text, preceded(space0, parse_rendermode))),
+        tuple((name_string, preceded(space0, between_space))),
         |(texture, render)| {
             QcCommand::TextureRenderMode(TextureRenderMode {
                 texture: texture.to_string(),
-                render,
+                render: RenderMode::from(render),
             })
         },
     )(i)
@@ -388,28 +441,62 @@ fn parse_bbox(i: &str) -> CResult {
     })(i)
 }
 
-fn parse_body(i: &str) -> CResult {
-    qc_command(
-        "$body",
+fn body(i: &str) -> IResult<Body> {
+    map(
         tuple((
-            quoted_text,
-            preceded(space0, quoted_text),
+            name_string,
+            preceded(space0, name_string),
             opt(preceded(space0, tag("reverse"))),
             opt(preceded(space0, double)),
         )),
-        |(name, mesh, reverse, scale)| {
-            QcCommand::Body(Body {
-                name: name.to_string(),
-                mesh: mesh.to_string(),
-                reverse: reverse.is_some(),
-                scale,
-            })
+        |(name, mesh, reverse, scale)| Body {
+            name: name.to_string(),
+            mesh: mesh.to_string(),
+            reverse: reverse.is_some(),
+            scale,
         },
     )(i)
 }
 
+fn parse_body(i: &str) -> CResult {
+    qc_command("$body", body, |body| QcCommand::Body(body))(i)
+}
+
 // TODO parse all of the options just in case
-// fn parse_sequence_options
+fn parse_sequence_option(i: &str) -> SResult {
+    context(
+        format!("Parse command not supported yet {}", i).leak(),
+        alt((
+            map(preceded(tag("fps"), double), |fps| SequenceOption::Fps(fps)),
+            map(
+                preceded(tag("frame"), tuple((number, number))),
+                |(start, end)| SequenceOption::Frame { start, end },
+            ),
+            map(preceded(tag("origin"), dvec3), |what| {
+                SequenceOption::Origin(what)
+            }),
+            map(preceded(tag("angles"), dvec3), |what| {
+                SequenceOption::Angles(what)
+            }),
+            map(preceded(tag("rotate"), double), |what| {
+                SequenceOption::Rotate(what)
+            }),
+            map(tag("reverse"), |_| SequenceOption::Reverse),
+            map(tag("loop"), |_| SequenceOption::Loop),
+            map(tag("hidden"), |_| SequenceOption::Hidden),
+            map(tag("noanimation"), |_| SequenceOption::NoAnimation),
+            // This should be last because it will match anything.
+            map(
+                tuple((name_string, opt(number), preceded(space0, between_space))),
+                |(motion, endframe, axis)| SequenceOption::MotionExtractAxis {
+                    motion: motion.to_string(),
+                    endframe,
+                    axis: axis.to_string(),
+                },
+            ),
+        )),
+    )(i)
+}
 
 // TODO: make it works like how studiomdl works (very complicated)
 fn parse_sequence(i: &str) -> CResult {
@@ -419,19 +506,23 @@ fn parse_sequence(i: &str) -> CResult {
     // They might or might not have quotation mark. Very great.
     let (i, name) = terminated(name_string, multispace0)(i)?;
 
-    println!("name is {}", name);
-
     // Now check if we have brackets because it is very problematic.
     let (i, is_bracket) = map(opt(tag("{")), |s| s.is_some())(i)?;
 
-    println!("is bracket {}", is_bracket);
-
     // If not is simple, it means the next one will definitely be the smd file.
+    // For now smd is synonymous with the skeletal
+    // It could be another linked animation
     // TODO: care about more things
-    let (i, smd) = if !is_bracket {
-        terminated(name_string, space0)(i)?
-    } else {
+    let (i, smd) = if is_bracket {
         unimplemented!("For possible S2GConverter rewrite");
+    } else {
+        terminated(name_string, space0)(i)?
+    };
+
+    let (i, options) = if is_bracket {
+        unimplemented!("For possible S2GConverter rewrite");
+    } else {
+        delimited(space0, many0(preceded(space0, parse_sequence_option)), multispace0)(i)?
     };
 
     // Consume all end lines to be paritiy with the other commands
@@ -441,27 +532,62 @@ fn parse_sequence(i: &str) -> CResult {
         i,
         QcCommand::Sequence(Sequence {
             name: name.to_string(),
-            mode: SequenceMode::Immedidate(SequenceImmediate {
-                smd: smd.to_string(),
-                rest: "".to_string(),
-            }),
+            skeletal: smd.to_string(),
+            options,
         }),
     ))
 }
 
+fn parse_clip_to_textures(i: &str) -> CResult {
+    qc_command("$cliptotextures", take(0usize), |_| {
+        QcCommand::ClipToTextures
+    })(i)
+}
+
+fn parse_eye_position(i: &str) -> CResult {
+    qc_command("$eyeposition", dvec3, |pos| QcCommand::EyePosition(pos))(i)
+}
+
+fn parse_bodygroup(i: &str) -> CResult {
+    qc_command(
+        "$bodygroup",
+        tuple((
+            name_string,
+            between_braces(many0(delimited(multispace0, body, multispace0))),
+        )),
+        |(name, bodies)| {
+            QcCommand::BodyGroup(BodyGroup {
+                name: name.to_string(),
+                bodies,
+            })
+        },
+    )(i)
+}
+
 // Main functions
 fn parse_qc_command(i: &str) -> CResult {
-    alt((
-        parse_bbox,
-        parse_body,
-        parse_cbox,
-        parse_cd,
-        parse_cd_texture,
-        parse_modelname,
-        parse_scale,
-        parse_sequence,
-        parse_texrendermode,
-    ))(i)
+    context(
+        format!("Parse command not supported yet {}", i).leak(),
+        alt((
+            // For commands with similar name
+            // Either put the longer command first,
+            // or have the tag taking the trailing space.
+            // Otherwise, it would always fail.
+            // I learnt it the hard way.
+            parse_bodygroup,
+            parse_bbox,
+            parse_cbox,
+            parse_cd_texture,
+            parse_cd,
+            parse_modelname,
+            parse_scale,
+            parse_sequence,
+            parse_texrendermode,
+            parse_clip_to_textures,
+            parse_eye_position,
+            parse_body,
+        )),
+    )(i)
 }
 
 fn parse_qc_commands(i: &str) -> IResult<Vec<QcCommand>> {
@@ -479,8 +605,8 @@ fn parse_qc(i: &str) -> IResult<Qc> {
 // Remember to add new line
 // Without quotation mark works just fine.
 fn write_qc_command(i: QcCommand) -> Vec<u8> {
-    match i {
-        QcCommand::ModelName(x) => format!("$modelname {}\n", x).into_bytes(),
+    (match i {
+        QcCommand::ModelName(x) => format!("$modelname \"{}\"\n", x),
         QcCommand::Body(Body {
             name,
             mesh,
@@ -496,24 +622,15 @@ fn write_qc_command(i: QcCommand) -> Vec<u8> {
             } else {
                 "".to_string()
             }
-        )
-        .into_bytes(),
-        QcCommand::Cd(x) => format!("$cd {}\n", x).into_bytes(),
-        QcCommand::CdTexture(x) => format!("$cdtexture {}\n", x).into_bytes(),
-        QcCommand::ClipToTextures => "$cliptotexture \n".to_string().into_bytes(),
-        QcCommand::Scale(x) => format!("$scale {}\n", x).into_bytes(),
-        QcCommand::TextureRenderMode(TextureRenderMode { texture, render }) => format!(
-            "$texrendermode {} {}\n",
-            texture,
-            match render {
-                RenderMode::Masked => "masked",
-                RenderMode::Additive => "additive",
-                RenderMode::FlatShade => "flatshade",
-                RenderMode::FullBright => "fullbright",
-            }
-        )
-        .into_bytes(),
-        QcCommand::Gamma(x) => format!("$gamma {}\n", x).into_bytes(),
+        ),
+        QcCommand::Cd(x) => format!("$cd \"{}\"\n", x),
+        QcCommand::CdTexture(x) => format!("$cdtexture \"{}\"\n", x),
+        QcCommand::ClipToTextures => "$cliptotextures \n".to_string(),
+        QcCommand::Scale(x) => format!("$scale {}\n", x),
+        QcCommand::TextureRenderMode(TextureRenderMode { texture, render }) => {
+            format!("$texrendermode {} {}\n", texture, render.to_string(),)
+        }
+        QcCommand::Gamma(x) => format!("$gamma {}\n", x),
         QcCommand::Origin(Origin { origin, rotation }) => format!(
             "$origin {} {} {} {}\n",
             origin.x,
@@ -524,19 +641,16 @@ fn write_qc_command(i: QcCommand) -> Vec<u8> {
             } else {
                 "".to_string()
             }
-        )
-        .into_bytes(),
+        ),
         QcCommand::BBox(BBox { mins, maxs }) => format!(
             "$bbox {} {} {} {} {} {}\n",
             mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
-        )
-        .into_bytes(),
+        ),
         QcCommand::CBox(BBox { mins, maxs }) => format!(
             "$cbox {} {} {} {} {} {}\n",
             mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
-        )
-        .into_bytes(),
-        QcCommand::Flags(Flags(x)) => format!("$flags {}\n", x).into_bytes(),
+        ),
+        QcCommand::Flags(Flags(x)) => format!("$flags {}\n", x),
         QcCommand::HBox(HBox {
             group,
             bone_name,
@@ -545,22 +659,93 @@ fn write_qc_command(i: QcCommand) -> Vec<u8> {
         }) => format!(
             "$hbox {} {} {} {} {} {} {} {}\n",
             group, bone_name, mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
-        )
-        .into_bytes(),
-        QcCommand::Sequence(Sequence { name, mode }) => {
+        ),
+        QcCommand::Sequence(Sequence {
+            name,
+            skeletal,
+            options,
+        }) => {
             let mut res = format!("$sequence {} ", name);
 
-            match mode {
-                SequenceMode::Immedidate(SequenceImmediate { smd, rest }) => {
-                    res += format!("{} {}\n", smd, rest).as_str()
-                }
-                SequenceMode::Intermediate(_) => todo!(),
+            res += format!("{} ", skeletal).as_str();
+
+            // For a very lazy reason, everything is INLINE
+            // TODO maybe don't do inline to make it look prettier
+            for option in options {
+                // No need to add space. Will add space after this
+                res += (match option {
+                    SequenceOption::Frame { start, end } => format!("frame {} {}", start, end),
+                    SequenceOption::Origin(_) => todo!(),
+                    SequenceOption::Angles(_) => todo!(),
+                    SequenceOption::Rotate(_) => todo!(),
+                    SequenceOption::Scale(scale) => format!("scale {}", scale),
+                    SequenceOption::Reverse => format!("reverse "),
+                    SequenceOption::Loop => format!("loop"),
+                    SequenceOption::Hidden => format!("hidden"),
+                    SequenceOption::NoAnimation => format!("noanimation"),
+                    SequenceOption::Fps(fps) => format!("fps {}", fps),
+                    SequenceOption::MotionExtractAxis {
+                        motion,
+                        endframe,
+                        axis,
+                    } => format!(
+                        "{} {} {}",
+                        motion,
+                        endframe.map(|x| x.to_string()).unwrap_or("".to_string()),
+                        axis
+                    ),
+                    SequenceOption::Activity { name, weight } => {
+                        format!("activity {} {}", name, weight)
+                    }
+                    SequenceOption::AutoPlay => format!("autoplay"),
+                    SequenceOption::AddLayer(_) => todo!(),
+                    SequenceOption::BlendLayer(_) => todo!(),
+                    SequenceOption::WorldSpace => format!("worldspace"),
+                    SequenceOption::WorldBlendSpace => format!("worldspaceblend"),
+                    SequenceOption::Snap => format!("snap"),
+                    SequenceOption::RealTime => format!("realtime"),
+                    SequenceOption::FadeIn(_) => todo!(),
+                    SequenceOption::FadeOut(_) => todo!(),
+                    SequenceOption::WeightList(_) => todo!(),
+                    SequenceOption::WorldRelative => todo!(),
+                    SequenceOption::LocalHierarchy(_) => todo!(),
+                    SequenceOption::Compress(_) => todo!(),
+                    SequenceOption::PoseCycle(_) => todo!(),
+                    SequenceOption::NumFrames(_) => todo!(),
+                })
+                .as_str();
+
+                // Add space at the end for each.
+                res += " ";
             }
 
-            res.into_bytes()
+            res += "\n";
+            res
         }
-        _ => unimplemented!("Currently not supported. Too much work. Go ask me. I will do it."),
-    }
+        QcCommand::EyePosition(what) => format!("$eyeposition {} {} {}\n", what.x, what.y, what.z),
+        QcCommand::BodyGroup(BodyGroup { name, bodies }) => {
+            let mut res = format!("$bodygroup {} {{\n", name);
+
+            for body in bodies {
+                res += format!(
+                    "{} {} {} {}\n",
+                    body.name,
+                    body.mesh,
+                    if body.reverse { "reverse" } else { "" },
+                    body.scale.map(|x| x.to_string()).unwrap_or("".to_string())
+                )
+                .as_str();
+            }
+
+            res += "}\n";
+            res
+        }
+        _ => unimplemented!(
+            "Write command `{:?}` not implemented. Go ask me. I will do it.",
+            i
+        ),
+    })
+    .into_bytes()
 }
 
 #[cfg(test)]
@@ -583,6 +768,57 @@ mod test {
 
         assert!(rest.is_empty());
         assert_eq!(s, "what");
+    }
+
+    #[test]
+    fn between_space_parse() {
+        let i = "\
+what
+";
+        let (rest, s) = between_space(i).unwrap();
+
+        assert_eq!(rest, "\n");
+        assert_eq!(s, "what");
+    }
+
+    #[test]
+    fn between_braces_parse1() {
+        let i = "\
+{
+abc
+}";
+        let (rest, a) = between_braces(tag("abc"))(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert_eq!(a, "abc");
+    }
+
+    #[test]
+    fn between_braces_parse2() {
+        let i = "{
+    abc
+}";
+        let (rest, a) = between_braces(tag("abc"))(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert_eq!(a, "abc");
+    }
+
+    #[test]
+    fn between_braces_parse3() {
+        let i = "{
+    abc
+    123
+    321
+}";
+        let (rest, a) =
+            between_braces(many0(delimited(multispace0, name_string, multispace0)))(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert_eq!(a.len(), 3);
+        assert_eq!(a[0], "abc");
+        assert_eq!(a[1], "123");
+        assert_eq!(a[2], "321");
     }
 
     #[test]
@@ -679,12 +915,39 @@ mod test {
 
         if let QcCommand::Sequence(Sequence {
             name,
-            mode: SequenceMode::Immedidate(SequenceImmediate { smd, rest }),
+            skeletal,
+            options,
         }) = sequence
         {
             assert_eq!(name, "idle");
-            assert_eq!(smd, "idle");
+            assert_eq!(skeletal, "idle");
             assert!(rest.is_empty());
+            assert!(options.is_empty());
+        } else {
+            unreachable!()
+        }
+    }
+
+    #[test]
+    fn sequence_parse2() {
+        let i = "$sequence idle \"idle\" fps 30 loop";
+        let (rest, sequence) = parse_sequence(i).unwrap();
+
+        assert!(rest.is_empty());
+
+        if let QcCommand::Sequence(Sequence {
+            name,
+            skeletal,
+            options,
+        }) = sequence
+        {
+            assert_eq!(name, "idle");
+            assert_eq!(skeletal, "idle");
+            assert!(rest.is_empty());
+
+            assert_eq!(options.len(), 2);
+            assert!(matches!(options[0], SequenceOption::Fps(30.0)));
+            assert!(matches!(options[1], SequenceOption::Loop))
         } else {
             unreachable!()
         }
@@ -781,5 +1044,117 @@ $texrendermode \"mefl2_02_dark.bmp\" flatshade
         let file = Qc::new("./dunkin/do.nut");
 
         assert!(file.is_err());
+    }
+    #[test]
+    fn just_body_parse() {
+        let i = "studio chest_with_no_armor";
+        let (rest, body) = body(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert_eq!(body.name, "studio");
+        assert_eq!(body.mesh, "chest_with_no_armor");
+    }
+
+    #[test]
+    fn bodygroup_parse1() {
+        let i = "\
+$bodygroup body
+{
+studio \"t1_surf02_nown\"
+}";
+
+        let (rest, bodygroup) = parse_bodygroup(i).unwrap();
+
+        assert!(rest.is_empty());
+
+        assert!(matches!(bodygroup, QcCommand::BodyGroup(_)));
+
+        if let QcCommand::BodyGroup(BodyGroup { name, bodies }) = bodygroup {
+            assert_eq!(name, "body");
+            assert_eq!(bodies.len(), 1);
+            assert_eq!(bodies[0].name, "studio");
+            assert_eq!(bodies[0].mesh, "t1_surf02_nown");
+            assert_eq!(bodies[0].reverse, false);
+            assert!(bodies[0].scale.is_none());
+        }
+    }
+
+    #[test]
+    fn bodygroup_parse2() {
+        let i = "\
+$bodygroup chest
+{
+	studio chest_with_no_armor
+	studio chest_with_light_armor
+	studio chest_with_heavy_armor
+	studio chest_with_super_armor
+}";
+
+        let (rest, bodygroup) = parse_bodygroup(i).unwrap();
+
+        assert!(rest.is_empty());
+
+        assert!(matches!(bodygroup, QcCommand::BodyGroup(_)));
+
+        if let QcCommand::BodyGroup(BodyGroup { name, bodies }) = bodygroup {
+            assert_eq!(name, "chest");
+            assert_eq!(bodies.len(), 4);
+            assert_eq!(bodies[3].name, "studio");
+            assert_eq!(bodies[3].mesh, "chest_with_super_armor");
+            assert_eq!(bodies[3].reverse, false);
+            assert!(bodies[3].scale.is_none());
+        }
+    }
+
+    #[test]
+    fn some_read_string() {
+        let i = "\
+$modelname \"t1_surf02_nown100wn.mdl\"
+$cliptotextures
+$scale 1.0
+$texrendermode glass_cyber_stripes_grey.bmp masked
+$texrendermode CHROME_1.bmp additive
+
+$bbox 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000
+$cbox 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000
+$eyeposition 0.000000 0.000000 0.000000
+$body \"mesh\" \"t1_surf02_nown\"
+$sequence \"idle\" \"idle\" fps 30
+
+$bodygroup body
+{
+studio \"t1_surf02_nown\"
+}";
+
+        let (rest, _) = parse_qc_commands(i).unwrap();
+
+        assert!(rest.is_empty())
+    }
+
+    #[test]
+    fn some_out_read_string() {
+        let i = "\
+$modelname \"t1_surf02_nown100wn.mdl\"
+$cd \"\\users\\Keita\\Documents\\VHE\\J.A.C.K\\bspsrc_1.4.3\\surf_lt_omnific_d\\models\\props\\surf_lt\\nyro\"
+$cdtexture \"\\users\\Keita\\Documents\\VHE\\J.A.C.K\\bspsrc_1.4.3\\surf_lt_omnific_d\\models\\props\\surf_lt\\nyro\"
+$cliptotextures
+";
+
+        let (rest, commands) = parse_qc_commands(i).unwrap();
+        
+        assert!(rest.is_empty());
+        assert_eq!(commands.len(), 4);
+    }
+
+    #[test]
+    fn some_read_write() {
+        let file = Qc::new("./test/some.qc").unwrap();
+
+        let _ = file.write("./test/out/some_out.qc");
+
+        let file1 = Qc::new("./test/some.qc").unwrap();
+        let file2 = Qc::new("./test/out/some_out.qc").unwrap();
+
+        assert_eq!(file1, file2);
     }
 }
