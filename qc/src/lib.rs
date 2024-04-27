@@ -7,7 +7,7 @@ use glam::DVec3;
 use nom::branch::alt;
 use nom::bytes::complete::{take, take_till};
 use nom::character::complete::{digit1, multispace0, space0};
-use nom::combinator::{all_consuming, fail, map, map_parser, map_res, opt, recognize};
+use nom::combinator::{all_consuming, fail, map, map_parser, map_res, opt, peek, recognize, rest};
 use nom::error::context;
 use nom::multi::many0;
 use nom::sequence::{delimited, terminated, tuple};
@@ -111,13 +111,6 @@ bitflags! {
         const ComplexCollision = 1 << 9;
         const ForceSkylight = 1 << 10;
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TextureGroup {
-    pub name: String,
-    pub from: Vec<String>,
-    pub to: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -261,7 +254,11 @@ pub enum QcCommand {
     EyePosition(DVec3),
     BodyGroup(BodyGroup),
     Flags(Flags),
-    TextureGroup(TextureGroup),
+    TextureGroup {
+        name: String,
+        // Vec of vec because each texture name is corresponding with another one
+        groups: Vec<Vec<String>>,
+    },
     RenameBone(RenameBone),
     MirrorBone(String),
     Include(String),
@@ -269,6 +266,23 @@ pub enum QcCommand {
     HBox(HBox),
     Controller(Controller),
     Sequence(Sequence),
+    StaticProp,
+    SurfaceProp(String),
+    // TODO make it a vector or something
+    Content(String),
+    IllumPosition {
+        pos: DVec3,
+        bone_name: Option<String>,
+    },
+    DefineBone {
+        name: String,
+        // parent should explicitly be quoted text when write
+        parent: String,
+        origin: DVec3,
+        rotation: DVec3,
+        fixup_origin: DVec3,
+        fixup_rotation: DVec3,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -366,15 +380,78 @@ fn discard_comment_lines(i: &str) -> IResult<&str> {
     map(many0(discard_comment_line), |_| "")(i)
 }
 
+// https://github.com/getreu/parse-hyperlinks/blob/5af034d14aa72ffb9e705da13bf557a564b1bebf/parse-hyperlinks/src/lib.rs#L41
+pub fn take_until_unbalanced(
+    opening_bracket: char,
+    closing_bracket: char,
+) -> impl Fn(&str) -> IResult<&str> {
+    move |i: &str| {
+        let mut index = 0;
+        let mut bracket_counter = 0;
+        while let Some(n) = &i[index..].find(&[opening_bracket, closing_bracket, '\\'][..]) {
+            index += n;
+            let mut it = i[index..].chars();
+            match it.next() {
+                Some(c) if c == '\\' => {
+                    // Skip the escape char `\`.
+                    index += '\\'.len_utf8();
+                    // Skip also the following char.
+                    if let Some(c) = it.next() {
+                        index += c.len_utf8();
+                    }
+                }
+                Some(c) if c == opening_bracket => {
+                    bracket_counter += 1;
+                    index += opening_bracket.len_utf8();
+                }
+                Some(c) if c == closing_bracket => {
+                    // Closing bracket.
+                    bracket_counter -= 1;
+                    index += closing_bracket.len_utf8();
+                }
+                // Can not happen.
+                _ => unreachable!(),
+            };
+            // We found the unmatched closing bracket.
+            if bracket_counter == -1 {
+                // We do not consume it.
+                index -= closing_bracket.len_utf8();
+                return Ok((&i[index..], &i[0..index]));
+            };
+        }
+
+        if bracket_counter == 0 {
+            Ok(("", i))
+        } else {
+            Ok(fail(i)?)
+        }
+    }
+}
+
 fn between_braces<'a, T>(
     f: impl FnMut(&'a str) -> IResult<T>,
 ) -> impl FnMut(&'a str) -> IResult<'a, T> {
     // Look ahead approach to avoid using name_string / between_space
     // between_space is very bad for things like this.
+
     map_parser(
         preceded(
             tuple((multispace0, tag("{"), multispace0)),
-            terminated(take_till(|c| c == '}'), tuple((tag("}"), multispace0))),
+            terminated(
+                take_until_unbalanced('{', '}'),
+                tuple((tag("}"), multispace0)),
+            ),
+        ),
+        f,
+    )
+}
+
+fn line<'a, T>(f: impl FnMut(&'a str) -> IResult<T>) -> impl FnMut(&'a str) -> IResult<'a, T> {
+    // Take a line separated by either \r\n or just \n by looking ahead.
+    map_parser(
+        preceded(
+            space0,
+            terminated(take_till(|c| c == '\n' || c == '\r'), multispace0),
         ),
         f,
     )
@@ -485,15 +562,22 @@ fn parse_sequence_option(i: &str) -> SResult {
             map(tag("loop"), |_| SequenceOption::Loop),
             map(tag("hidden"), |_| SequenceOption::Hidden),
             map(tag("noanimation"), |_| SequenceOption::NoAnimation),
+            map(preceded(tag("fadein"), double), |seconds| {
+                SequenceOption::FadeIn(seconds)
+            }),
+            map(preceded(tag("fadeout"), double), |seconds| {
+                SequenceOption::FadeOut(seconds)
+            }),
             // This should be last because it will match anything.
-            map(
-                tuple((name_string, opt(number), preceded(space0, between_space))),
-                |(motion, endframe, axis)| SequenceOption::MotionExtractAxis {
-                    motion: motion.to_string(),
-                    endframe,
-                    axis: axis.to_string(),
-                },
-            ),
+            // TODO i dont understnad the format
+            // map(
+            //     tuple((name_string, opt(number), preceded(space0, between_space))),
+            //     |(motion, endframe, axis)| SequenceOption::MotionExtractAxis {
+            //         motion: motion.to_string(),
+            //         endframe,
+            //         axis: axis.to_string(),
+            //     },
+            // ),
         )),
     )(i)
 }
@@ -507,22 +591,33 @@ fn parse_sequence(i: &str) -> CResult {
     let (i, name) = terminated(name_string, multispace0)(i)?;
 
     // Now check if we have brackets because it is very problematic.
-    let (i, is_bracket) = map(opt(tag("{")), |s| s.is_some())(i)?;
+    let (i, is_bracket) = map(opt(peek(tag("{"))), |s| s.is_some())(i)?;
 
     // If not is simple, it means the next one will definitely be the smd file.
     // For now smd is synonymous with the skeletal
     // It could be another linked animation
     // TODO: care about more things
-    let (i, smd) = if is_bracket {
-        unimplemented!("For possible S2GConverter rewrite");
-    } else {
-        terminated(name_string, space0)(i)?
-    };
+    let (i, smd, options) = if is_bracket {
+        let (i, between) = between_braces(rest)(i)?;
 
-    let (i, options) = if is_bracket {
-        unimplemented!("For possible S2GConverter rewrite");
+        let (between, smd) = delimited(multispace0, name_string, multispace0)(between)?;
+
+        let (between, options) =
+            many0(delimited(multispace0, parse_sequence_option, multispace0))(between)?;
+
+        // just in case
+        assert!(between.is_empty());
+
+        (i, smd, options)
     } else {
-        delimited(space0, many0(preceded(space0, parse_sequence_option)), multispace0)(i)?
+        let (i, smd) = terminated(name_string, space0)(i)?;
+        let (i, options) = delimited(
+            space0,
+            many0(preceded(space0, parse_sequence_option)),
+            multispace0,
+        )(i)?;
+
+        (i, smd, options)
     };
 
     // Consume all end lines to be paritiy with the other commands
@@ -564,6 +659,72 @@ fn parse_bodygroup(i: &str) -> CResult {
     )(i)
 }
 
+fn parse_static_prop(i: &str) -> CResult {
+    qc_command("$staticprop", take(0usize), |_| QcCommand::StaticProp)(i)
+}
+
+fn parse_surface_prop(i: &str) -> CResult {
+    qc_command("$surfaceprop", name_string, |name| {
+        QcCommand::SurfaceProp(name.to_string())
+    })(i)
+}
+
+fn parse_contents(i: &str) -> CResult {
+    qc_command("$contents", line(rest), |content| {
+        QcCommand::Content(content.to_string())
+    })(i)
+}
+
+fn parse_illum_position(i: &str) -> CResult {
+    qc_command(
+        "$illumposition",
+        line(tuple((dvec3, opt(preceded(space0, name_string))))),
+        |(pos, bone_name)| QcCommand::IllumPosition {
+            pos,
+            bone_name: bone_name.map(|x| x.to_string()),
+        },
+    )(i)
+}
+
+fn parse_texture_group(i: &str) -> CResult {
+    qc_command(
+        "$texturegroup",
+        tuple((
+            name_string,
+            between_braces(many0(between_braces(many0(preceded(
+                space0,
+                map(name_string, |x| x.to_string()),
+            ))))),
+        )),
+        |(name, groups)| QcCommand::TextureGroup {
+            name: name.to_string(),
+            groups,
+        },
+    )(i)
+}
+
+fn parse_define_bone(i: &str) -> CResult {
+    qc_command(
+        "$definebone",
+        tuple((
+            name_string,
+            preceded(space0, name_string),
+            dvec3,
+            dvec3,
+            dvec3,
+            dvec3,
+        )),
+        |(name, parent, origin, rotation, fixup_origin, fixup_rotation)| QcCommand::DefineBone {
+            name: name.to_string(),
+            parent: parent.to_string(),
+            origin,
+            rotation,
+            fixup_origin,
+            fixup_rotation,
+        },
+    )(i)
+}
+
 // Main functions
 fn parse_qc_command(i: &str) -> CResult {
     context(
@@ -586,6 +747,12 @@ fn parse_qc_command(i: &str) -> CResult {
             parse_clip_to_textures,
             parse_eye_position,
             parse_body,
+            parse_static_prop,
+            parse_surface_prop,
+            parse_contents,
+            parse_illum_position,
+            parse_texture_group,
+            parse_define_bone,
         )),
     )(i)
 }
@@ -822,6 +989,40 @@ abc
     }
 
     #[test]
+    fn between_braces_parse4() {
+        let i = "{{}}";
+        let (rest, _) = between_braces(rest)(i).unwrap();
+
+        println!("{}", rest);
+
+        assert!(rest.is_empty());
+    }
+
+    #[test]
+    fn line_parse1() {
+        let i = "hahaha
+";
+
+        let (rest, a) = line(tag("hahaha"))(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert_eq!(a, "hahaha")
+    }
+
+    #[test]
+    fn line_parse2() {
+        let i = "\
+hohaha
+
+";
+
+        let (rest, a) = line(tag("ho"))(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert_eq!(a, "ho")
+    }
+
+    #[test]
     fn modelname_parse() {
         let i = "$modelname \"/home/khang/map_compiler/model_tools/S2GConverter/test/s1_r012-goldsrc.mdl\"";
         let (rest, modelname) = parse_modelname(i).unwrap();
@@ -950,6 +1151,37 @@ abc
             assert!(matches!(options[1], SequenceOption::Loop))
         } else {
             unreachable!()
+        }
+    }
+
+    #[test]
+    fn sequence_parse3() {
+        let i = "\
+$sequence \"idle\" {
+	\"arrowframe_anims\\idle.smd\"
+	fadein 0.2
+	fadeout 0.2
+	fps 30
+}
+";
+        let (rest, sequence) = parse_sequence(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert!(matches!(sequence, QcCommand::Sequence { .. }));
+
+        if let QcCommand::Sequence(Sequence {
+            name,
+            skeletal,
+            options,
+        }) = sequence
+        {
+            assert_eq!(name, "idle");
+            assert_eq!(skeletal, "arrowframe_anims\\idle.smd");
+
+            assert_eq!(options.len(), 3);
+            assert!(matches!(options[2], SequenceOption::Fps(30.0)));
+            assert!(matches!(options[1], SequenceOption::FadeOut(0.2)));
+            assert!(matches!(options[0], SequenceOption::FadeIn(0.2)))
         }
     }
 
@@ -1141,7 +1373,7 @@ $cliptotextures
 ";
 
         let (rest, commands) = parse_qc_commands(i).unwrap();
-        
+
         assert!(rest.is_empty());
         assert_eq!(commands.len(), 4);
     }
@@ -1156,5 +1388,110 @@ $cliptotextures
         let file2 = Qc::new("./test/out/some_out.qc").unwrap();
 
         assert_eq!(file1, file2);
+    }
+
+    #[test]
+    fn content_parse() {
+        let i = "$contents \"monster\" \"grate\"";
+
+        let (rest, a) = parse_contents(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert!(matches!(a, QcCommand::Content(_)));
+
+        if let QcCommand::Content(contents) = a {
+            assert_eq!(contents, "\"monster\" \"grate\"")
+        }
+    }
+
+    #[test]
+    fn illum_pos_parse() {
+        let i = "$illumposition 0.001 48.002 0";
+
+        let (rest, a) = parse_illum_position(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert!(matches!(a, QcCommand::IllumPosition { .. }));
+
+        if let QcCommand::IllumPosition { pos, bone_name } = a {
+            assert_eq!(pos, DVec3::new(0.001, 48.002, 0.));
+            assert!(bone_name.is_none());
+        }
+    }
+
+    #[test]
+    fn illum_pos_parse2() {
+        let i = "$illumposition 0.001 48.002 0 sneed";
+
+        let (rest, a) = parse_illum_position(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert!(matches!(a, QcCommand::IllumPosition { .. }));
+
+        if let QcCommand::IllumPosition { pos, bone_name } = a {
+            assert_eq!(pos, DVec3::new(0.001, 48.002, 0.));
+            assert_eq!(bone_name.unwrap(), "sneed");
+        }
+    }
+
+    #[test]
+    fn texturegroup_parse() {
+        let i = "\
+$texturegroup skinfamilies
+{
+	{ heavy_head_red        eyeball_r      eyeball_l      hvyweapon_red               hvyweapon_red_sheen               }
+	{ heavy_head_blue       eyeball_r      eyeball_l      hvyweapon_blue              hvyweapon_blue_sheen              }
+
+	{ heavy_head_red_invun  eyeball_invun  eyeball_invun  hvyweapon_red_invun         hvyweapon_red_invun               }
+	{ heavy_head_blue_invun eyeball_invun  eyeball_invun  hvyweapon_blue_invun        hvyweapon_blue_invun              }
+
+	{ heavy_head_zombie     eyeball_zombie eyeball_zombie heavy_red_zombie_alphatest  heavy_red_zombie_alphatest_sheen  }
+	{ heavy_head_zombie     eyeball_zombie eyeball_zombie heavy_blue_zombie_alphatest heavy_blue_zombie_alphatest_sheen }
+
+	{ heavy_head_red_invun  eyeball_invun  eyeball_invun  hvyweapon_red_zombie_invun  hvyweapon_red_zombie_invun        }
+	{ heavy_head_blue_invun eyeball_invun  eyeball_invun  hvyweapon_blue_zombie_invun hvyweapon_blue_zombie_invun       }
+}
+";
+
+        let (rest, a) = parse_texture_group(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert!(matches!(a, QcCommand::TextureGroup { .. }));
+
+        if let QcCommand::TextureGroup { name, groups } = a {
+            assert_eq!(name, "skinfamilies");
+
+            assert_eq!(groups.len(), 8);
+            assert_eq!(groups[0].len(), 5);
+
+            assert_eq!(groups[7][2], "eyeball_invun");
+        }
+    }
+
+    #[test]
+    fn define_bone_parse() {
+        let i = "$definebone \"static_prop\" \"\" 0 0 0 0 0 0 0 0 0 0 1 0";
+
+        let (rest, a) = parse_define_bone(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert!(matches!(a, QcCommand::DefineBone { .. }));
+
+        if let QcCommand::DefineBone {
+            name,
+            parent,
+            origin,
+            rotation,
+            fixup_origin,
+            fixup_rotation,
+        } = a
+        {
+            assert_eq!(name, "static_prop");
+            assert_eq!(parent, "");
+            assert_eq!(fixup_origin, DVec3::new(0., 0., 0.));
+            assert_eq!(origin, rotation);
+            assert_eq!(origin, fixup_origin);
+            assert_eq!(fixup_rotation, DVec3::new(0., 1., 0.));
+        };
     }
 }
