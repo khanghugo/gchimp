@@ -1,3 +1,4 @@
+use core::fmt;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
@@ -18,7 +19,6 @@ use nom::{
 
 type IResult<'a, T> = _IResult<&'a str, T>;
 type CResult<'a> = IResult<'a, QcCommand>;
-type SResult<'a> = IResult<'a, SequenceOption>;
 
 use eyre::eyre;
 
@@ -31,12 +31,6 @@ pub struct Body {
     // No need to write reverse
     pub reverse: bool,
     pub scale: Option<f64>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TextureRenderMode {
-    pub texture: String,
-    pub render: RenderMode,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -64,15 +58,21 @@ Check your QC file to make sure $texrendermode is correct.",
             ),
         }
     }
+}
 
-    fn to_string(self) -> String {
-        match self {
-            Self::Masked => "masked".to_string(),
-            Self::Additive => "additive".to_string(),
-            Self::FlatShade => "flatshade".to_string(),
-            Self::FullBright => "fullbright".to_string(),
-            Self::Chrome => "chrome".to_string(),
-        }
+impl fmt::Display for RenderMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Masked => "masked",
+                Self::Additive => "additive",
+                Self::FlatShade => "flatshade",
+                Self::FullBright => "fullbright",
+                Self::Chrome => "chrome",
+            }
+        )
     }
 }
 
@@ -179,7 +179,7 @@ pub enum SequenceOption {
     AddLayer(String),
     BlendLayer(SequenceOptionBlendLayer),
     WorldSpace,
-    WorldBlendSpace,
+    WorldSpaceBlend,
     Snap,
     RealTime,
     FadeIn(f64),
@@ -190,6 +190,78 @@ pub enum SequenceOption {
     Compress(i32),
     PoseCycle(String),
     NumFrames(i32),
+}
+
+impl SequenceOption {
+    fn get_name(&self) -> String {
+        (match self {
+            SequenceOption::Frame { .. } => "frame",
+            SequenceOption::Origin(_) => todo!(),
+            SequenceOption::Angles(_) => todo!(),
+            SequenceOption::Rotate(_) => todo!(),
+            SequenceOption::Scale(_) => todo!(),
+            SequenceOption::Reverse => "reverse",
+            SequenceOption::Loop => "loop",
+            SequenceOption::Hidden => "hidden",
+            SequenceOption::NoAnimation => "noanimation",
+            SequenceOption::Fps(_) => "fps",
+            SequenceOption::MotionExtractAxis { .. } => todo!(),
+            SequenceOption::Activity { .. } => "activity",
+            SequenceOption::AutoPlay => "autoplay",
+            SequenceOption::AddLayer(_) => todo!(),
+            SequenceOption::BlendLayer(_) => "blendlayer",
+            SequenceOption::WorldSpace => "worldspace",
+            SequenceOption::WorldSpaceBlend => "worldspaceblend",
+            SequenceOption::Snap => "snap",
+            SequenceOption::RealTime => "realtime",
+            SequenceOption::FadeIn(_) => todo!(),
+            SequenceOption::FadeOut(_) => todo!(),
+            SequenceOption::WeightList(_) => todo!(),
+            SequenceOption::WorldRelative => todo!(),
+            SequenceOption::LocalHierarchy(_) => todo!(),
+            SequenceOption::Compress(_) => todo!(),
+            SequenceOption::PoseCycle(_) => todo!(),
+            SequenceOption::NumFrames(_) => todo!(),
+        })
+        .to_string()
+    }
+}
+
+impl fmt::Display for SequenceOption {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.get_name())?;
+        write!(f, " ")?;
+
+        match self {
+            SequenceOption::Frame { start, end } => write!(f, "{} {}", start, end),
+            SequenceOption::Origin(_) => todo!(),
+            SequenceOption::Angles(_) => todo!(),
+            SequenceOption::Rotate(_) => todo!(),
+            SequenceOption::Scale(x) => write!(f, "{}", x),
+            SequenceOption::Reverse => Ok(()),
+            SequenceOption::Loop => Ok(()),
+            SequenceOption::Hidden => Ok(()),
+            SequenceOption::NoAnimation => Ok(()),
+            SequenceOption::Fps(x) => write!(f, "{}", x),
+            SequenceOption::MotionExtractAxis { .. } => todo!(),
+            SequenceOption::Activity { name, weight } => write!(f, "{} {}", name, weight),
+            SequenceOption::AutoPlay => Ok(()),
+            SequenceOption::AddLayer(_) => todo!(),
+            SequenceOption::BlendLayer(_) => todo!(),
+            SequenceOption::WorldSpace => Ok(()),
+            SequenceOption::WorldSpaceBlend => Ok(()),
+            SequenceOption::Snap => Ok(()),
+            SequenceOption::RealTime => Ok(()),
+            SequenceOption::FadeIn(_) => todo!(),
+            SequenceOption::FadeOut(_) => todo!(),
+            SequenceOption::WeightList(_) => todo!(),
+            SequenceOption::WorldRelative => todo!(),
+            SequenceOption::LocalHierarchy(_) => todo!(),
+            SequenceOption::Compress(_) => todo!(),
+            SequenceOption::PoseCycle(_) => todo!(),
+            SequenceOption::NumFrames(_) => todo!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -246,7 +318,10 @@ pub enum QcCommand {
     CdTexture(String),
     ClipToTextures,
     Scale(f64),
-    TextureRenderMode(TextureRenderMode),
+    TextureRenderMode {
+        texture: String,
+        render: RenderMode,
+    },
     Gamma(f64),
     Origin(Origin),
     BBox(BBox),
@@ -283,6 +358,171 @@ pub enum QcCommand {
         fixup_origin: DVec3,
         fixup_rotation: DVec3,
     },
+    CollisionModel {
+        physics: String,
+        options: Vec<CollisionModelOption>,
+    },
+}
+
+impl QcCommand {
+    fn get_name(&self) -> String {
+        match self {
+            QcCommand::ModelName(_) => "$modelname",
+            QcCommand::Body(_) => "$body",
+            QcCommand::Cd(_) => "$cd",
+            QcCommand::CdTexture(_) => "$cdtexture",
+            QcCommand::ClipToTextures => "$cliptotextures",
+            QcCommand::Scale(_) => "$scale",
+            QcCommand::TextureRenderMode { .. } => "$texrendermode",
+            QcCommand::Gamma(_) => "$gamma",
+            QcCommand::Origin(_) => "$origin",
+            QcCommand::BBox(_) => "$bbox",
+            QcCommand::CBox(_) => "$cbox",
+            QcCommand::EyePosition(_) => "$eyeposition",
+            QcCommand::BodyGroup(_) => "$bodygroup",
+            QcCommand::Flags(_) => "$flags",
+            QcCommand::TextureGroup { .. } => "$texturegroup",
+            QcCommand::RenameBone(_) => "$renamebone",
+            QcCommand::MirrorBone(_) => "$mirrorbone",
+            QcCommand::Include(_) => "$include",
+            QcCommand::Attachment(_) => "$attachment",
+            QcCommand::HBox(_) => "$hbox",
+            QcCommand::Controller(_) => "$controller",
+            QcCommand::Sequence(_) => "$sequence",
+            QcCommand::StaticProp => "$staticprop",
+            QcCommand::SurfaceProp(_) => "$surfaceprop",
+            QcCommand::Content(_) => "$content",
+            QcCommand::IllumPosition { .. } => "$illumposition",
+            QcCommand::DefineBone { .. } => "$definebone",
+            QcCommand::CollisionModel { .. } => "$collisionmodel",
+        }
+        .to_string()
+    }
+}
+
+impl fmt::Display for QcCommand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.get_name())?;
+        write!(f, " ")?;
+
+        match self {
+            QcCommand::ModelName(x) => write!(f, "{}", x),
+            QcCommand::Body(Body {
+                name,
+                mesh,
+                reverse,
+                scale,
+            }) => write!(
+                f,
+                "{} {} {} {}",
+                name,
+                mesh,
+                if *reverse { "reverse" } else { "" },
+                if let Some(scale) = scale {
+                    scale.to_string()
+                } else {
+                    "".to_string()
+                }
+            ),
+            QcCommand::Cd(x) => write!(f, "{}", x),
+            QcCommand::CdTexture(x) => write!(f, "{}", x),
+            QcCommand::ClipToTextures => Ok(()),
+            QcCommand::Scale(x) => write!(f, "{}", x),
+            QcCommand::TextureRenderMode { texture, render } => {
+                write!(f, "{} {}", texture, render)
+            }
+            QcCommand::Gamma(x) => write!(f, "{}", x),
+            QcCommand::Origin(x) => write!(
+                f,
+                "{} {} {} {}",
+                x.origin.x,
+                x.origin.y,
+                x.origin.z,
+                if let Some(rotation) = x.rotation {
+                    rotation.to_string()
+                } else {
+                    "".to_string()
+                }
+            ),
+            QcCommand::BBox(BBox { mins, maxs }) => write!(
+                f,
+                "{} {} {} {} {} {}",
+                mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
+            ),
+            QcCommand::CBox(BBox { mins, maxs }) => write!(
+                f,
+                "{} {} {} {} {} {}",
+                mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
+            ),
+            QcCommand::EyePosition(x) => write!(f, "{} {} {}", x.x, x.y, x.z),
+            QcCommand::BodyGroup(BodyGroup { name, bodies }) => {
+                // use writeln! here because we want new line for these.
+                writeln!(f, "{}", name)?;
+                writeln!(f, "{{")?;
+
+                for body in bodies {
+                    // writeln! because each body is one line
+                    writeln!(
+                        f,
+                        "{} {} {} {}",
+                        body.name,
+                        body.mesh,
+                        if body.reverse { "reverse" } else { "" },
+                        // body.scale.map(|x| x.to_string()).unwrap_or("".to_string())
+                        body.scale.map_or("".to_string(), |x| x.to_string())
+                    )?;
+                }
+
+                write!(f, "}}")
+            }
+            QcCommand::Flags(Flags(x)) => write!(f, "{}", x),
+            QcCommand::TextureGroup { .. } => todo!(),
+            QcCommand::RenameBone(_) => todo!(),
+            QcCommand::MirrorBone(_) => todo!(),
+            QcCommand::Include(_) => todo!(),
+            QcCommand::Attachment(_) => todo!(),
+            QcCommand::HBox(_) => todo!(),
+            QcCommand::Controller(_) => todo!(),
+            QcCommand::Sequence(Sequence {
+                name,
+                skeletal,
+                options,
+            }) => {
+                // Adding space because lazy
+                write!(f, "{} ", name)?;
+                write!(f, "{} ", skeletal)?;
+
+                // For a very lazy reason, everything is INLINE
+                // TODO maybe don't do inline to make it look prettier
+                for option in options {
+                    // No need to add space. Will add space after this
+                    write!(f, "{}", option)?;
+
+                    // Add space at the end for each.
+                    write!(f, " ")?;
+                }
+
+                Ok(())
+            }
+            QcCommand::StaticProp => todo!(),
+            QcCommand::SurfaceProp(_) => todo!(),
+            QcCommand::Content(_) => todo!(),
+            QcCommand::IllumPosition { .. } => todo!(),
+            QcCommand::DefineBone { .. } => todo!(),
+            QcCommand::CollisionModel { .. } => todo!(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CollisionModelOption {
+    Mass(f64),
+    Inertia(f64),
+    Damping(f64),
+    RotationalDamping(f64),
+    RootBone(String),
+    Concave,
+    MaxConvexPieces(i32),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -313,7 +553,9 @@ impl Qc {
         let mut file = BufWriter::new(file);
 
         for command in self.commands {
-            file.write_all(&write_qc_command(command))?;
+            file.write_all(command.to_string().as_bytes())?;
+            // explicitly write newline
+            file.write_all("\n".as_bytes())?;
         }
 
         file.flush()?;
@@ -392,7 +634,7 @@ pub fn take_until_unbalanced(
             index += n;
             let mut it = i[index..].chars();
             match it.next() {
-                Some(c) if c == '\\' => {
+                Some('\\') => {
                     // Skip the escape char `\`.
                     index += '\\'.len_utf8();
                     // Skip also the following char.
@@ -462,7 +704,7 @@ fn command<'a, T>(
     s: &'a str,
     f: impl FnMut(&'a str) -> IResult<T>,
 ) -> impl FnMut(&'a str) -> IResult<'a, T> {
-    preceded(tuple((space0, tag(s), space0)), f)
+    preceded(tuple((multispace0, tag(s), multispace0)), f)
 }
 
 fn qc_command<'a, T>(
@@ -497,11 +739,9 @@ fn parse_texrendermode(i: &str) -> CResult {
     qc_command(
         "$texrendermode",
         tuple((name_string, preceded(space0, between_space))),
-        |(texture, render)| {
-            QcCommand::TextureRenderMode(TextureRenderMode {
-                texture: texture.to_string(),
-                render: RenderMode::from(render),
-            })
+        |(texture, render)| QcCommand::TextureRenderMode {
+            texture: texture.to_string(),
+            render: RenderMode::from(render),
         },
     )(i)
 }
@@ -536,38 +776,36 @@ fn body(i: &str) -> IResult<Body> {
 }
 
 fn parse_body(i: &str) -> CResult {
-    qc_command("$body", body, |body| QcCommand::Body(body))(i)
+    qc_command("$body", body, QcCommand::Body)(i)
+}
+
+fn sequence_option<'a, T>(
+    s: &'a str,
+    f: impl FnMut(&'a str) -> IResult<T>,
+    cm: impl Fn(T) -> SequenceOption,
+) -> impl FnMut(&'a str) -> IResult<SequenceOption> {
+    map(terminated(command(s, f), multispace0), cm)
 }
 
 // TODO parse all of the options just in case
-fn parse_sequence_option(i: &str) -> SResult {
+fn parse_sequence_option(i: &str) -> IResult<SequenceOption> {
     context(
         format!("Parse command not supported yet {}", i).leak(),
         alt((
-            map(preceded(tag("fps"), double), |fps| SequenceOption::Fps(fps)),
-            map(
-                preceded(tag("frame"), tuple((number, number))),
-                |(start, end)| SequenceOption::Frame { start, end },
-            ),
-            map(preceded(tag("origin"), dvec3), |what| {
-                SequenceOption::Origin(what)
+            // map(preceded(tag("fps"), double), |fps| SequenceOption::Fps(fps)),
+            sequence_option("fps", double, SequenceOption::Fps),
+            sequence_option("frame", tuple((number, number)), |(start, end)| {
+                SequenceOption::Frame { start, end }
             }),
-            map(preceded(tag("angles"), dvec3), |what| {
-                SequenceOption::Angles(what)
-            }),
-            map(preceded(tag("rotate"), double), |what| {
-                SequenceOption::Rotate(what)
-            }),
-            map(tag("reverse"), |_| SequenceOption::Reverse),
-            map(tag("loop"), |_| SequenceOption::Loop),
-            map(tag("hidden"), |_| SequenceOption::Hidden),
-            map(tag("noanimation"), |_| SequenceOption::NoAnimation),
-            map(preceded(tag("fadein"), double), |seconds| {
-                SequenceOption::FadeIn(seconds)
-            }),
-            map(preceded(tag("fadeout"), double), |seconds| {
-                SequenceOption::FadeOut(seconds)
-            }),
+            sequence_option("origin", dvec3, SequenceOption::Origin),
+            sequence_option("angles", dvec3, SequenceOption::Angles),
+            sequence_option("rotate", double, SequenceOption::Rotate),
+            sequence_option("reverse", take(0usize), |_| SequenceOption::Reverse),
+            sequence_option("loop", take(0usize), |_| SequenceOption::Loop),
+            sequence_option("hidden", take(0usize), |_| SequenceOption::Hidden),
+            sequence_option("noanimation", take(0usize), |_| SequenceOption::NoAnimation),
+            sequence_option("fadein", double, SequenceOption::FadeIn),
+            sequence_option("fadeout", double, SequenceOption::FadeOut),
             // This should be last because it will match anything.
             // TODO i dont understnad the format
             // map(
@@ -640,7 +878,7 @@ fn parse_clip_to_textures(i: &str) -> CResult {
 }
 
 fn parse_eye_position(i: &str) -> CResult {
-    qc_command("$eyeposition", dvec3, |pos| QcCommand::EyePosition(pos))(i)
+    qc_command("$eyeposition", dvec3, QcCommand::EyePosition)(i)
 }
 
 fn parse_bodygroup(i: &str) -> CResult {
@@ -725,6 +963,34 @@ fn parse_define_bone(i: &str) -> CResult {
     )(i)
 }
 
+fn collision_model_option<'a, T>(
+    s: &'a str,
+    f: impl FnMut(&'a str) -> IResult<T>,
+    cm: impl Fn(T) -> CollisionModelOption,
+) -> impl FnMut(&'a str) -> IResult<CollisionModelOption> {
+    map(terminated(command(s, f), multispace0), cm)
+}
+
+fn parse_collision_model_option(i: &str) -> IResult<CollisionModelOption> {
+    context(
+        format!("Collision model options not yet supported {}", i).leak(),
+        alt((
+            collision_model_option("$mass", double, CollisionModelOption::Mass),
+            collision_model_option("$inertia", double, CollisionModelOption::Inertia),
+            collision_model_option("$damping", double, CollisionModelOption::Damping),
+            collision_model_option(
+                "$rotdamping",
+                double,
+                CollisionModelOption::RotationalDamping,
+            ),
+        )),
+    )(i)
+}
+
+// fn parse_collision_model(i: &str) -> CResult {
+//     qc_command("$collisionmodel", , qc)(i)
+// }
+
 // Main functions
 fn parse_qc_command(i: &str) -> CResult {
     context(
@@ -767,152 +1033,6 @@ fn parse_qc_commands(i: &str) -> IResult<Vec<QcCommand>> {
 
 fn parse_qc(i: &str) -> IResult<Qc> {
     map(all_consuming(parse_qc_commands), |commands| Qc { commands })(i)
-}
-
-// Remember to add new line
-// Without quotation mark works just fine.
-fn write_qc_command(i: QcCommand) -> Vec<u8> {
-    (match i {
-        QcCommand::ModelName(x) => format!("$modelname \"{}\"\n", x),
-        QcCommand::Body(Body {
-            name,
-            mesh,
-            reverse,
-            scale,
-        }) => format!(
-            "$body {} {} {} {}\n",
-            name,
-            mesh,
-            if reverse { "reverse" } else { "" },
-            if let Some(scale) = scale {
-                scale.to_string()
-            } else {
-                "".to_string()
-            }
-        ),
-        QcCommand::Cd(x) => format!("$cd \"{}\"\n", x),
-        QcCommand::CdTexture(x) => format!("$cdtexture \"{}\"\n", x),
-        QcCommand::ClipToTextures => "$cliptotextures \n".to_string(),
-        QcCommand::Scale(x) => format!("$scale {}\n", x),
-        QcCommand::TextureRenderMode(TextureRenderMode { texture, render }) => {
-            format!("$texrendermode {} {}\n", texture, render.to_string(),)
-        }
-        QcCommand::Gamma(x) => format!("$gamma {}\n", x),
-        QcCommand::Origin(Origin { origin, rotation }) => format!(
-            "$origin {} {} {} {}\n",
-            origin.x,
-            origin.y,
-            origin.z,
-            if let Some(rotation) = rotation {
-                rotation.to_string()
-            } else {
-                "".to_string()
-            }
-        ),
-        QcCommand::BBox(BBox { mins, maxs }) => format!(
-            "$bbox {} {} {} {} {} {}\n",
-            mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
-        ),
-        QcCommand::CBox(BBox { mins, maxs }) => format!(
-            "$cbox {} {} {} {} {} {}\n",
-            mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
-        ),
-        QcCommand::Flags(Flags(x)) => format!("$flags {}\n", x),
-        QcCommand::HBox(HBox {
-            group,
-            bone_name,
-            mins,
-            maxs,
-        }) => format!(
-            "$hbox {} {} {} {} {} {} {} {}\n",
-            group, bone_name, mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
-        ),
-        QcCommand::Sequence(Sequence {
-            name,
-            skeletal,
-            options,
-        }) => {
-            let mut res = format!("$sequence {} ", name);
-
-            res += format!("{} ", skeletal).as_str();
-
-            // For a very lazy reason, everything is INLINE
-            // TODO maybe don't do inline to make it look prettier
-            for option in options {
-                // No need to add space. Will add space after this
-                res += (match option {
-                    SequenceOption::Frame { start, end } => format!("frame {} {}", start, end),
-                    SequenceOption::Origin(_) => todo!(),
-                    SequenceOption::Angles(_) => todo!(),
-                    SequenceOption::Rotate(_) => todo!(),
-                    SequenceOption::Scale(scale) => format!("scale {}", scale),
-                    SequenceOption::Reverse => format!("reverse "),
-                    SequenceOption::Loop => format!("loop"),
-                    SequenceOption::Hidden => format!("hidden"),
-                    SequenceOption::NoAnimation => format!("noanimation"),
-                    SequenceOption::Fps(fps) => format!("fps {}", fps),
-                    SequenceOption::MotionExtractAxis {
-                        motion,
-                        endframe,
-                        axis,
-                    } => format!(
-                        "{} {} {}",
-                        motion,
-                        endframe.map(|x| x.to_string()).unwrap_or("".to_string()),
-                        axis
-                    ),
-                    SequenceOption::Activity { name, weight } => {
-                        format!("activity {} {}", name, weight)
-                    }
-                    SequenceOption::AutoPlay => format!("autoplay"),
-                    SequenceOption::AddLayer(_) => todo!(),
-                    SequenceOption::BlendLayer(_) => todo!(),
-                    SequenceOption::WorldSpace => format!("worldspace"),
-                    SequenceOption::WorldBlendSpace => format!("worldspaceblend"),
-                    SequenceOption::Snap => format!("snap"),
-                    SequenceOption::RealTime => format!("realtime"),
-                    SequenceOption::FadeIn(_) => todo!(),
-                    SequenceOption::FadeOut(_) => todo!(),
-                    SequenceOption::WeightList(_) => todo!(),
-                    SequenceOption::WorldRelative => todo!(),
-                    SequenceOption::LocalHierarchy(_) => todo!(),
-                    SequenceOption::Compress(_) => todo!(),
-                    SequenceOption::PoseCycle(_) => todo!(),
-                    SequenceOption::NumFrames(_) => todo!(),
-                })
-                .as_str();
-
-                // Add space at the end for each.
-                res += " ";
-            }
-
-            res += "\n";
-            res
-        }
-        QcCommand::EyePosition(what) => format!("$eyeposition {} {} {}\n", what.x, what.y, what.z),
-        QcCommand::BodyGroup(BodyGroup { name, bodies }) => {
-            let mut res = format!("$bodygroup {} {{\n", name);
-
-            for body in bodies {
-                res += format!(
-                    "{} {} {} {}\n",
-                    body.name,
-                    body.mesh,
-                    if body.reverse { "reverse" } else { "" },
-                    body.scale.map(|x| x.to_string()).unwrap_or("".to_string())
-                )
-                .as_str();
-            }
-
-            res += "}\n";
-            res
-        }
-        _ => unimplemented!(
-            "Write command `{:?}` not implemented. Go ask me. I will do it.",
-            i
-        ),
-    })
-    .into_bytes()
 }
 
 #[cfg(test)]
@@ -1046,10 +1166,10 @@ hohaha
 
         assert!(rest.is_empty());
 
-        if let QcCommand::TextureRenderMode(t) = rendermode {
-            assert_eq!(t.texture, "metal_light_01_dark.bmp");
+        if let QcCommand::TextureRenderMode { texture, render } = rendermode {
+            assert_eq!(texture, "metal_light_01_dark.bmp");
 
-            assert_eq!(t.render, RenderMode::FullBright);
+            assert_eq!(render, RenderMode::FullBright);
         } else {
             unreachable!()
         }
@@ -1062,10 +1182,10 @@ hohaha
 
         assert!(rest.is_empty());
 
-        if let QcCommand::TextureRenderMode(t) = rendermode {
-            assert_eq!(t.texture, "metal_light_01_dark.bmp");
+        if let QcCommand::TextureRenderMode { texture, render } = rendermode {
+            assert_eq!(texture, "metal_light_01_dark.bmp");
 
-            assert_eq!(t.render, RenderMode::FlatShade);
+            assert_eq!(render, RenderMode::FlatShade);
         } else {
             unreachable!()
         }
@@ -1493,5 +1613,29 @@ $texturegroup skinfamilies
             assert_eq!(origin, fixup_origin);
             assert_eq!(fixup_rotation, DVec3::new(0., 1., 0.));
         };
+    }
+
+    #[test]
+    fn parse_qc_test() {
+        let i = "\
+$modelname t1_surf02_nown100wn.mdl
+$cd \\users\\Keita\\Documents\\VHE\\J.A.C.K\\bspsrc_1.4.3\\surf_lt_omnific_d\\models\\props\\surf_lt\\nyro
+$cdtexture \\users\\Keita\\Documents\\VHE\\J.A.C.K\\bspsrc_1.4.3\\surf_lt_omnific_d\\models\\props\\surf_lt\\nyro
+$cliptotextures 
+$scale 1
+$texrendermode glass_cyber_stripes_grey.bmp masked
+$texrendermode CHROME_1.bmp additive
+$bbox 0 0 0 0 0 0
+$cbox 0 0 0 0 0 0
+$eyeposition 0 0 0
+$body mesh t1_surf02_nown  
+$sequence idle idle fps 30 
+$bodygroup body
+{
+studio t1_surf02_nown  
+}
+";
+
+        parse_qc(i).unwrap();
     }
 }
