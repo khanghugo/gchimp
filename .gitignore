@@ -17,3 +17,5 @@
 **/*.rs.bk
 
 .vscode
+
+Cargo.lock
