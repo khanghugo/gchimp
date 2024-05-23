@@ -1,8 +1,10 @@
 mod cli;
+mod gui;
 mod modules;
 
 fn main() {
-    cli::cli();
+    gui::gui();
+    // cli::cli();
 
     // let mut map = map::Map::new("./examples/surf_raphaello.map");
     // map.light_scale((1., 1., 1., 1.));
