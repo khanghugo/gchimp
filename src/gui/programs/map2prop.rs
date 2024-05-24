@@ -1,4 +1,6 @@
-use super::*;
+use eframe::egui;
+
+use crate::gui::TabProgram;
 
 #[derive(Default)]
 pub struct Map2Prop {}
@@ -8,7 +10,7 @@ impl TabProgram for Map2Prop {
         "Map2Prop".into()
     }
 
-    fn tab_ui(&self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+    fn tab_ui(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
         ui.label("this is Map2Prop panel");
 
         // Make it non drag-able

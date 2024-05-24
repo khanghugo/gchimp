@@ -1,81 +1,70 @@
 use eframe::egui;
+use egui_tiles::Tree;
 
-use self::{map2prop::Map2Prop, s2g::S2G};
+use self::{
+    config::{parse_config, Config},
+    constants::{CONFIG_FILE_NAME, PROGRAM_HEIGHT, PROGRAM_WIDTH},
+    pane::{create_tree, Pane, TreeBehavior},
+};
 
-mod map2prop;
-mod s2g;
+mod config;
+mod constants;
+mod pane;
+mod programs;
 mod utils;
 
 trait TabProgram {
     fn tab_title(&self) -> egui::WidgetText;
-    fn tab_ui(&self, ui: &mut egui::Ui) -> egui_tiles::UiResponse;
-}
-
-enum Pane {
-    Map2Prop(Map2Prop),
-    S2G(S2G),
-}
-
-impl Pane {
-    fn title(&self) -> egui::WidgetText {
-        match self {
-            Pane::Map2Prop(m2p) => m2p.tab_title(),
-            Pane::S2G(s2g) => s2g.tab_title(),
-        }
-    }
-
-    fn ui(&self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
-        match self {
-            Pane::Map2Prop(m2p) => m2p.tab_ui(ui),
-            Pane::S2G(s2g) => s2g.tab_ui(ui),
-        }
-    }
-}
-
-struct TreeBehavior {}
-
-impl egui_tiles::Behavior<Pane> for TreeBehavior {
-    fn tab_title_for_pane(&mut self, pane: &Pane) -> egui::WidgetText {
-        pane.title()
-    }
-
-    fn pane_ui(
-        &mut self,
-        ui: &mut egui::Ui,
-        _tile_id: egui_tiles::TileId,
-        pane: &mut Pane,
-    ) -> egui_tiles::UiResponse {
-        pane.ui(ui)
-    }
+    fn tab_ui(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse;
 }
 
 pub fn gui() -> Result<(), eframe::Error> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
 
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
+        viewport: egui::ViewportBuilder::default()
+            // This is OKAY for now.
+            .with_inner_size([PROGRAM_WIDTH, PROGRAM_HEIGHT])
+            .with_drag_and_drop(true),
         ..Default::default()
     };
 
-    let mut tree = create_tree();
-
-    eframe::run_simple_native("My egui App", options, move |ctx, _frame| {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            let mut behavior = TreeBehavior {};
-            tree.ui(&mut behavior, ui);
-        });
-    })
+    eframe::run_native(
+        "My egui App",
+        options,
+        Box::new(|_cc| Box::<MyApp>::default()),
+    )
 }
 
-fn create_tree() -> egui_tiles::Tree<Pane> {
-    let mut tiles = egui_tiles::Tiles::default();
+struct FilePicker {
+    dropped_files: Vec<egui::DroppedFile>,
+    picked_path: Option<String>,
+}
 
-    let mut tabs = vec![];
+struct MyApp {
+    tree: Tree<Pane>,
+    file_picker: Option<FilePicker>,
+    config: Option<Config>,
+}
 
-    tabs.push(tiles.insert_pane(Pane::Map2Prop(Map2Prop::default())));
-    tabs.push(tiles.insert_pane(Pane::S2G(S2G::default())));
+impl Default for MyApp {
+    fn default() -> Self {
+        let config = parse_config(CONFIG_FILE_NAME);
+        let config = config.ok();
 
-    let root = tiles.insert_tab_tile(tabs);
+        Self {
+            tree: create_tree(),
+            file_picker: None,
+            config,
+        }
+    }
+}
 
-    egui_tiles::Tree::new("my_tree", root, tiles)
+impl eframe::App for MyApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            let mut behavior = TreeBehavior {};
+            self.tree.ui(&mut behavior, ui);
+        });
+    }
 }

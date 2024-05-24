@@ -13,6 +13,9 @@ qc = { version = "0.1.0", path = "qc" }
 rayon = "1.10.0"
 rhai = "1.17.1"
 smd = { path = "smd" }
+eyre = "0.6.12"
+toml = "0.8.13"
+serde = "1.0.202"
 
 # egui stuffs
 eframe = "0.27.2"

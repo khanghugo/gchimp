@@ -22,6 +22,7 @@ pub trait Cli {
 }
 
 pub fn cli() {
+    // Add new modules here.
     let modules: &[&dyn Cli] = &[&CustomScript, &LightScale, &RotatePropStatic, &TextureScale];
 
     let args: Vec<String> = std::env::args().collect();
