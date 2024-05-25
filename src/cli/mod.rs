@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use map::Map;
 
 use self::{
@@ -14,18 +12,24 @@ mod texture_scale;
 
 pub trait Cli {
     fn name(&self) -> &'static str;
-    /// `args[1]` is the name of the function.
-    ///
-    /// Arguments for the the functions start at `args[2]`
+    /// Each module has to handle the arguments by itself.
     fn cli(&self);
     fn cli_help(&self);
 }
 
-pub fn cli() {
+/// Runs command-line options
+///
+/// Returns a boolean to indicate whether any CLI actions taken.
+pub fn cli() -> bool {
+    let mut args = std::env::args();
+
+    // No arguments
+    if args.len() <= 1 {
+        return false;
+    }
+
     // Add new modules here.
     let modules: &[&dyn Cli] = &[&CustomScript, &LightScale, &RotatePropStatic, &TextureScale];
-
-    let args: Vec<String> = std::env::args().collect();
 
     let help = || {
         println!(
@@ -39,17 +43,18 @@ Available modules:"
         }
     };
 
-    if args.len() < 2 {
-        help();
-        return;
-    }
+    // len >= 2
+    let command = args.next().unwrap();
 
     for module in modules {
-        if args[1] == module.name() {
+        if command == module.name() {
             module.cli();
-            return;
+            return true;
         }
     }
 
+    // In case nothing fits then prints this again.
     help();
+
+    true
 }
