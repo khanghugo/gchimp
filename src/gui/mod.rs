@@ -36,14 +36,8 @@ pub fn gui() -> Result<(), eframe::Error> {
     )
 }
 
-struct FilePicker {
-    dropped_files: Vec<egui::DroppedFile>,
-    picked_path: Option<String>,
-}
-
 struct MyApp {
     tree: Tree<Pane>,
-    file_picker: Option<FilePicker>,
     config: Option<Config>,
 }
 
@@ -54,7 +48,6 @@ impl Default for MyApp {
 
         Self {
             tree: create_tree(),
-            file_picker: None,
             config,
         }
     }
