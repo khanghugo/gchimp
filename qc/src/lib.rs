@@ -983,13 +983,36 @@ fn parse_collision_model_option(i: &str) -> IResult<CollisionModelOption> {
                 double,
                 CollisionModelOption::RotationalDamping,
             ),
+            collision_model_option("$rootbone", name_string, |str| {
+                CollisionModelOption::RootBone(str.to_string())
+            }),
+            collision_model_option("$concave", take(0usize), |_| CollisionModelOption::Concave),
+            collision_model_option(
+                "$maxconvexpieces",
+                number,
+                CollisionModelOption::MaxConvexPieces,
+            ),
         )),
     )(i)
 }
 
-// fn parse_collision_model(i: &str) -> CResult {
-//     qc_command("$collisionmodel", , qc)(i)
-// }
+fn parse_collision_model(i: &str) -> CResult {
+    qc_command(
+        "$collisionmodel",
+        tuple((
+            name_string,
+            between_braces(many0(delimited(
+                multispace0,
+                parse_collision_model_option,
+                multispace0,
+            ))),
+        )),
+        |(physics, options)| QcCommand::CollisionModel {
+            physics: physics.to_string(),
+            options,
+        },
+    )(i)
+}
 
 // Main functions
 fn parse_qc_command(i: &str) -> CResult {
@@ -1019,6 +1042,7 @@ fn parse_qc_command(i: &str) -> CResult {
             parse_illum_position,
             parse_texture_group,
             parse_define_bone,
+            parse_collision_model,
         )),
     )(i)
 }
@@ -1612,7 +1636,34 @@ $texturegroup skinfamilies
             assert_eq!(origin, rotation);
             assert_eq!(origin, fixup_origin);
             assert_eq!(fixup_rotation, DVec3::new(0., 1., 0.));
-        };
+        }
+    }
+
+    #[test]
+    fn collision_model_parse() {
+        let i = "\
+$collisionmodel \"arrowframe_physics.smd\"
+{
+	$mass 47850.57
+	$inertia 1
+	$damping 0
+	$rotdamping 0
+	$rootbone \" \"
+	$concave
+	$maxconvexpieces 7
+
+}
+";
+        let (rest, a) = parse_collision_model(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert!(matches!(a, QcCommand::CollisionModel { .. }));
+
+        if let QcCommand::CollisionModel { physics, options } = a {
+            assert_eq!(physics, "arrowframe_physics.smd");
+
+            assert!(options.len() == 7)
+        }
     }
 
     #[test]
