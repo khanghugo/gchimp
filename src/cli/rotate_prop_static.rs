@@ -17,7 +17,7 @@ impl Cli for RotatePropStatic {
             return;
         }
 
-        let mut map = Map::new(&args[0]).unwrap();
+        let mut map = Map::from_file(&args[0]).unwrap();
 
         rotate_prop_static(&mut map, if args.len() > 2 { Some(&args[2]) } else { None });
 

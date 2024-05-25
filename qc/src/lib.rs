@@ -531,14 +531,22 @@ pub struct Qc {
 }
 
 impl Qc {
-    pub fn new(file_name: &str) -> eyre::Result<Self> {
-        let path = Path::new(file_name);
-        let file = std::fs::read_to_string(path)?;
+    pub fn new() -> Self {
+        Self { commands: vec![] }
+    }
 
-        match parse_qc(&file) {
+    pub fn from(text: &str) -> eyre::Result<Self> {
+        match parse_qc(text) {
             Ok((_, res)) => Ok(res),
-            Err(_) => Err(eyre!("Cannot read file `{}`", file_name)),
+            Err(err) => Err(eyre!("Cannot parse text: {}", err.to_string())),
         }
+    }
+
+    pub fn from_file(file_name: &str) -> eyre::Result<Self> {
+        let path = Path::new(file_name);
+        let text = std::fs::read_to_string(path)?;
+
+        Self::from(&text)
     }
 
     pub fn write(self, file_name: &str) -> io::Result<()> {
@@ -1403,21 +1411,21 @@ $texrendermode \"mefl2_02_dark.bmp\" flatshade
 
     #[test]
     fn read_goldsrc() {
-        assert!(Qc::new("./test/s1_r012-goldsrc.qc").is_ok());
+        assert!(Qc::from_file("./test/s1_r012-goldsrc.qc").is_ok());
     }
 
     // TODO: test source file
 
     #[test]
     fn write_goldsrc() {
-        let file = Qc::new("./test/s1_r012-goldsrc.qc").unwrap();
+        let file = Qc::from_file("./test/s1_r012-goldsrc.qc").unwrap();
 
         file.write("./test/out/s1_r012-goldsrc_out.qc").unwrap();
     }
 
     #[test]
     fn fail_read() {
-        let file = Qc::new("./dunkin/do.nut");
+        let file = Qc::from_file("./dunkin/do.nut");
 
         assert!(file.is_err());
     }
@@ -1524,12 +1532,12 @@ $cliptotextures
 
     #[test]
     fn some_read_write() {
-        let file = Qc::new("./test/some.qc").unwrap();
+        let file = Qc::from_file("./test/some.qc").unwrap();
 
         let _ = file.write("./test/out/some_out.qc");
 
-        let file1 = Qc::new("./test/some.qc").unwrap();
-        let file2 = Qc::new("./test/out/some_out.qc").unwrap();
+        let file1 = Qc::from_file("./test/some.qc").unwrap();
+        let file2 = Qc::from_file("./test/out/some_out.qc").unwrap();
 
         assert_eq!(file1, file2);
     }

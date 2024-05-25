@@ -55,14 +55,25 @@ pub struct Map {
 }
 
 impl Map {
-    pub fn new(file_name: &str) -> eyre::Result<Self> {
-        let path = Path::new(file_name);
-        let file = std::fs::read_to_string(path)?;
-
-        match parse_map(&file) {
-            Ok((_, res)) => Ok(res),
-            Err(_) => Err(eyre!("Cannot read file `{}`", file_name)),
+    pub fn new() -> Self {
+        Self {
+            tb_header: None,
+            entities: vec![],
         }
+    }
+
+    pub fn from(text: &str) -> eyre::Result<Self> {
+        match parse_map(text) {
+            Ok((_, res)) => Ok(res),
+            Err(err) => Err(eyre!("Cannot parse text: {}", err.to_string())),
+        }
+    }
+
+    pub fn from_file(file_name: &str) -> eyre::Result<Self> {
+        let path = Path::new(file_name);
+        let text = std::fs::read_to_string(path)?;
+
+        Self::from(&text)
     }
 
     pub fn write(self, file_name: &str) -> io::Result<()> {
@@ -422,23 +433,23 @@ a
 
     #[test]
     fn file_read() {
-        assert!(Map::new("./test/sky_vis.map").is_ok());
+        assert!(Map::from_file("./test/sky_vis.map").is_ok());
     }
 
     #[test]
     fn file_write_read() {
-        let i = Map::new("./test/sky_vis.map").unwrap();
+        let i = Map::from_file("./test/sky_vis.map").unwrap();
         i.write("./test/out/sky_vis_out.map").unwrap();
 
-        let i = Map::new("./test/sky_vis.map").unwrap();
-        let j = Map::new("./test/out/sky_vis_out.map").unwrap();
+        let i = Map::from_file("./test/sky_vis.map").unwrap();
+        let j = Map::from_file("./test/out/sky_vis_out.map").unwrap();
 
         assert_eq!(i, j);
     }
 
     #[test]
     fn fail_read() {
-        let file = Map::new("./dunkin/do.nut");
+        let file = Map::from_file("./dunkin/do.nut");
 
         assert!(file.is_err());
     }

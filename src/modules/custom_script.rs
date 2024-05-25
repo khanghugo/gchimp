@@ -63,7 +63,9 @@ pub fn custom_script(rhai_file: &Path) {
     // For write functions. Need to ignore Result.
     engine
         .register_type_with_name::<map::Map>("Map")
-        .register_fn("new_map", |file_name| map::Map::new(file_name).unwrap())
+        .register_fn("new_map", |file_name| {
+            map::Map::from_file(file_name).unwrap()
+        })
         .register_fn("write", |map, out| {
             let _ = map::Map::write(map, out);
         })
@@ -73,14 +75,16 @@ pub fn custom_script(rhai_file: &Path) {
 
     engine
         .register_type_with_name::<qc::Qc>("Qc")
-        .register_fn("new_qc", |file_name| qc::Qc::new(file_name).unwrap())
+        .register_fn("new_qc", |file_name| qc::Qc::from_file(file_name).unwrap())
         .register_fn("write", |qc, out| {
             let _ = qc::Qc::write(qc, out);
         });
 
     engine
         .register_type_with_name::<smd::Smd>("Smd")
-        .register_fn("new_smd", |file_name| smd::Smd::new(file_name).unwrap())
+        .register_fn("new_smd", |file_name| {
+            smd::Smd::from_file(file_name).unwrap()
+        })
         .register_fn("write", |smd, out| {
             let _ = smd::Smd::write(smd, out);
         })

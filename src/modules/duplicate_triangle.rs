@@ -44,7 +44,7 @@ pub fn mass_duplicate_triangle(folder: &str, texture: &str, new_texture: &str) {
     });
 
     smd_paths.for_each(|path| {
-        if let Ok(mut smd) = smd::Smd::new(path.to_str().unwrap()) {
+        if let Ok(mut smd) = smd::Smd::from_file(path.to_str().unwrap()) {
             smd.duplicate_triangle(texture, new_texture);
             let _ = smd.write(path.to_str().unwrap());
         }

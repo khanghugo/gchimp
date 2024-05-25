@@ -32,7 +32,7 @@ impl Cli for LightScale {
             })
             .collect();
 
-        let mut map = Map::new(&args[0]).unwrap();
+        let mut map = Map::from_file(&args[0]).unwrap();
 
         light_scale(&mut map, (scalars[0], scalars[1], scalars[2], scalars[3]));
 

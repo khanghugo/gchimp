@@ -25,7 +25,7 @@ impl Cli for TextureScale {
             return;
         }
 
-        let mut map = Map::new(&args[0]).unwrap();
+        let mut map = Map::from_file(&args[0]).unwrap();
 
         texture_scale(&mut map, scalar.unwrap());
 
