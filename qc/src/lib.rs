@@ -89,6 +89,9 @@ pub struct BBox {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct CBox(BBox);
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct BodyGroup {
     pub name: String,
     pub bodies: Vec<Body>,
@@ -325,7 +328,7 @@ pub enum QcCommand {
     Gamma(f64),
     Origin(Origin),
     BBox(BBox),
-    CBox(BBox),
+    CBox(CBox),
     EyePosition(DVec3),
     BodyGroup(BodyGroup),
     Flags(Flags),
@@ -449,7 +452,7 @@ impl fmt::Display for QcCommand {
                 "{} {} {} {} {} {}",
                 mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
             ),
-            QcCommand::CBox(BBox { mins, maxs }) => write!(
+            QcCommand::CBox(CBox(BBox { mins, maxs })) => write!(
                 f,
                 "{} {} {} {} {} {}",
                 mins.x, mins.y, mins.z, maxs.x, maxs.y, maxs.z,
@@ -525,9 +528,21 @@ pub enum CollisionModelOption {
     MaxConvexPieces(i32),
 }
 
+/// The Qc data.
+///
+/// To access the data, follow this.
+/// ```no_run
+/// for command in qc.commands {
+///     match command {
+///         QcCommand::ModelName(modelname) => (),
+///         QcCommand::Body(body) => (),
+///         _ => (),
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Qc {
-    pub commands: Vec<QcCommand>,
+    commands: Vec<QcCommand>,
 }
 
 impl Qc {
@@ -569,6 +584,17 @@ impl Qc {
         file.flush()?;
 
         Ok(())
+    }
+
+    /// Add a [`QcCommand`]
+    pub fn add(&mut self, command: QcCommand) -> &mut Self {
+        self.commands.push(command);
+
+        self
+    }
+
+    pub fn commands(&self) -> &Vec<QcCommand> {
+        &self.commands
     }
 }
 
@@ -756,7 +782,7 @@ fn parse_texrendermode(i: &str) -> CResult {
 
 fn parse_cbox(i: &str) -> CResult {
     qc_command("$cbox", tuple((dvec3, dvec3)), |(mins, maxs)| {
-        QcCommand::CBox(BBox { mins, maxs })
+        QcCommand::CBox(CBox(BBox { mins, maxs }))
     })(i)
 }
 
@@ -1344,7 +1370,7 @@ $sequence \"idle\" {
 
         assert!(rest.is_empty());
 
-        if let QcCommand::CBox(BBox { mins, maxs }) = rv {
+        if let QcCommand::CBox(CBox(BBox { mins, maxs })) = rv {
             assert_eq!(mins, maxs);
             assert_eq!(mins, DVec3::new(0., 0., 0.));
         }
