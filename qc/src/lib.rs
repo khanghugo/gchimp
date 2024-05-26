@@ -545,6 +545,12 @@ pub struct Qc {
     commands: Vec<QcCommand>,
 }
 
+impl Default for Qc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Qc {
     pub fn new() -> Self {
         Self { commands: vec![] }

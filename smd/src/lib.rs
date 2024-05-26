@@ -88,6 +88,12 @@ macro_rules! write_dvec {
     }};
 }
 
+impl Default for Smd {
+    fn default() -> Self {
+        Self::new(1)
+    }
+}
+
 impl Smd {
     pub fn new(version: i32) -> Self {
         Self {

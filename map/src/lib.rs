@@ -54,6 +54,12 @@ pub struct Map {
     pub entities: Vec<Entity>,
 }
 
+impl Default for Map {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Map {
     pub fn new() -> Self {
         Self {
