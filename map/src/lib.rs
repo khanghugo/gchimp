@@ -82,7 +82,7 @@ impl Map {
         Self::from(&text)
     }
 
-    pub fn write(self, file_name: &str) -> io::Result<()> {
+    pub fn write(&self, file_name: &str) -> io::Result<()> {
         let path = Path::new(file_name);
 
         let file = OpenOptions::new()
@@ -93,7 +93,7 @@ impl Map {
 
         let mut file = BufWriter::new(file);
 
-        if let Some(tb_header) = self.tb_header {
+        if let Some(tb_header) = &self.tb_header {
             for s in tb_header {
                 file.write_all("//".as_bytes())?;
                 file.write_all(s.as_bytes())?;

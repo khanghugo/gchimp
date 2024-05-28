@@ -570,7 +570,7 @@ impl Qc {
         Self::from(&text)
     }
 
-    pub fn write(self, file_name: &str) -> io::Result<()> {
+    pub fn write(&self, file_name: &str) -> io::Result<()> {
         let path = Path::new(file_name);
 
         let file = OpenOptions::new()
@@ -581,7 +581,7 @@ impl Qc {
 
         let mut file = BufWriter::new(file);
 
-        for command in self.commands {
+        for command in &self.commands {
             file.write_all(command.to_string().as_bytes())?;
             // explicitly write newline
             file.write_all("\n".as_bytes())?;
