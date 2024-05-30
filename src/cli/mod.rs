@@ -1,13 +1,9 @@
 use map::Map;
 
-use self::{
-    custom_script::CustomScript, light_scale::LightScale, rotate_prop_static::RotatePropStatic,
-    texture_scale::TextureScale,
-};
-
 mod custom_script;
 mod light_scale;
 mod rotate_prop_static;
+mod s2g;
 mod texture_scale;
 
 pub trait Cli {
@@ -21,7 +17,7 @@ pub trait Cli {
 ///
 /// Returns a boolean to indicate whether any CLI actions taken.
 pub fn cli() -> bool {
-    let mut args = std::env::args();
+    let args = std::env::args();
 
     // No arguments
     if args.len() <= 1 {
@@ -29,7 +25,13 @@ pub fn cli() -> bool {
     }
 
     // Add new modules here.
-    let modules: &[&dyn Cli] = &[&CustomScript, &LightScale, &RotatePropStatic, &TextureScale];
+    let modules: &[&dyn Cli] = &[
+        &custom_script::CustomScript,
+        &light_scale::LightScale,
+        &rotate_prop_static::RotatePropStatic,
+        &texture_scale::TextureScale,
+        &s2g::S2G,
+    ];
 
     let help = || {
         println!(
@@ -44,7 +46,7 @@ Available modules:"
     };
 
     // len >= 2
-    let command = args.next().unwrap();
+    let command = args.skip(1).next().unwrap();
 
     for module in modules {
         if command == module.name() {

@@ -22,6 +22,7 @@ eframe = "0.27.2"
 env_logger = "0.11.3"
 egui_tiles = "0.8.0"
 rfd = "0.14.1"
+clap = { version = "4.5.4", features = ["derive"] }
 
 [workspace]
 members = [".", "map", "smd", "qc" ]
