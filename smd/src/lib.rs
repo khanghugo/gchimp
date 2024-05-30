@@ -77,7 +77,8 @@ pub struct Smd {
     pub version: i32,
     pub nodes: Vec<Node>,
     pub skeleton: Vec<Skeleton>,
-    pub triangles: Vec<Triangle>,
+    // triangles is optional because sequence file does not have triangles apparently.
+    pub triangles: Option<Vec<Triangle>>,
     /// Optional for Source
     pub vertex_anim: Option<Vec<VertexAnim>>,
 }
@@ -102,7 +103,7 @@ impl Smd {
             version,
             nodes: vec![],
             skeleton: vec![],
-            triangles: vec![],
+            triangles: None,
             vertex_anim: None,
         }
     }
@@ -158,26 +159,30 @@ impl Smd {
         file.write_all("end\n".as_bytes())?;
 
         // triangles
-        file.write_all("triangles\n".as_bytes())?;
-        for triangle in &self.triangles {
-            file.write_all(format!("{}\n", triangle.material).as_bytes())?;
+        if let Some(triangles) = &self.triangles {
+            file.write_all("triangles\n".as_bytes())?;
 
-            for vertex in &triangle.vertices {
-                file.write_all(format!("{} ", vertex.parent).as_bytes())?;
-                write_dvec!(file, vertex.pos);
-                write_dvec!(file, vertex.norm);
-                write_dvec!(file, vertex.uv);
+            for triangle in triangles {
+                file.write_all(format!("{}\n", triangle.material).as_bytes())?;
 
-                if let Some(source) = &vertex.source {
-                    file.write_all(
-                        format!("{} {} {}", source.links, source.bone, source.weight).as_bytes(),
-                    )?
+                for vertex in &triangle.vertices {
+                    file.write_all(format!("{} ", vertex.parent).as_bytes())?;
+                    write_dvec!(file, vertex.pos);
+                    write_dvec!(file, vertex.norm);
+                    write_dvec!(file, vertex.uv);
+
+                    if let Some(source) = &vertex.source {
+                        file.write_all(
+                            format!("{} {} {}", source.links, source.bone, source.weight)
+                                .as_bytes(),
+                        )?
+                    }
+
+                    file.write_all("\n".as_bytes())?;
                 }
-
-                file.write_all("\n".as_bytes())?;
             }
+            file.write_all("end\n".as_bytes())?;
         }
-        file.write_all("end\n".as_bytes())?;
 
         if let Some(vertex_anim) = &self.vertex_anim {
             // skeleton
@@ -382,16 +387,27 @@ fn parse_vertex_anims(i: &str) -> IResult<Vec<VertexAnim>> {
     )(i)
 }
 
+fn discard_comment_line(i: &str) -> IResult<&str> {
+    terminated(
+        preceded(
+            tuple((multispace0, tag("//"))),
+            take_till(|c| c == '\n' || c == '\r'),
+        ),
+        multispace0,
+    )(i)
+}
+
 fn parse_smd(i: &str) -> IResult<Smd> {
     map(
         tuple((
+            opt(many0(discard_comment_line)),
             parse_header,
             parse_nodes,
             parse_skeleton,
-            parse_triangles,
+            opt(parse_triangles),
             opt(parse_vertex_anims),
         )),
-        |(version, nodes, skeleton, triangles, vertex_anim)| Smd {
+        |(_, version, nodes, skeleton, triangles, vertex_anim)| Smd {
             version,
             nodes,
             skeleton,
@@ -627,7 +643,8 @@ end
         assert_eq!(smd.version, 1);
         assert_eq!(smd.nodes.len(), 1);
         assert_eq!(smd.skeleton.len(), 1);
-        assert_eq!(smd.triangles.len(), 1);
+        assert!(smd.triangles.is_some());
+        assert_eq!(smd.triangles.unwrap().len(), 1);
     }
 
     #[test]
@@ -670,5 +687,19 @@ end
         let file = Smd::from_file("./dunkin/do.nut");
 
         assert!(file.is_err());
+    }
+
+    #[test]
+    fn parse_epiphany() {
+        let file = Smd::from_file("test/willbreakanyway_001_ref.smd");
+
+        assert!(file.is_ok());
+    }
+
+    #[test]
+    fn parse_sequence_smd() {
+        let file = Smd::from_file("test/idle.smd");
+
+        assert!(file.is_ok());
     }
 }
