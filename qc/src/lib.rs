@@ -319,6 +319,7 @@ pub enum QcCommand {
     Body(Body),
     Cd(String),
     CdTexture(String),
+    CdMaterials(String),
     ClipToTextures,
     Scale(f64),
     TextureRenderMode {
@@ -398,6 +399,7 @@ impl QcCommand {
             QcCommand::IllumPosition { .. } => "$illumposition",
             QcCommand::DefineBone { .. } => "$definebone",
             QcCommand::CollisionModel { .. } => "$collisionmodel",
+            QcCommand::CdMaterials(_) => "$cdmaterials",
         }
         .to_string()
     }
@@ -429,6 +431,7 @@ impl fmt::Display for QcCommand {
             ),
             QcCommand::Cd(x) => write!(f, "{}", x),
             QcCommand::CdTexture(x) => write!(f, "{}", x),
+            QcCommand::CdMaterials(x) => write!(f, "{}", x),
             QcCommand::ClipToTextures => Ok(()),
             QcCommand::Scale(x) => write!(f, "{}", x),
             QcCommand::TextureRenderMode { texture, render } => {
@@ -602,6 +605,52 @@ impl Qc {
     pub fn commands(&self) -> &Vec<QcCommand> {
         &self.commands
     }
+
+    /// Add a [`QcCommand::Body`]
+    pub fn add_body(
+        &mut self,
+        name: &str,
+        mesh: &str,
+        reverse: bool,
+        scale: Option<f64>,
+    ) -> &mut Self {
+        let body = Body {
+            name: name.to_string(),
+            mesh: mesh.to_string(),
+            reverse,
+            scale,
+        };
+        self.add(QcCommand::Body(body))
+    }
+
+    pub fn add_sequence(
+        &mut self,
+        name: &str,
+        skeletal: &str,
+        options: Vec<SequenceOption>,
+    ) -> &mut Self {
+        let sequence = Sequence {
+            name: name.to_string(),
+            skeletal: skeletal.to_string(),
+            options,
+        };
+        self.add(QcCommand::Sequence(sequence))
+    }
+
+    /// Sets [`QcCommand::ModelName`] if exists or adds new one
+    pub fn set_model_name(&mut self, name: &str) -> &mut Self {
+        let model_name = self
+            .commands
+            .iter_mut()
+            .find(|command| matches!(command, QcCommand::ModelName(_)));
+
+        if let Some(QcCommand::ModelName(model_name)) = model_name {
+            *model_name = name.to_string();
+            self
+        } else {
+            self.add(QcCommand::ModelName(name.to_string()))
+        }
+    }
 }
 
 fn _number(i: &str) -> IResult<i32> {
@@ -765,9 +814,17 @@ fn parse_cd(i: &str) -> CResult {
     qc_command("$cd", name_string, |cd| QcCommand::Cd(cd.to_string()))(i)
 }
 
+// $cdtexture is for GoldSrc
 fn parse_cd_texture(i: &str) -> CResult {
     qc_command("$cdtexture", name_string, |cd_texture| {
         QcCommand::CdTexture(cd_texture.to_string())
+    })(i)
+}
+
+// $cdmaterials is for Source
+fn parse_cd_materials(i: &str) -> CResult {
+    qc_command("$cdmaterials", name_string, |cd_materials| {
+        QcCommand::CdMaterials(cd_materials.to_string())
     })(i)
 }
 
@@ -1068,6 +1125,7 @@ fn parse_qc_command(i: &str) -> CResult {
             parse_bbox,
             parse_cbox,
             parse_cd_texture,
+            parse_cd_materials,
             parse_cd,
             parse_modelname,
             parse_scale,
@@ -1619,7 +1677,7 @@ $cliptotextures
     }
 
     #[test]
-    fn texturegroup_parse() {
+    fn texture_group_parse() {
         let i = "\
 $texturegroup skinfamilies
 {
@@ -1649,6 +1707,28 @@ $texturegroup skinfamilies
             assert_eq!(groups[0].len(), 5);
 
             assert_eq!(groups[7][2], "eyeball_invun");
+        }
+    }
+
+    #[test]
+    fn texture_group_parse2() {
+        let i = "\
+$texturegroup \"skinfamilies\"
+{
+	{ \"tilefloor01\" \"marblefloor001b\" \"metalflat\" \"gridwall_glow\" \"unbreakable\" }
+}
+
+";
+
+        let (rest, i) = parse_texture_group(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert!(matches!(i, QcCommand::TextureGroup { .. }));
+
+        if let QcCommand::TextureGroup { name, groups } = i {
+            assert_eq!(name, "skinfamilies");
+            assert!(groups.len() == 1);
+            assert!(groups[0].len() == 5);
         }
     }
 
@@ -1728,5 +1808,27 @@ studio t1_surf02_nown
 ";
 
         parse_qc(i).unwrap();
+    }
+
+    #[test]
+    fn cd_material_parse() {
+        let i = "\
+$cdmaterials \"models\\props\\willbreakanyway_001\\\"";
+
+        let (rest, a) = parse_cd_materials(i).unwrap();
+
+        assert!(rest.is_empty());
+        assert!(matches!(a, QcCommand::CdMaterials(_)));
+
+        if let QcCommand::CdMaterials(path) = a {
+            assert_eq!(path, "models\\props\\willbreakanyway_001\\")
+        }
+    }
+
+    #[test]
+    fn parse_epiphany() {
+        let file = Qc::from_file("test/willbreakanyway_001.qc");
+
+        assert!(file.is_ok())
     }
 }
