@@ -10,7 +10,7 @@ pub fn duplicate_triangle(smd: &mut Smd, texture: &str, new_texture: &str) {
 
     // Find triangles
     // Can't rayon this sad
-    smd.triangles.iter().for_each(|tri| {
+    smd.triangles.as_ref().unwrap().iter().for_each(|tri| {
         // material might have .BMP at the end
         let mat = Path::new(&tri.material);
 
@@ -32,7 +32,7 @@ pub fn duplicate_triangle(smd: &mut Smd, texture: &str, new_texture: &str) {
 
     // Add triangles
     new_triangles.iter().for_each(|tri| {
-        smd.triangles.push(tri.clone());
+        smd.triangles.as_mut().unwrap().push(tri.clone());
     });
 }
 
