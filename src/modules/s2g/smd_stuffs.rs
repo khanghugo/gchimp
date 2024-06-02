@@ -15,17 +15,18 @@ pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
     let needed_smd = old_triangles.len() / MAX_TRIANGLE + 1;
 
     (0..needed_smd).for_each(|index| {
-        let mut new_smd = Smd::default();
-
-        new_smd.nodes = smd.nodes.clone();
-        new_smd.skeleton = smd.skeleton.clone();
-        new_smd.triangles = Some(
-            old_triangles
-                .chunks(MAX_TRIANGLE)
-                .nth(index)
-                .unwrap()
-                .to_vec(),
-        );
+        let mut new_smd = Smd {
+            nodes: smd.nodes.clone(),
+            skeleton: smd.skeleton.clone(),
+            triangles: Some(
+                old_triangles
+                    .chunks(MAX_TRIANGLE)
+                    .nth(index)
+                    .unwrap()
+                    .to_vec(),
+            ),
+            ..Default::default()
+        };
 
         // fix the triangles
         new_smd

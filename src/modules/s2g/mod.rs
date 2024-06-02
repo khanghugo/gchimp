@@ -1,7 +1,8 @@
 use std::{
-    fs,
+    fs, io,
     path::{Path, PathBuf},
     process::{Command, Output},
+    sync::{Arc, Mutex},
     thread::JoinHandle,
 };
 
@@ -45,7 +46,7 @@ pub struct S2GSettings {
     studiomdl: PathBuf,
     crowbar: PathBuf,
     no_vtf: PathBuf,
-    wine_prefix: Option<String>,
+    wineprefix: Option<String>,
 }
 
 impl Default for S2GSettings {
@@ -96,7 +97,7 @@ impl S2GSettings {
             studiomdl,
             crowbar,
             no_vtf,
-            wine_prefix: None,
+            wineprefix: None,
         }
     }
 
@@ -115,18 +116,49 @@ impl S2GSettings {
         self
     }
 
-    pub fn wine_prefix(&mut self, path: &str) -> &mut Self {
-        self.wine_prefix = Some(path.into());
+    pub fn wineprefix(&mut self, path: &str) -> &mut Self {
+        self.wineprefix = Some(path.into());
         self
     }
 
     #[cfg(target_os = "linux")]
-    fn check_wine_prefix(&self) -> eyre::Result<()> {
-        if self.wine_prefix.is_none() {
+    fn check_wineprefix(&self) -> eyre::Result<()> {
+        if self.wineprefix.is_none() || self.wineprefix.as_ref().unwrap().is_empty() {
             return Err(eyre!("No WINEPREFIX supplied"));
         }
 
         Ok(())
+    }
+}
+
+#[derive(Clone)]
+pub struct S2GSync {
+    stdout: Arc<Mutex<String>>,
+    is_done: Arc<Mutex<bool>>,
+}
+
+impl S2GSync {
+    pub fn stdout(&self) -> &Arc<Mutex<String>> {
+        &self.stdout
+    }
+
+    pub fn is_done(&self) -> &Arc<Mutex<bool>> {
+        &self.is_done
+    }
+}
+
+impl S2GSync {
+    fn new() -> Self {
+        Self {
+            stdout: Arc::new(Mutex::new(String::new())),
+            is_done: Arc::new(Mutex::new(false)),
+        }
+    }
+}
+
+impl Default for S2GSync {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -141,7 +173,7 @@ pub struct S2GOptions {
     // other stuffs
     /// Proceeds even when there is failure
     force: bool,
-    pseudo_stdout: String,
+    process_sync: Option<S2GSync>,
 }
 
 // TODO: fn new() without S2GSettings in the argument.
@@ -154,8 +186,8 @@ impl S2GOptions {
             vtf: true,
             smd_and_qc: true,
             compile: true,
-            pseudo_stdout: String::new(),
             force: false,
+            process_sync: None,
         }
     }
 
@@ -169,8 +201,13 @@ impl S2GOptions {
             smd_and_qc: true,
             compile: true,
             force: false,
-            pseudo_stdout: String::new(),
+            process_sync: None,
         }
+    }
+
+    pub fn sync(&mut self, sync: S2GSync) -> &mut Self {
+        self.process_sync = Some(sync);
+        self
     }
 
     /// Decompiles Source model.
@@ -197,15 +234,32 @@ impl S2GOptions {
         self
     }
 
-    pub fn set_wine_prefix(&mut self, wine_prefix: &str) -> &mut Self {
-        self.settings.wine_prefix(wine_prefix);
+    pub fn set_wineprefix(&mut self, wine_prefix: &str) -> &mut Self {
+        self.settings.wineprefix(wine_prefix);
         self
     }
 
     /// An amateurish way to instrumentation and proper logging.
-    fn log(&mut self, what: &str) {
+    fn log_info(&self, what: &str) {
         println!("{}", what);
-        self.pseudo_stdout += what;
+
+        if let Some(sync) = &self.process_sync {
+            let mut stdout = sync.stdout.lock().unwrap();
+            *stdout += "- [INFO] ";
+            *stdout += what;
+            *stdout += "\n";
+        }
+    }
+
+    fn log_err(&self, what: &str) {
+        println!("{}", what);
+
+        if let Some(sync) = &self.process_sync {
+            let mut stdout = sync.stdout.lock().unwrap();
+            *stdout += "- [ERROR] ";
+            *stdout += what;
+            *stdout += "\n";
+        }
     }
 
     /// Continues with the process even if there is error
@@ -214,8 +268,10 @@ impl S2GOptions {
         self
     }
 
-    fn work_decompile(&mut self, input_files: &Vec<PathBuf>) -> eyre::Result<()> {
+    fn work_decompile(&mut self, input_files: &[PathBuf]) -> eyre::Result<()> {
         let mut handles: Vec<JoinHandle<eyre::Result<Output>>> = vec![];
+
+        self.log_info("Decompiling model");
 
         for input_file in input_files.iter() {
             let mut err_str = String::new();
@@ -234,13 +290,13 @@ impl S2GOptions {
                 err_str += format!("Cannot find VTX file for {}", input_file.display()).as_str();
             }
 
-            self.log(err_str.as_str());
-
             if !self.force && !err_str.is_empty() {
+                self.log_err(err_str.as_str());
+
                 return Err(eyre!(err_str));
             }
 
-            handles.push(run_crowbar(&input_file, &self.settings));
+            handles.push(run_crowbar(input_file, &self.settings));
         }
 
         // // TODO: do something with the output
@@ -265,10 +321,12 @@ impl S2GOptions {
         Ok(())
     }
 
-    fn work_smd_and_qc(&mut self, input_files: &Vec<PathBuf>) -> eyre::Result<Vec<PathBuf>> {
+    fn work_smd_and_qc(&mut self, input_files: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
         let mut missing_qc: Vec<PathBuf> = vec![];
         let mut qc_paths: Vec<PathBuf> = vec![];
         let mut compile_able_qcs: Vec<PathBuf> = vec![];
+
+        self.log_info("Converting SMD(s) and QC(s)");
 
         input_files.iter().for_each(|file| {
             let mut probable_qc = file.clone();
@@ -291,7 +349,7 @@ impl S2GOptions {
                 err_str += "\n";
             }
 
-            self.log(&err_str);
+            self.log_err(&err_str);
 
             if !self.force {
                 return Err(eyre!(err_str));
@@ -305,9 +363,9 @@ impl S2GOptions {
             let source_qc = Qc::from_file(qc_path.display().to_string().as_str());
 
             if let Err(err) = &source_qc {
-                let err_str = format!("Cannot load QC {}: {}", qc_path.display(), err.to_string());
+                let err_str = format!("Cannot load QC {}: {}", qc_path.display(), err);
 
-                self.log(&err_str);
+                self.log_err(&err_str);
 
                 if !self.force {
                     return Err(eyre!(err_str));
@@ -316,16 +374,12 @@ impl S2GOptions {
 
             let source_qc = source_qc.unwrap();
             let mut goldsrc_qc = create_goldsrc_base_qc_from_source(&source_qc);
-            let linked_smds = find_linked_smd_path(&qc_path.parent().unwrap(), &source_qc);
+            let linked_smds = find_linked_smd_path(qc_path.parent().unwrap(), &source_qc);
 
             if let Err(err) = &linked_smds {
-                let err_str = format!(
-                    "Cannot find linked SMD for {}: {}",
-                    qc_path.display(),
-                    err.to_string()
-                );
+                let err_str = format!("Cannot find linked SMD for {}: {}", qc_path.display(), err);
 
-                self.log(&err_str);
+                self.log_err(&err_str);
 
                 if !self.force {
                     return Err(eyre!(err_str));
@@ -382,9 +436,9 @@ impl S2GOptions {
                     match smd.write(smd_path_for_writing.display().to_string().as_str()) {
                         Ok(_) => {}
                         Err(err) => {
-                            let err_str = format!("Cannot write SMD: {}", err.to_string());
+                            let err_str = format!("Cannot write SMD: {}", err);
 
-                            self.log(&err_str);
+                            self.log_err(&err_str);
 
                             if !self.force {
                                 return Err(eyre!(err_str));
@@ -417,7 +471,7 @@ impl S2GOptions {
                 qc_paths.len()
             );
 
-            self.log(&err_str);
+            self.log_err(&err_str);
 
             if !self.force {
                 return Err(eyre!(err_str));
@@ -430,13 +484,9 @@ impl S2GOptions {
                     compile_able_qcs.push(path.clone());
                 }
                 Err(err) => {
-                    let err_str = format!(
-                        "Cannot write QC {}: {}",
-                        path.display().to_string(),
-                        err.to_string()
-                    );
+                    let err_str = format!("Cannot write QC {}: {}", path.display(), err);
 
-                    self.log(&err_str);
+                    self.log_err(&err_str);
 
                     if !self.force {
                         return Err(eyre!(err_str));
@@ -448,7 +498,8 @@ impl S2GOptions {
         Ok(compile_able_qcs)
     }
 
-    fn work_compile(&mut self, compile_able_qcs: &Vec<PathBuf>) -> eyre::Result<Vec<PathBuf>> {
+    fn work_compile(&mut self, compile_able_qcs: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
+        // let what = io::stdout().;
         let mut result: Vec<PathBuf> = vec![];
         let mut instr_msg = String::from("Compiling {} models: \n");
 
@@ -456,7 +507,7 @@ impl S2GOptions {
             instr_msg += path.display().to_string().as_str();
         });
 
-        self.log(instr_msg.as_str());
+        self.log_info(instr_msg.as_str());
 
         compile_able_qcs.iter().for_each(|path| {
             run_studiomdl(path, &self.settings);
@@ -480,14 +531,46 @@ impl S2GOptions {
     ///
     /// Returns the path of converted models .mdl
     pub fn work(&mut self) -> eyre::Result<Vec<PathBuf>> {
+        self.log_info("Starting...");
+
+        self.log_info("Checking paths...");
+        if self.path.display().to_string().is_empty() {
+            let err_str = "Path is empty";
+
+            self.log_err(err_str);
+
+            return Err(eyre!(err_str));
+        }
+
         let input_files = if self.path.is_file() {
+            self.log_info("Single file conversion");
             vec![self.path.clone()]
         } else {
+            self.log_info("Folder conversion");
             find_file_with_ext_in_folder(&self.path, "mdl")?
         };
 
+        let mut input_files_log_str = String::from("Detected .mdl(s):");
+        input_files.iter().for_each(|file| {
+            input_files_log_str += "\n";
+            input_files_log_str += file.display().to_string().as_str();
+        });
+
+        self.log_info(&input_files_log_str);
+
         #[cfg(target_os = "linux")]
-        self.settings.check_wine_prefix()?;
+        match self.settings.check_wineprefix() {
+            Ok(_) => {
+                self.log_info(
+                    format!("WINEPREFIX={}", self.settings.wineprefix.as_ref().unwrap()).as_str(),
+                );
+            }
+            Err(err) => {
+                self.log_err(err.to_string().as_str());
+
+                return Err(err);
+            }
+        };
 
         // TODO: decompile would not keep anything after ward, just know the result that it works
         if self.decompile {
@@ -513,25 +596,10 @@ impl S2GOptions {
             result.append(&mut res);
         }
 
+        self.log_info("Done");
+
         Ok(result)
     }
-}
-
-struct Texture(PathBuf);
-
-/// All of information related to a model conversion process
-struct Bucket {
-    file_name: PathBuf,
-    textures: Vec<Texture>,
-    orig_qc: Qc,
-    orig_smd: Vec<SmdType>,
-    converted_qc: Qc,
-    converted_smd: Vec<SmdType>,
-}
-
-enum SmdType {
-    Body(Smd),
-    Sequence(Smd),
 }
 
 fn run_crowbar(mdl: &Path, settings: &S2GSettings) -> JoinHandle<eyre::Result<Output>> {
@@ -548,7 +616,7 @@ fn run_crowbar(mdl: &Path, settings: &S2GSettings) -> JoinHandle<eyre::Result<Ou
     let output = if cfg!(target_os = "windows") {
         run_command_windows(command)
     } else {
-        run_command_linux_with_wine(command, settings.wine_prefix.as_ref().unwrap().to_string())
+        run_command_linux_with_wine(command, settings.wineprefix.as_ref().unwrap().to_string())
     };
 
     output
@@ -564,7 +632,7 @@ fn run_studiomdl(qc: &Path, settings: &S2GSettings) -> JoinHandle<eyre::Result<O
     let output = if cfg!(target_os = "windows") {
         run_command_windows(command)
     } else {
-        run_command_linux_with_wine(command, settings.wine_prefix.as_ref().unwrap().to_string())
+        run_command_linux_with_wine(command, settings.wineprefix.as_ref().unwrap().to_string())
     };
 
     output

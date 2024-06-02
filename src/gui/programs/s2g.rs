@@ -1,9 +1,19 @@
+use std::{
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    thread::{self, JoinHandle},
+};
+
 use eframe::egui::{self, ScrollArea};
 
-use crate::gui::{
-    constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
-    utils::preview_files_being_dropped,
-    TabProgram,
+use crate::{
+    gui::{
+        config::Config,
+        constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
+        utils::preview_files_being_dropped,
+        TabProgram,
+    },
+    modules::s2g::{S2GOptions, S2GSync},
 };
 
 struct DragAndDrop {
@@ -25,6 +35,7 @@ impl Default for DragAndDrop {
     }
 }
 
+#[derive(Clone)]
 struct Steps {
     decompile: bool,
     vtf: bool,
@@ -43,46 +54,115 @@ impl Default for Steps {
     }
 }
 
-// #[derive(Default)]
-pub struct S2G {
+struct Options {
+    force: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self { force: false }
+    }
+}
+
+pub struct S2GGui {
+    app_config: Option<Config>,
+    s2g: Option<S2GOptions>,
+    s2g_sync: S2GSync,
     drag_and_drop: DragAndDrop,
     steps: Steps,
-    output: String,
+    options: Options,
+    is_idle: bool,
 }
 
-impl Default for S2G {
-    fn default() -> Self {
+impl S2GGui {
+    // runs in a different thread to avoid blocking
+    fn run(&mut self) -> JoinHandle<eyre::Result<Vec<PathBuf>>> {
+        let path = self.drag_and_drop.file_path.clone();
+        let steps = self.steps.clone();
+
+        let wineprefix = if let Some(app_config) = &self.app_config {
+            app_config.wineprefix.clone()
+        } else {
+            None
+        };
+
+        let sync = self.s2g_sync.clone();
+
+        let handle = thread::spawn(move || {
+            let mut s2g = S2GOptions::new_with_path_to_bin(path.as_str(), "dist");
+
+            let Steps {
+                decompile,
+                vtf,
+                smd_and_qc,
+                goldsrc_compile,
+            } = steps;
+
+            s2g.decompile(decompile)
+                .vtf(vtf)
+                .smd_and_qc(smd_and_qc)
+                .compile(goldsrc_compile)
+                .sync(sync)
+                // .force(force)
+                ;
+
+            #[cfg(target_os = "linux")]
+            if let Some(wineprefix) = wineprefix {
+                s2g.set_wineprefix(wineprefix.as_str());
+            }
+
+            s2g.work()
+            // let _ = self.s2g.as_mut().unwrap().work();
+        });
+
+        handle
+        // self.s2g = Some(S2GOptions::new_with_path_to_bin(
+        //     &self.drag_and_drop.file_path,
+        //     "dist",
+        // ));
+
+        // let Steps {
+        //     decompile,
+        //     vtf,
+        //     smd_and_qc,
+        //     goldsrc_compile,
+        // } = self.steps;
+
+        // self.s2g.as_mut().unwrap().decompile(decompile)
+        //     .vtf(vtf)
+        //     .smd_and_qc(smd_and_qc)
+        //     .compile(goldsrc_compile)
+        //     // .force(force)
+        //     ;
+
+        // // #[cfg(target_os = "linux")]
+        // self.s2g.as_mut().unwrap().set_wine_prefix(
+        //     self.app_config
+        //         .as_ref()
+        //         .unwrap()
+        //         .wineprefix
+        //         .as_ref()
+        //         .unwrap()
+        //         .as_str(),
+        // );
+
+        // let _ = self.s2g.as_mut().unwrap().work();
+    }
+
+    pub fn new(app_config: Option<Config>) -> Self {
         Self {
-            drag_and_drop: Default::default(),
-            steps: Default::default(),
-            output: String::from(
-                "\
-std::array<float, 3> HwDLL::GetRenderedViewangles() {
-	std::array<float, 3> res = {player.Viewangles[0], player.Viewangles[1], player.Viewangles[2]};
-
-	if (!PitchOverrides.empty()) {
-		res[0] = PitchOverrides[PitchOverrideIndex];
-	}
-	if (!RenderPitchOverrides.empty()) {
-		res[0] = RenderPitchOverrides[RenderPitchOverrideIndex];
-	}
-
-	if (!TargetYawOverrides.empty()) {
-		res[1] = TargetYawOverrides[TargetYawOverrideIndex];
-	}
-	if (!RenderYawOverrides.empty()) {
-		res[1] = RenderYawOverrides[RenderYawOverrideIndex];
-	}
-
-	return res;
-}
-",
-            ),
+            app_config,
+            s2g: None,
+            s2g_sync: S2GSync::default(),
+            drag_and_drop: DragAndDrop::default(),
+            steps: Steps::default(),
+            options: Options::default(),
+            is_idle: true,
         }
     }
 }
 
-impl TabProgram for S2G {
+impl TabProgram for S2GGui {
     fn tab_title(&self) -> eframe::egui::WidgetText {
         "S2G".into()
     }
@@ -135,13 +215,40 @@ impl TabProgram for S2G {
         });
 
         ui.separator();
-        ui.label("Output: ");
+        ui.label("Options:");
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.options.force, "Force")
+                .on_hover_text("Continue with the process even when there is error.");
+        });
+
         ui.separator();
+        ui.horizontal(|ui| {
+            ui.add_enabled_ui(self.is_idle, |ui| {
+                if ui.button("Run").clicked() {
+                    self.is_idle = false;
+                    self.run();
+                }
+            });
+            ui.add_enabled_ui(!self.is_idle, |ui| {
+                if ui.button("Cancel").clicked() {
+                    self.is_idle = true;
+                }
+            });
+        });
+
+        ui.separator();
+
+        // let mut readonly_buffer = "abc";
+
+        let binding = self.s2g_sync.stdout().lock().unwrap();
+        let mut readonly_buffer = binding.as_str();
+
         ScrollArea::vertical().show(ui, |ui| {
             ui.add_sized(
                 egui::vec2(PROGRAM_WIDTH, PROGRAM_HEIGHT / 3.),
                 // Unironically the way to make textbox immutable, LMFAO
-                egui::TextEdit::multiline(&mut self.output.as_str()),
+                egui::TextEdit::multiline(&mut readonly_buffer),
+                // egui::TextEdit::multiline(&mut self.output.as_str()),
             );
         });
 
