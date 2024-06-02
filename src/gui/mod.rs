@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use eframe::egui;
 use egui_tiles::Tree;
 
@@ -43,11 +45,12 @@ struct MyApp {
 
 impl Default for MyApp {
     fn default() -> Self {
-        let config = parse_config(CONFIG_FILE_NAME);
+        let config_path = PathBuf::from(format!("dist/{}", CONFIG_FILE_NAME));
+        let config = parse_config(config_path.display().to_string().as_str());
         let config = config.ok();
 
         Self {
-            tree: create_tree(),
+            tree: create_tree(&config),
             config,
         }
     }

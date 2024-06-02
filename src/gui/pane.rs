@@ -1,13 +1,14 @@
 use eframe::egui::{self, Sense};
 
 use super::{
-    programs::{map2prop::Map2Prop, s2g::S2G},
+    config::Config,
+    programs::{map2prop::Map2Prop, s2g::S2GGui},
     TabProgram,
 };
 
 pub enum Pane {
     Map2Prop(Map2Prop),
-    S2G(S2G),
+    S2G(S2GGui),
 }
 
 impl Pane {
@@ -26,13 +27,15 @@ impl Pane {
     }
 }
 
-pub fn create_tree() -> egui_tiles::Tree<Pane> {
+pub fn create_tree(app_config: &Option<Config>) -> egui_tiles::Tree<Pane> {
     let mut tiles = egui_tiles::Tiles::default();
 
-    let mut tabs = vec![];
-
-    tabs.push(tiles.insert_pane(Pane::Map2Prop(Map2Prop::default())));
-    tabs.push(tiles.insert_pane(Pane::S2G(S2G::default())));
+    // TODO somehow access the config without doing clone.
+    // add new programs here
+    let tabs = vec![
+        tiles.insert_pane(Pane::S2G(S2GGui::new(app_config.clone()))),
+        tiles.insert_pane(Pane::Map2Prop(Map2Prop::default())),
+    ];
 
     let root = tiles.insert_tab_tile(tabs);
 
