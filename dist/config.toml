@@ -1,0 +1,4 @@
+studiomdl = "./studiomdl.exe"
+crowbar = "./CrowbarCommandLineDecomp.exe"
+no_vtf = "./no_vtf/no_vtf"
+wineprefix = "/home/khang/.local/share/wineprefixes/wine32/"
