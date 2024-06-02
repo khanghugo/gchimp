@@ -109,7 +109,7 @@ impl Smd {
     }
 
     pub fn from(text: &str) -> eyre::Result<Self> {
-        match parse_smd(&text) {
+        match parse_smd(text) {
             Ok((_, res)) => Ok(res),
             Err(err) => Err(eyre!("Cannot parse text: {}", err.to_string())),
         }
