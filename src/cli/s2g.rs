@@ -73,11 +73,10 @@ impl Cli for S2G {
             .force(force);
 
         #[cfg(target_os = "linux")]
-        s2g.set_wine_prefix(wineprefix.as_str());
+        s2g.set_wineprefix(wineprefix.as_str());
 
-        match s2g.work() {
-            Err(err) => println!("{:?}", err),
-            _ => {}
+        if let Err(err) = s2g.work() {
+            println!("{:?}", err);
         };
     }
 
