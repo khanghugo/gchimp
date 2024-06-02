@@ -17,7 +17,7 @@ pub trait Cli {
 ///
 /// Returns a boolean to indicate whether any CLI actions taken.
 pub fn cli() -> bool {
-    let args = std::env::args();
+    let mut args = std::env::args();
 
     // No arguments
     if args.len() <= 1 {
@@ -46,7 +46,7 @@ Available modules:"
     };
 
     // len >= 2
-    let command = args.skip(1).next().unwrap();
+    let command = args.nth(1).unwrap();
 
     for module in modules {
         if command == module.name() {
