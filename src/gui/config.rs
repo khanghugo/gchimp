@@ -4,12 +4,12 @@ use std::{fs::OpenOptions, io::Read};
 
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub studiomdl: String,
     pub crowbar: String,
     pub no_vtf: String,
-    pub wine_prefix: Option<String>,
+    pub wineprefix: Option<String>,
 }
 
 pub fn parse_config(filename: &str) -> eyre::Result<Config> {
