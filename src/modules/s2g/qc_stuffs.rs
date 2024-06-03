@@ -1,7 +1,11 @@
 use super::*;
 
 // Base Qc includes ModelName, Cd, CdTexture, CBox, and Scale
-pub fn create_goldsrc_base_qc_from_source(source_qc: &Qc) -> Qc {
+// Input `root` means the folder containing the original qc file
+// That would help with studiomdl to cd into the correct directory
+// Though this is just the bandaid solution for now
+// If this were to work with bspsrc decompiled result, might need two paths
+pub fn create_goldsrc_base_qc_from_source(source_qc: &Qc, root: &Path) -> Qc {
     let mut new_qc = Qc::new();
 
     source_qc
@@ -20,8 +24,8 @@ pub fn create_goldsrc_base_qc_from_source(source_qc: &Qc) -> Qc {
             _ => (),
         });
 
-    new_qc.add(QcCommand::Cd(".".to_string()));
-    new_qc.add(QcCommand::CdTexture(".".to_string()));
+    new_qc.add(QcCommand::Cd(root.display().to_string()));
+    new_qc.add(QcCommand::CdTexture(root.display().to_string()));
 
     new_qc
 }

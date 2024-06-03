@@ -12,7 +12,7 @@ pub fn maybe_add_extension_to_string(s: &str, ext: &str) -> String {
     }
 }
 
-pub fn find_file_with_ext_in_folder(path: &Path, ext: &str) -> std::io::Result<Vec<PathBuf>> {
+pub fn find_files_with_ext_in_folder(path: &Path, ext: &str) -> std::io::Result<Vec<PathBuf>> {
     let rd = fs::read_dir(path)?;
     let paths = rd.filter_map(|path| path.ok()).map(|path| path.path());
     let ext_paths = paths

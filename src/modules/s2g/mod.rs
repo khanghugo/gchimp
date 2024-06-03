@@ -1,13 +1,16 @@
 use std::{
-    fs, io,
+    collections::HashSet,
+    fs,
     path::{Path, PathBuf},
     process::{Command, Output},
+    str::from_utf8,
     sync::{Arc, Mutex},
     thread::JoinHandle,
 };
 
 use constants::{
-    CROWBAR_BINARY, GOLDSRC_SUFFIX, NO_VTF_BINARY, STUDIOMDL_BINARY, VTX_EXTENSION, VVD_EXTENSION,
+    CROWBAR_BINARY, GOLDSRC_SUFFIX, NO_VTF_BINARY, STUDIOMDL_BINARY, STUDIOMDL_ERROR_PATTERN,
+    VTX_EXTENSION, VVD_EXTENSION,
 };
 use eyre::eyre;
 use qc::{BodyGroup, Qc, QcCommand};
@@ -16,7 +19,7 @@ use utils::fix_backslash;
 
 use crate::modules::s2g::{
     qc_stuffs::create_goldsrc_base_qc_from_source, smd_stuffs::source_smd_to_goldsrc_smd,
-    utils::find_file_with_ext_in_folder,
+    utils::find_files_with_ext_in_folder,
 };
 
 use self::{
@@ -138,21 +141,20 @@ pub struct S2GSync {
 }
 
 impl S2GSync {
+    fn new() -> Self {
+        Self {
+            stdout: Arc::new(Mutex::new(String::new())),
+            // is_done = true initially
+            is_done: Arc::new(Mutex::new(true)),
+        }
+    }
+
     pub fn stdout(&self) -> &Arc<Mutex<String>> {
         &self.stdout
     }
 
     pub fn is_done(&self) -> &Arc<Mutex<bool>> {
         &self.is_done
-    }
-}
-
-impl S2GSync {
-    fn new() -> Self {
-        Self {
-            stdout: Arc::new(Mutex::new(String::new())),
-            is_done: Arc::new(Mutex::new(false)),
-        }
     }
 }
 
@@ -173,6 +175,8 @@ pub struct S2GOptions {
     // other stuffs
     /// Proceeds even when there is failure
     force: bool,
+    /// Adds "_goldsrc" to the output model name
+    add_suffix: bool,
     process_sync: Option<S2GSync>,
 }
 
@@ -187,11 +191,11 @@ impl S2GOptions {
             smd_and_qc: true,
             compile: true,
             force: false,
+            add_suffix: true,
             process_sync: None,
         }
     }
 
-    #[allow(dead_code)]
     pub fn new_with_path_to_bin(path: &str, path_to_bin: &str) -> Self {
         Self {
             settings: S2GSettings::new(PathBuf::from(path_to_bin).as_path()),
@@ -201,6 +205,7 @@ impl S2GOptions {
             smd_and_qc: true,
             compile: true,
             force: false,
+            add_suffix: true,
             process_sync: None,
         }
     }
@@ -268,6 +273,12 @@ impl S2GOptions {
         self
     }
 
+    /// Adds "_goldsrc" to the end of output model name
+    pub fn add_suffix(&mut self, add_suffix: bool) -> &mut Self {
+        self.add_suffix = add_suffix;
+        self
+    }
+
     fn work_decompile(&mut self, input_files: &[PathBuf]) -> eyre::Result<()> {
         let mut handles: Vec<JoinHandle<eyre::Result<Output>>> = vec![];
 
@@ -290,9 +301,11 @@ impl S2GOptions {
                 err_str += format!("Cannot find VTX file for {}", input_file.display()).as_str();
             }
 
-            if !self.force && !err_str.is_empty() {
+            if !err_str.is_empty() {
                 self.log_err(err_str.as_str());
+            }
 
+            if !self.force && !err_str.is_empty() {
                 return Err(eyre!(err_str));
             }
 
@@ -321,6 +334,7 @@ impl S2GOptions {
         Ok(())
     }
 
+    // `input_files` is slice of .mdl files
     fn work_smd_and_qc(&mut self, input_files: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
         let mut missing_qc: Vec<PathBuf> = vec![];
         let mut qc_paths: Vec<PathBuf> = vec![];
@@ -359,6 +373,35 @@ impl S2GOptions {
         // Qc file would be the top level. There is 1 Qc file and it will link to other Smd files.
         let mut goldsrc_qcs: Vec<(PathBuf, Qc)> = vec![];
 
+        // TODO: just a hack and an assumption that everything is in the same folder
+        // good assumption but maybe it can be better in ze future
+        let texture_folder = if input_files[0].is_file() {
+            input_files[0].parent().unwrap()
+        } else {
+            input_files[0].as_path()
+        };
+
+        let textures = find_files_with_ext_in_folder(texture_folder, "bmp");
+
+        if let Err(err) = &textures {
+            let err_str = format!("Cannot open texture folder: {}", err);
+            self.log_err(err_str.as_str());
+        }
+
+        let textures_in_folder: Vec<String> = textures
+            .unwrap()
+            .iter()
+            .map(|path| {
+                path.file_name() // full file name because we can be more flexible from then on
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string()
+            })
+            .collect();
+
+        let mut missing_textures = HashSet::<String>::new();
+
         for qc_path in qc_paths.iter() {
             let source_qc = Qc::from_file(qc_path.display().to_string().as_str());
 
@@ -373,7 +416,8 @@ impl S2GOptions {
             }
 
             let source_qc = source_qc.unwrap();
-            let mut goldsrc_qc = create_goldsrc_base_qc_from_source(&source_qc);
+            let mut goldsrc_qc =
+                create_goldsrc_base_qc_from_source(&source_qc, qc_path.parent().unwrap());
             let linked_smds = find_linked_smd_path(qc_path.parent().unwrap(), &source_qc);
 
             if let Err(err) = &linked_smds {
@@ -403,11 +447,32 @@ impl S2GOptions {
                 let smd_file_name = path.file_stem().unwrap().to_str().unwrap();
 
                 for (index, smd) in goldsrc_smds.iter().enumerate() {
+                    // check for every texture
+                    // TODO: make it efficent but this might be on smd side to use map for each texture to avoid doing thousands plus comparisons
+                    if let Some(triangles) = &smd.triangles {
+                        // have to iterate everything to make sure that we have every missing textures ever
+                        triangles.iter().for_each(|tri| {
+                            if !textures_in_folder.contains(&tri.material)
+                                && !missing_textures.contains(&tri.material)
+                            {
+                                missing_textures.insert(tri.material.to_string());
+                            }
+                        })
+                    }
+
+                    // if there is missing texture then just don't do anything next
+                    // also do this same thing for the qc loop.
+                    // but at least do it after opening the qc so we can detect for more missing textures.
+                    if !self.force && !missing_textures.is_empty() {
+                        continue;
+                    }
+
                     let smd_path_for_qc = if *is_body {
                         let name = format!("studio{}", index);
                         let smd_path_for_qc = path
                             .with_file_name(format!("{}{}{}", smd_file_name, GOLDSRC_SUFFIX, index))
-                            .with_extension("smd");
+                            // .with_extension("smd") // do not write the extension
+                            ;
 
                         goldsrc_qc.add_body(
                             name.as_str(),
@@ -420,7 +485,8 @@ impl S2GOptions {
                     } else {
                         let smd_path_for_qc = path
                             .with_file_name(format!("{}{}", smd_file_name, GOLDSRC_SUFFIX))
-                            .with_extension("smd");
+                            // .with_extension("smd") // do not write the extension
+                            ;
                         // TODO do something more than just idle
                         goldsrc_qc.add_sequence(
                             "idle",
@@ -431,7 +497,9 @@ impl S2GOptions {
                         smd_path_for_qc
                     };
 
-                    let smd_path_for_writing = qc_path.parent().unwrap().join(smd_path_for_qc);
+                    let smd_path_for_writing = qc_path.parent().unwrap().join(
+                        smd_path_for_qc.with_extension("smd"), // now writes extension because it is file
+                    );
 
                     match smd.write(smd_path_for_writing.display().to_string().as_str()) {
                         Ok(_) => {}
@@ -448,6 +516,10 @@ impl S2GOptions {
                 }
             }
 
+            if !self.force && !missing_textures.is_empty() {
+                continue;
+            }
+
             // after writing all of the SMD, now it is time to write our QC
             // not only that, we also add the appropriate model name inside the QC
             let goldsrc_qc_path = qc_path
@@ -459,14 +531,36 @@ impl S2GOptions {
                 .with_extension("qc");
             let goldsrc_mdl_path = goldsrc_qc_path.with_extension("mdl");
 
-            goldsrc_qc.set_model_name(goldsrc_mdl_path.display().to_string().as_str());
+            if self.add_suffix {
+                goldsrc_qc.set_model_name(goldsrc_mdl_path.display().to_string().as_str());
+            } else {
+                let goldsrc_model_path = goldsrc_qc_path
+                    .with_file_name(qc_path.file_stem().unwrap().to_str().unwrap())
+                    .with_extension("mdl");
+                goldsrc_qc.set_model_name(goldsrc_model_path.display().to_string().as_str());
+            };
 
             goldsrc_qcs.push((goldsrc_qc_path, goldsrc_qc));
         }
 
+        // no need to short circuit here because the next condition will do that
+        if !missing_textures.is_empty() {
+            let mut err_str = format!(
+                "Missing ({}) textures in QC folder:",
+                missing_textures.len()
+            );
+
+            for missing_texture in &missing_textures {
+                err_str += "\n";
+                err_str += missing_texture;
+            }
+
+            self.log_err(&err_str)
+        }
+
         if goldsrc_qcs.len() != qc_paths.len() {
             let err_str = format!(
-                "Failed to process {}/{} .qc files",
+                "Failed to process {}/{} QC files",
                 qc_paths.len() - goldsrc_qcs.len(),
                 qc_paths.len()
             );
@@ -499,9 +593,8 @@ impl S2GOptions {
     }
 
     fn work_compile(&mut self, compile_able_qcs: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
-        // let what = io::stdout().;
         let mut result: Vec<PathBuf> = vec![];
-        let mut instr_msg = String::from("Compiling {} models: \n");
+        let mut instr_msg = format!("Compiling {} models: \n", compile_able_qcs.len());
 
         compile_able_qcs.iter().for_each(|path| {
             instr_msg += path.display().to_string().as_str();
@@ -509,9 +602,37 @@ impl S2GOptions {
 
         self.log_info(instr_msg.as_str());
 
-        compile_able_qcs.iter().for_each(|path| {
-            run_studiomdl(path, &self.settings);
-        });
+        for path in compile_able_qcs.iter() {
+            let res = run_studiomdl(path, &self.settings);
+            match res.join() {
+                Ok(res) => {
+                    let output = res?;
+                    let stdout = from_utf8(&output.stdout).unwrap();
+
+                    let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
+
+                    if let Some(err_index) = maybe_err {
+                        let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
+                        let err_str = format!("Cannot compile {}: {}", path.display(), err.trim());
+                        self.log_err(&err_str);
+
+                        if !self.force {
+                            return Err(eyre!(err_str));
+                        }
+                    }
+                }
+                Err(_) => {
+                    let err_str =
+                        "No idea what happens with running studiomdl. Probably just a dream.";
+
+                    self.log_err(err_str);
+
+                    if !self.force {
+                        return Err(eyre!(err_str));
+                    }
+                }
+            };
+        }
 
         let mut goldsrc_mdl_path = compile_able_qcs
             .iter()
@@ -533,7 +654,7 @@ impl S2GOptions {
     pub fn work(&mut self) -> eyre::Result<Vec<PathBuf>> {
         self.log_info("Starting...");
 
-        self.log_info("Checking paths...");
+        self.log_info("Checking paths");
         if self.path.display().to_string().is_empty() {
             let err_str = "Path is empty";
 
@@ -542,12 +663,24 @@ impl S2GOptions {
             return Err(eyre!(err_str));
         }
 
+        if self.path.is_file()
+            && (self.path.extension().is_none() || (self.path.extension().unwrap() != "mdl"))
+        {
+            let err_str = format!("Input file {} is not an MDL", self.path.display());
+
+            self.log_err(&err_str);
+
+            if !self.force {
+                return Err(eyre!(err_str));
+            }
+        }
+
         let input_files = if self.path.is_file() {
             self.log_info("Single file conversion");
             vec![self.path.clone()]
         } else {
             self.log_info("Folder conversion");
-            find_file_with_ext_in_folder(&self.path, "mdl")?
+            find_files_with_ext_in_folder(&self.path, "mdl")?
         };
 
         let mut input_files_log_str = String::from("Detected .mdl(s):");

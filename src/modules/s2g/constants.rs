@@ -10,3 +10,5 @@ pub static NO_VTF_BINARY: &str = "no_vtf";
 
 pub static VTX_EXTENSION: &str = "sw.vtx";
 pub static VVD_EXTENSION: &str = "vvd";
+
+pub static STUDIOMDL_ERROR_PATTERN: &str = "************ ERROR ************";

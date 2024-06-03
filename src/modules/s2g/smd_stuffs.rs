@@ -45,6 +45,11 @@ pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
 
                 // make the texture name lower case
                 tri.material = tri.material.to_lowercase();
+
+                // goldsrc models need .bmp in the name
+                if !tri.material.ends_with(".bmp") {
+                    tri.material += ".bmp";
+                }
             });
 
         res.push(new_smd);

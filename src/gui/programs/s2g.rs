@@ -1,6 +1,5 @@
 use std::{
     path::PathBuf,
-    sync::{Arc, Mutex},
     thread::{self, JoinHandle},
 };
 
@@ -54,19 +53,23 @@ impl Default for Steps {
     }
 }
 
+#[derive(Clone)]
 struct Options {
     force: bool,
+    add_suffix: bool,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Self { force: false }
+        Self {
+            force: false,
+            add_suffix: true,
+        }
     }
 }
 
 pub struct S2GGui {
     app_config: Option<Config>,
-    s2g: Option<S2GOptions>,
     s2g_sync: S2GSync,
     drag_and_drop: DragAndDrop,
     steps: Steps,
@@ -76,9 +79,10 @@ pub struct S2GGui {
 
 impl S2GGui {
     // runs in a different thread to avoid blocking
-    fn run(&mut self) -> JoinHandle<eyre::Result<Vec<PathBuf>>> {
+    fn run(&self) -> JoinHandle<eyre::Result<Vec<PathBuf>>> {
         let path = self.drag_and_drop.file_path.clone();
         let steps = self.steps.clone();
+        let options = self.options.clone();
 
         let wineprefix = if let Some(app_config) = &self.app_config {
             app_config.wineprefix.clone()
@@ -89,6 +93,8 @@ impl S2GGui {
         let sync = self.s2g_sync.clone();
 
         let handle = thread::spawn(move || {
+            *sync.is_done().lock().unwrap() = false;
+
             let mut s2g = S2GOptions::new_with_path_to_bin(path.as_str(), "dist");
 
             let Steps {
@@ -98,61 +104,34 @@ impl S2GGui {
                 goldsrc_compile,
             } = steps;
 
+            let Options { force, add_suffix } = options;
+
             s2g.decompile(decompile)
                 .vtf(vtf)
                 .smd_and_qc(smd_and_qc)
                 .compile(goldsrc_compile)
-                .sync(sync)
-                // .force(force)
-                ;
+                .sync(sync.clone())
+                .force(force)
+                .add_suffix(add_suffix);
 
             #[cfg(target_os = "linux")]
             if let Some(wineprefix) = wineprefix {
                 s2g.set_wineprefix(wineprefix.as_str());
             }
 
-            s2g.work()
-            // let _ = self.s2g.as_mut().unwrap().work();
+            let res = s2g.work();
+
+            *sync.is_done().lock().unwrap() = true;
+
+            res
         });
 
         handle
-        // self.s2g = Some(S2GOptions::new_with_path_to_bin(
-        //     &self.drag_and_drop.file_path,
-        //     "dist",
-        // ));
-
-        // let Steps {
-        //     decompile,
-        //     vtf,
-        //     smd_and_qc,
-        //     goldsrc_compile,
-        // } = self.steps;
-
-        // self.s2g.as_mut().unwrap().decompile(decompile)
-        //     .vtf(vtf)
-        //     .smd_and_qc(smd_and_qc)
-        //     .compile(goldsrc_compile)
-        //     // .force(force)
-        //     ;
-
-        // // #[cfg(target_os = "linux")]
-        // self.s2g.as_mut().unwrap().set_wine_prefix(
-        //     self.app_config
-        //         .as_ref()
-        //         .unwrap()
-        //         .wineprefix
-        //         .as_ref()
-        //         .unwrap()
-        //         .as_str(),
-        // );
-
-        // let _ = self.s2g.as_mut().unwrap().work();
     }
 
     pub fn new(app_config: Option<Config>) -> Self {
         Self {
             app_config,
-            s2g: None,
             s2g_sync: S2GSync::default(),
             drag_and_drop: DragAndDrop::default(),
             steps: Steps::default(),
@@ -176,7 +155,7 @@ impl TabProgram for S2GGui {
                 ui.add_enabled_ui(self.drag_and_drop.use_file, |ui| {
                     ui.add(
                         egui::TextEdit::singleline(&mut self.drag_and_drop.file_path)
-                            .hint_text("Choose .mdl file (or .qc)"),
+                            .hint_text("Choose .mdl file"),
                     );
                 });
                 if ui.button("+").clicked() {
@@ -205,31 +184,41 @@ impl TabProgram for S2GGui {
             })
         });
 
+        // if compile is ticked then always do the smd and qc step
+        if self.steps.goldsrc_compile {
+            self.steps.smd_and_qc = true;
+        }
+
         ui.separator();
         ui.label("Steps:");
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.steps.decompile, "Decompile");
             ui.checkbox(&mut self.steps.vtf, "VTF");
             ui.checkbox(&mut self.steps.smd_and_qc, "Smd/Qc");
-            ui.checkbox(&mut self.steps.goldsrc_compile, "GoldSrc Compile");
+            ui.checkbox(&mut self.steps.goldsrc_compile, "GoldSrc Compile")
+                .on_hover_text("Must have Smd/Qc step enabled");
         });
 
         ui.separator();
         ui.label("Options:");
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.options.force, "Force")
-                .on_hover_text("Continue with the process even when there is error.");
+                .on_hover_text("Continues with the process even when there is error.");
+            ui.checkbox(&mut self.options.add_suffix, "Add suffix")
+                .on_hover_text("Adds suffix \"_goldsrc\" to the name of the converted model");
         });
+
+        let is_done = *self.s2g_sync.is_done().lock().unwrap();
 
         ui.separator();
         ui.horizontal(|ui| {
-            ui.add_enabled_ui(self.is_idle, |ui| {
+            ui.add_enabled_ui(is_done, |ui| {
                 if ui.button("Run").clicked() {
                     self.is_idle = false;
                     self.run();
                 }
             });
-            ui.add_enabled_ui(!self.is_idle, |ui| {
+            ui.add_enabled_ui(!is_done, |ui| {
                 if ui.button("Cancel").clicked() {
                     self.is_idle = true;
                 }
@@ -237,8 +226,6 @@ impl TabProgram for S2GGui {
         });
 
         ui.separator();
-
-        // let mut readonly_buffer = "abc";
 
         let binding = self.s2g_sync.stdout().lock().unwrap();
         let mut readonly_buffer = binding.as_str();
