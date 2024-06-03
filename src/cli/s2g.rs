@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use crate::modules::s2g::S2GOptions;
+use crate::modules::s2g::S2GBuilder;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -64,7 +64,7 @@ impl Cli for S2G {
             wineprefix,
         } = cli.command;
 
-        let mut s2g = S2GOptions::new_with_path_to_bin(path.display().to_string().as_str(), "dist");
+        let mut s2g = S2GBuilder::new_with_path_to_bin(path.display().to_string().as_str(), "dist");
 
         s2g.decompile(!decompile)
             .vtf(!vtf)

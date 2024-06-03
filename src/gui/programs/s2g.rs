@@ -12,7 +12,7 @@ use crate::{
         utils::preview_files_being_dropped,
         TabProgram,
     },
-    modules::s2g::{S2GOptions, S2GSync},
+    modules::s2g::{S2GBuilder, S2GOptions, S2GSteps, S2GSync},
 };
 
 struct DragAndDrop {
@@ -34,46 +34,12 @@ impl Default for DragAndDrop {
     }
 }
 
-#[derive(Clone)]
-struct Steps {
-    decompile: bool,
-    vtf: bool,
-    smd_and_qc: bool,
-    goldsrc_compile: bool,
-}
-
-impl Default for Steps {
-    fn default() -> Self {
-        Self {
-            decompile: true,
-            vtf: true,
-            smd_and_qc: true,
-            goldsrc_compile: true,
-        }
-    }
-}
-
-#[derive(Clone)]
-struct Options {
-    force: bool,
-    add_suffix: bool,
-}
-
-impl Default for Options {
-    fn default() -> Self {
-        Self {
-            force: false,
-            add_suffix: true,
-        }
-    }
-}
-
 pub struct S2GGui {
     app_config: Option<Config>,
     s2g_sync: S2GSync,
     drag_and_drop: DragAndDrop,
-    steps: Steps,
-    options: Options,
+    steps: S2GSteps,
+    options: S2GOptions,
     is_idle: bool,
 }
 
@@ -95,21 +61,21 @@ impl S2GGui {
         let handle = thread::spawn(move || {
             *sync.is_done().lock().unwrap() = false;
 
-            let mut s2g = S2GOptions::new_with_path_to_bin(path.as_str(), "dist");
+            let mut s2g = S2GBuilder::new_with_path_to_bin(path.as_str(), "dist");
 
-            let Steps {
+            let S2GSteps {
                 decompile,
                 vtf,
                 smd_and_qc,
-                goldsrc_compile,
+                compile,
             } = steps;
 
-            let Options { force, add_suffix } = options;
+            let S2GOptions { force, add_suffix } = options;
 
             s2g.decompile(decompile)
                 .vtf(vtf)
                 .smd_and_qc(smd_and_qc)
-                .compile(goldsrc_compile)
+                .compile(compile)
                 .sync(sync.clone())
                 .force(force)
                 .add_suffix(add_suffix);
@@ -134,8 +100,8 @@ impl S2GGui {
             app_config,
             s2g_sync: S2GSync::default(),
             drag_and_drop: DragAndDrop::default(),
-            steps: Steps::default(),
-            options: Options::default(),
+            steps: S2GSteps::default(),
+            options: S2GOptions::default(),
             is_idle: true,
         }
     }
@@ -185,7 +151,7 @@ impl TabProgram for S2GGui {
         });
 
         // if compile is ticked then always do the smd and qc step
-        if self.steps.goldsrc_compile {
+        if self.steps.compile {
             self.steps.smd_and_qc = true;
         }
 
@@ -193,9 +159,12 @@ impl TabProgram for S2GGui {
         ui.label("Steps:");
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.steps.decompile, "Decompile");
-            ui.checkbox(&mut self.steps.vtf, "VTF");
-            ui.checkbox(&mut self.steps.smd_and_qc, "Smd/Qc");
-            ui.checkbox(&mut self.steps.goldsrc_compile, "GoldSrc Compile")
+            ui.checkbox(&mut self.steps.vtf, "VTF").on_hover_text(
+                "Uses no_vtf to convert .vtx files into .png then to compliant .bmp",
+            );
+            ui.checkbox(&mut self.steps.smd_and_qc, "Smd/Qc")
+                .on_hover_text("Converts decompiled Smd/Qc files");
+            ui.checkbox(&mut self.steps.compile, "GoldSrc Compile")
                 .on_hover_text("Must have Smd/Qc step enabled");
         });
 
