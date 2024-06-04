@@ -15,7 +15,7 @@ type Palette = Vec<quantette::palette::rgb::Rgb<quantette::palette::encoding::Sr
 fn quantize_to_8pp(img: RgbImage) -> eyre::Result<(RgbImage, Palette)> {
     let pipeline = ImagePipeline::try_from(&img)?
         .palette_size(255)
-        .dither(false)
+        .dither(true)
         .colorspace(ColorSpace::Oklab)
         .quantize_method(QuantizeMethod::kmeans());
 

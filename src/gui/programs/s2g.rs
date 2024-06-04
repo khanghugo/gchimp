@@ -12,7 +12,7 @@ use crate::{
         utils::preview_files_being_dropped,
         TabProgram,
     },
-    modules::s2g::{S2GBuilder, S2GOptions, S2GSteps, S2GSync},
+    modules::s2g::{options::S2GOptions, S2GBuilder, S2GSteps, S2GSync},
 };
 
 struct DragAndDrop {
@@ -46,7 +46,12 @@ pub struct S2GGui {
 impl S2GGui {
     // runs in a different thread to avoid blocking
     fn run(&self) -> JoinHandle<eyre::Result<Vec<PathBuf>>> {
-        let path = self.drag_and_drop.file_path.clone();
+        let path = if self.drag_and_drop.use_file {
+            self.drag_and_drop.file_path.clone()
+        } else {
+            self.drag_and_drop.folder_path.clone()
+        };
+
         let steps = self.steps.clone();
         let options = self.options.clone();
 
@@ -71,7 +76,11 @@ impl S2GGui {
                 compile,
             } = steps;
 
-            let S2GOptions { force, add_suffix } = options;
+            let S2GOptions {
+                force,
+                add_suffix,
+                ignore_converted,
+            } = options;
 
             s2g.decompile(decompile)
                 .vtf(vtf)
@@ -80,7 +89,8 @@ impl S2GGui {
                 .compile(compile)
                 .sync(sync.clone())
                 .force(force)
-                .add_suffix(add_suffix);
+                .add_suffix(add_suffix)
+                .ignore_converted(ignore_converted);
 
             #[cfg(target_os = "linux")]
             if let Some(wineprefix) = wineprefix {
@@ -178,6 +188,8 @@ impl TabProgram for S2GGui {
                 .on_hover_text("Continues with the process even when there is error.");
             ui.checkbox(&mut self.options.add_suffix, "Add suffix")
                 .on_hover_text("Adds suffix \"_goldsrc\" to the name of the converted model");
+            ui.checkbox(&mut self.options.ignore_converted, "Ignore converted")
+                .on_hover_text("Ignores models with \"_goldsrc\" suffix");
         });
 
         let is_done = *self.s2g_sync.is_done().lock().unwrap();

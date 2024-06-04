@@ -14,6 +14,7 @@ use constants::{
 };
 use eyre::eyre;
 use img_stuffs::png_to_bmp_par;
+use options::S2GOptions;
 use qc::{BodyGroup, Qc, QcCommand};
 use smd::Smd;
 use utils::fix_backslash;
@@ -33,6 +34,7 @@ use self::{
 
 mod constants;
 mod img_stuffs;
+pub mod options;
 mod qc_stuffs;
 mod smd_stuffs;
 mod utils;
@@ -177,23 +179,6 @@ impl Default for S2GSteps {
     }
 }
 
-#[derive(Clone)]
-pub struct S2GOptions {
-    /// Proceeds even when there is failure
-    pub force: bool,
-    /// Adds "_goldsrc" to the output model name
-    pub add_suffix: bool,
-}
-
-impl Default for S2GOptions {
-    fn default() -> Self {
-        Self {
-            force: false,
-            add_suffix: true,
-        }
-    }
-}
-
 pub struct S2GBuilder {
     settings: S2GSettings,
     path: PathBuf,
@@ -297,6 +282,11 @@ impl S2GBuilder {
     /// Adds "_goldsrc" to the end of output model name
     pub fn add_suffix(&mut self, add_suffix: bool) -> &mut Self {
         self.options.add_suffix = add_suffix;
+        self
+    }
+
+    pub fn ignore_converted(&mut self, ignore_converted: bool) -> &mut Self {
+        self.options.ignore_converted = ignore_converted;
         self
     }
 
@@ -734,7 +724,26 @@ impl S2GBuilder {
             vec![self.path.clone()]
         } else {
             self.log_info("Folder conversion");
-            find_files_with_ext_in_folder(&self.path, "mdl")?
+            let mdls_in_folder = find_files_with_ext_in_folder(&self.path, "mdl")?;
+
+            let res = if !self.options.ignore_converted {
+                mdls_in_folder
+            } else {
+                mdls_in_folder
+                    .iter()
+                    .filter(|path| {
+                        !path
+                            .file_name()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .contains(GOLDSRC_SUFFIX)
+                    })
+                    .map(|path| path.to_owned())
+                    .collect::<Vec<PathBuf>>()
+            };
+
+            res
         };
 
         let mut input_files_log_str = String::from("Detected MDL(s):");

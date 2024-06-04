@@ -28,6 +28,9 @@ enum Commands {
         /// Skips converting .vtf to .png
         #[arg(short, long)]
         vtf: bool,
+        /// Skips converting .png to .bmp
+        #[arg(short, long)]
+        bmp: bool,
         /// Skips converting .qc and .smd
         #[arg(short, long)]
         assembly: bool,
@@ -57,6 +60,7 @@ impl Cli for S2G {
             path,
             decompile,
             vtf,
+            bmp,
             assembly,
             compile,
             force,
@@ -68,6 +72,7 @@ impl Cli for S2G {
 
         s2g.decompile(!decompile)
             .vtf(!vtf)
+            .bmp(!bmp)
             .smd_and_qc(!assembly)
             .compile(!compile)
             .force(force);
