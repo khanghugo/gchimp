@@ -4,7 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use image::{imageops, RgbImage};
+use eyre::eyre;
+use image::{imageops, RgbImage, RgbaImage};
 use quantette::{ColorSpace, ImagePipeline, QuantizeMethod};
 use rayon::prelude::*;
 
@@ -46,9 +47,32 @@ fn maybe_resize(img: RgbImage) -> RgbImage {
     }
 }
 
+fn rgba_to_rgb(img: RgbaImage) -> eyre::Result<RgbImage> {
+    let (width, height) = img.dimensions();
+    let buf = img
+        .par_chunks_exact(4)
+        .flat_map(|p| {
+            let opacity = p[3] as f32 / 255.;
+            [
+                (p[0] as f32 * opacity).round() as u8,
+                (p[1] as f32 * opacity).round() as u8,
+                (p[2] as f32 * opacity).round() as u8,
+            ]
+        })
+        .collect::<Vec<u8>>();
+
+    let res = match RgbImage::from_vec(width, height, buf) {
+        Some(buf) => Ok(buf),
+        None => Err(eyre!("Cannot convert Rgba to Rgb")),
+    }?;
+
+    Ok(res)
+}
+
 fn png_to_bmp(img_path: &Path) -> eyre::Result<()> {
-    let img: RgbImage = image::open(img_path)?.into_rgb8();
-    let img: RgbImage = maybe_resize(img);
+    let img = image::open(img_path)?.into_rgba8();
+    let img = rgba_to_rgb(img)?;
+    let img = maybe_resize(img);
     let (width, height) = img.dimensions();
     let (img, palette_color) = quantize_to_8pp(img)?;
 
