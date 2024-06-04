@@ -69,7 +69,7 @@ fn rgba_to_rgb(img: RgbaImage) -> eyre::Result<RgbImage> {
     Ok(res)
 }
 
-fn png_to_bmp(img_path: &Path) -> eyre::Result<()> {
+pub fn png_to_bmp(img_path: &Path) -> eyre::Result<()> {
     let img = image::open(img_path)?.into_rgba8();
     let img = rgba_to_rgb(img)?;
     let img = maybe_resize(img);
@@ -115,7 +115,7 @@ fn png_to_bmp(img_path: &Path) -> eyre::Result<()> {
     Ok(())
 }
 
-pub fn png_to_bmp_par(paths: &[PathBuf]) -> eyre::Result<()> {
+pub fn png_to_bmp_folder(paths: &[PathBuf]) -> eyre::Result<()> {
     let err: Vec<eyre::Error> = paths
         .par_iter()
         .filter_map(|path| png_to_bmp(path).err())
