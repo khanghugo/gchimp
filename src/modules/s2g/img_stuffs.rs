@@ -92,13 +92,13 @@ fn png_to_bmp(img_path: &Path) -> eyre::Result<()> {
 }
 
 pub fn png_to_bmp_par(paths: &[PathBuf]) -> eyre::Result<()> {
-    let res: Vec<eyre::Error> = paths
+    let err: Vec<eyre::Error> = paths
         .par_iter()
         .filter_map(|path| png_to_bmp(path).err())
         .collect();
 
-    if !res.is_empty() {
-        let err_str = res
+    if !err.is_empty() {
+        let err_str = err
             .iter()
             .fold(String::new(), |acc, e| format!("{}\n{}", acc, e));
 
