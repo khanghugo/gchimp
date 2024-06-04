@@ -13,6 +13,7 @@ use constants::{
     VTX_EXTENSION, VVD_EXTENSION,
 };
 use eyre::eyre;
+use img_stuffs::png_to_bmp_par;
 use qc::{BodyGroup, Qc, QcCommand};
 use smd::Smd;
 use utils::fix_backslash;
@@ -41,6 +42,7 @@ use self::{
 /// extra steps:
 /// bmp conversion
 mod constants;
+mod img_stuffs;
 mod qc_stuffs;
 mod smd_stuffs;
 mod utils;
@@ -164,34 +166,59 @@ impl Default for S2GSync {
     }
 }
 
-pub struct S2GOptions {
-    settings: S2GSettings,
-    path: PathBuf,
-    // steps
-    decompile: bool,
-    vtf: bool,
-    smd_and_qc: bool,
-    compile: bool,
-    // other stuffs
-    /// Proceeds even when there is failure
-    force: bool,
-    /// Adds "_goldsrc" to the output model name
-    add_suffix: bool,
-    process_sync: Option<S2GSync>,
+#[derive(Clone)]
+pub struct S2GSteps {
+    pub decompile: bool,
+    pub vtf: bool,
+    pub smd_and_qc: bool,
+    pub compile: bool,
 }
 
-// TODO: fn new() without S2GSettings in the argument.
-impl S2GOptions {
-    pub fn new(path: &str) -> Self {
+impl Default for S2GSteps {
+    fn default() -> Self {
         Self {
-            settings: S2GSettings::default(),
-            path: PathBuf::from(path),
             decompile: true,
             vtf: true,
             smd_and_qc: true,
             compile: true,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct S2GOptions {
+    /// Proceeds even when there is failure
+    pub force: bool,
+    /// Adds "_goldsrc" to the output model name
+    pub add_suffix: bool,
+}
+
+impl Default for S2GOptions {
+    fn default() -> Self {
+        Self {
             force: false,
             add_suffix: true,
+        }
+    }
+}
+
+pub struct S2GBuilder {
+    settings: S2GSettings,
+    path: PathBuf,
+    steps: S2GSteps,
+    options: S2GOptions,
+    // other stuffs
+    process_sync: Option<S2GSync>,
+}
+
+// TODO: fn new() without S2GSettings in the argument.
+impl S2GBuilder {
+    pub fn new(path: &str) -> Self {
+        Self {
+            settings: S2GSettings::default(),
+            path: PathBuf::from(path),
+            steps: S2GSteps::default(),
+            options: S2GOptions::default(),
             process_sync: None,
         }
     }
@@ -200,12 +227,8 @@ impl S2GOptions {
         Self {
             settings: S2GSettings::new(PathBuf::from(path_to_bin).as_path()),
             path: PathBuf::from(path),
-            decompile: true,
-            vtf: true,
-            smd_and_qc: true,
-            compile: true,
-            force: false,
-            add_suffix: true,
+            steps: S2GSteps::default(),
+            options: S2GOptions::default(),
             process_sync: None,
         }
     }
@@ -217,25 +240,25 @@ impl S2GOptions {
 
     /// Decompiles Source model.
     pub fn decompile(&mut self, decompile: bool) -> &mut Self {
-        self.decompile = decompile;
+        self.steps.decompile = decompile;
         self
     }
 
     /// Runs no_vtf to convert .vtf to .bmp.
     pub fn vtf(&mut self, vtf: bool) -> &mut Self {
-        self.vtf = vtf;
+        self.steps.vtf = vtf;
         self
     }
 
     /// Converts .smd and .qc.
     pub fn smd_and_qc(&mut self, smd_and_qc: bool) -> &mut Self {
-        self.smd_and_qc = smd_and_qc;
+        self.steps.smd_and_qc = smd_and_qc;
         self
     }
 
     /// Compiles the new GoldSrc model.
     pub fn compile(&mut self, compile: bool) -> &mut Self {
-        self.compile = compile;
+        self.steps.compile = compile;
         self
     }
 
@@ -269,13 +292,13 @@ impl S2GOptions {
 
     /// Continues with the process even if there is error
     pub fn force(&mut self, force: bool) -> &mut Self {
-        self.force = force;
+        self.options.force = force;
         self
     }
 
     /// Adds "_goldsrc" to the end of output model name
     pub fn add_suffix(&mut self, add_suffix: bool) -> &mut Self {
-        self.add_suffix = add_suffix;
+        self.options.add_suffix = add_suffix;
         self
     }
 
@@ -305,7 +328,7 @@ impl S2GOptions {
                 self.log_err(err_str.as_str());
             }
 
-            if !self.force && !err_str.is_empty() {
+            if !self.options.force && !err_str.is_empty() {
                 return Err(eyre!(err_str));
             }
 
@@ -314,7 +337,7 @@ impl S2GOptions {
 
         // // TODO: do something with the output
         for handle in handles {
-            let res = handle.join();
+            let _ = handle.join();
         }
 
         Ok(())
@@ -327,9 +350,32 @@ impl S2GOptions {
             self.path.parent().unwrap()
         };
 
+        self.log_info(format!("Running no_vtf over {}", folder_path.display()).as_str());
+
         let handle = run_no_vtf(folder_path, &self.settings);
 
+        // usually it would just work
+        // TODO: do somethign when it doesn't just work
         let _ = handle.join();
+
+        let png_files = find_files_with_ext_in_folder(folder_path, "png")?;
+
+        self.log_info(format!("Found ({}) textures", png_files.len()).as_str());
+
+        self.log_info("Converting PNG to BMP");
+
+        match png_to_bmp_par(&png_files) {
+            Ok(_) => {}
+            Err(err) => {
+                let err_str = format!("Problem with converting PNG to BMP: {}", err);
+
+                self.log_err(&err_str);
+
+                if !self.options.force {
+                    return Err(eyre!(err_str));
+                }
+            }
+        };
 
         Ok(())
     }
@@ -365,7 +411,7 @@ impl S2GOptions {
 
             self.log_err(&err_str);
 
-            if !self.force {
+            if !self.options.force {
                 return Err(eyre!(err_str));
             }
         }
@@ -410,7 +456,7 @@ impl S2GOptions {
 
                 self.log_err(&err_str);
 
-                if !self.force {
+                if !self.options.force {
                     return Err(eyre!(err_str));
                 }
             }
@@ -425,7 +471,7 @@ impl S2GOptions {
 
                 self.log_err(&err_str);
 
-                if !self.force {
+                if !self.options.force {
                     return Err(eyre!(err_str));
                 }
             }
@@ -463,7 +509,7 @@ impl S2GOptions {
                     // if there is missing texture then just don't do anything next
                     // also do this same thing for the qc loop.
                     // but at least do it after opening the qc so we can detect for more missing textures.
-                    if !self.force && !missing_textures.is_empty() {
+                    if !self.options.force && !missing_textures.is_empty() {
                         continue;
                     }
 
@@ -508,7 +554,7 @@ impl S2GOptions {
 
                             self.log_err(&err_str);
 
-                            if !self.force {
+                            if !self.options.force {
                                 return Err(eyre!(err_str));
                             }
                         }
@@ -516,7 +562,7 @@ impl S2GOptions {
                 }
             }
 
-            if !self.force && !missing_textures.is_empty() {
+            if !self.options.force && !missing_textures.is_empty() {
                 continue;
             }
 
@@ -531,7 +577,7 @@ impl S2GOptions {
                 .with_extension("qc");
             let goldsrc_mdl_path = goldsrc_qc_path.with_extension("mdl");
 
-            if self.add_suffix {
+            if self.options.add_suffix {
                 goldsrc_qc.set_model_name(goldsrc_mdl_path.display().to_string().as_str());
             } else {
                 let goldsrc_model_path = goldsrc_qc_path
@@ -567,7 +613,7 @@ impl S2GOptions {
 
             self.log_err(&err_str);
 
-            if !self.force {
+            if !self.options.force {
                 return Err(eyre!(err_str));
             }
         }
@@ -582,7 +628,7 @@ impl S2GOptions {
 
                     self.log_err(&err_str);
 
-                    if !self.force {
+                    if !self.options.force {
                         return Err(eyre!(err_str));
                     }
                 }
@@ -616,7 +662,7 @@ impl S2GOptions {
                         let err_str = format!("Cannot compile {}: {}", path.display(), err.trim());
                         self.log_err(&err_str);
 
-                        if !self.force {
+                        if !self.options.force {
                             return Err(eyre!(err_str));
                         }
                     }
@@ -627,7 +673,7 @@ impl S2GOptions {
 
                     self.log_err(err_str);
 
-                    if !self.force {
+                    if !self.options.force {
                         return Err(eyre!(err_str));
                     }
                 }
@@ -652,7 +698,7 @@ impl S2GOptions {
     ///
     /// Returns the path of converted models .mdl
     pub fn work(&mut self) -> eyre::Result<Vec<PathBuf>> {
-        self.log_info("Starting...");
+        self.log_info("Starting..............");
 
         self.log_info("Checking paths");
         if self.path.display().to_string().is_empty() {
@@ -670,7 +716,7 @@ impl S2GOptions {
 
             self.log_err(&err_str);
 
-            if !self.force {
+            if !self.options.force {
                 return Err(eyre!(err_str));
             }
         }
@@ -706,25 +752,25 @@ impl S2GOptions {
         };
 
         // TODO: decompile would not keep anything after ward, just know the result that it works
-        if self.decompile {
+        if self.steps.decompile {
             self.work_decompile(&input_files)?;
         }
 
         // TODO what the above
-        if self.vtf {
+        if self.steps.vtf {
             self.work_vtf()?;
         }
 
         let mut compile_able_qcs: Vec<PathBuf> = vec![];
 
-        if self.smd_and_qc {
+        if self.steps.smd_and_qc {
             let mut res = self.work_smd_and_qc(&input_files)?;
             compile_able_qcs.append(&mut res);
         }
 
         let mut result: Vec<PathBuf> = vec![];
 
-        if self.compile {
+        if self.steps.compile {
             let mut res = self.work_compile(&compile_able_qcs)?;
             result.append(&mut res);
         }
