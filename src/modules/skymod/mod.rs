@@ -1,7 +1,3 @@
-pub struct SkyModBuilder {
+pub struct SkyModBuilder {}
 
-}
-
-impl SkyModBuilder {
-    
-}
+impl SkyModBuilder {}

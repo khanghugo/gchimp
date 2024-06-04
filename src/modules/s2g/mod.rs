@@ -12,12 +12,12 @@ use constants::{
     VTX_EXTENSION, VVD_EXTENSION,
 };
 use eyre::eyre;
-use img_stuffs::png_to_bmp_par;
 use options::S2GOptions;
 use qc::{BodyGroup, Qc, QcCommand};
 use smd::Smd;
 
 use crate::utils::{
+    img_stuffs::png_to_bmp_par,
     misc::{
         find_files_with_ext_in_folder, fix_backslash, maybe_add_extension_to_string,
         relative_to_less_relative, run_command_linux, run_command_linux_with_wine,
@@ -28,7 +28,6 @@ use crate::utils::{
 };
 
 mod constants;
-mod img_stuffs;
 pub mod options;
 
 pub struct S2GSettings {
