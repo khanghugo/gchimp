@@ -31,16 +31,6 @@ use self::{
     },
 };
 
-/// 1 detect mdl
-/// decompile mdl
-/// look at the mdl's linked files
-/// check whether linked files exist
-/// split triangles from smd file
-/// create qc file
-/// call studiomdl.exe
-///
-/// extra steps:
-/// bmp conversion
 mod constants;
 mod img_stuffs;
 mod qc_stuffs;
@@ -170,6 +160,7 @@ impl Default for S2GSync {
 pub struct S2GSteps {
     pub decompile: bool,
     pub vtf: bool,
+    pub bmp: bool,
     pub smd_and_qc: bool,
     pub compile: bool,
 }
@@ -179,6 +170,7 @@ impl Default for S2GSteps {
         Self {
             decompile: true,
             vtf: true,
+            bmp: true,
             smd_and_qc: true,
             compile: true,
         }
@@ -244,9 +236,15 @@ impl S2GBuilder {
         self
     }
 
-    /// Runs no_vtf to convert .vtf to .bmp.
+    /// Runs no_vtf to convert .vtf to .png.
     pub fn vtf(&mut self, vtf: bool) -> &mut Self {
         self.steps.vtf = vtf;
+        self
+    }
+
+    /// Converts .png to compliant .bmp
+    pub fn bmp(&mut self, bmp: bool) -> &mut Self {
+        self.steps.bmp = bmp;
         self
     }
 
@@ -358,11 +356,21 @@ impl S2GBuilder {
         // TODO: do somethign when it doesn't just work
         let _ = handle.join();
 
+        Ok(())
+    }
+
+    fn work_bmp(&mut self) -> eyre::Result<()> {
+        self.log_info("Converting PNG to BMP");
+
+        let folder_path = if self.path.is_dir() {
+            &self.path
+        } else {
+            self.path.parent().unwrap()
+        };
+
         let png_files = find_files_with_ext_in_folder(folder_path, "png")?;
 
-        self.log_info(format!("Found ({}) textures", png_files.len()).as_str());
-
-        self.log_info("Converting PNG to BMP");
+        self.log_info(format!("Found ({}) texture file(s)", png_files.len()).as_str());
 
         match png_to_bmp_par(&png_files) {
             Ok(_) => {}
@@ -640,7 +648,7 @@ impl S2GBuilder {
 
     fn work_compile(&mut self, compile_able_qcs: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
         let mut result: Vec<PathBuf> = vec![];
-        let mut instr_msg = format!("Compiling {} models: \n", compile_able_qcs.len());
+        let mut instr_msg = format!("Compiling {} model(s): \n", compile_able_qcs.len());
 
         compile_able_qcs.iter().for_each(|path| {
             instr_msg += path.display().to_string().as_str();
@@ -700,7 +708,7 @@ impl S2GBuilder {
     pub fn work(&mut self) -> eyre::Result<Vec<PathBuf>> {
         self.log_info("Starting..............");
 
-        self.log_info("Checking paths");
+        self.log_info("Validating input path");
         if self.path.display().to_string().is_empty() {
             let err_str = "Path is empty";
 
@@ -729,7 +737,7 @@ impl S2GBuilder {
             find_files_with_ext_in_folder(&self.path, "mdl")?
         };
 
-        let mut input_files_log_str = String::from("Detected .mdl(s):");
+        let mut input_files_log_str = String::from("Detected MDL(s):");
         input_files.iter().for_each(|file| {
             input_files_log_str += "\n";
             input_files_log_str += file.display().to_string().as_str();
@@ -759,6 +767,10 @@ impl S2GBuilder {
         // TODO what the above
         if self.steps.vtf {
             self.work_vtf()?;
+        }
+
+        if self.steps.bmp {
+            self.work_bmp()?;
         }
 
         let mut compile_able_qcs: Vec<PathBuf> = vec![];

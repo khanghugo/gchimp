@@ -66,6 +66,7 @@ impl S2GGui {
             let S2GSteps {
                 decompile,
                 vtf,
+                bmp,
                 smd_and_qc,
                 compile,
             } = steps;
@@ -74,6 +75,7 @@ impl S2GGui {
 
             s2g.decompile(decompile)
                 .vtf(vtf)
+                .bmp(bmp)
                 .smd_and_qc(smd_and_qc)
                 .compile(compile)
                 .sync(sync.clone())
@@ -159,9 +161,10 @@ impl TabProgram for S2GGui {
         ui.label("Steps:");
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.steps.decompile, "Decompile");
-            ui.checkbox(&mut self.steps.vtf, "VTF").on_hover_text(
-                "Uses no_vtf to convert .vtx files into .png then to compliant .bmp",
-            );
+            ui.checkbox(&mut self.steps.vtf, "VTF")
+                .on_hover_text("Uses no_vtf to convert all .vtx files in the folder to .png");
+            ui.checkbox(&mut self.steps.bmp, "BMP")
+                .on_hover_text("Converts all .png in the folder to compliant .bmp");
             ui.checkbox(&mut self.steps.smd_and_qc, "Smd/Qc")
                 .on_hover_text("Converts decompiled Smd/Qc files");
             ui.checkbox(&mut self.steps.compile, "GoldSrc Compile")
