@@ -9,7 +9,7 @@ use image::{imageops, RgbImage, RgbaImage};
 use quantette::{ColorSpace, ImagePipeline, QuantizeMethod};
 use rayon::prelude::*;
 
-use super::constants::MAX_GAME_TEXTURE_SIZE;
+use crate::utils::constants::MAX_GOLDSRC_TEXTURE_SIZE;
 
 type Palette = Vec<quantette::palette::rgb::Rgb<quantette::palette::encoding::Srgb, u8>>;
 
@@ -30,7 +30,7 @@ fn maybe_resize(img: RgbImage) -> RgbImage {
     let (width, height) = img.dimensions();
 
     let bigger_side = if width >= height { width } else { height };
-    let q = bigger_side as f32 / MAX_GAME_TEXTURE_SIZE as f32;
+    let q = bigger_side as f32 / MAX_GOLDSRC_TEXTURE_SIZE as f32;
 
     if q <= 1. {
         img

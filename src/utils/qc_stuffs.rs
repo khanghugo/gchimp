@@ -1,4 +1,6 @@
-use super::*;
+use std::path::Path;
+
+use qc::{Qc, QcCommand};
 
 // Base Qc includes ModelName, Cd, CdTexture, CBox, and Scale
 // Input `root` means the folder containing the original qc file

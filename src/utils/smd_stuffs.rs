@@ -1,4 +1,6 @@
-use super::*;
+use smd::Smd;
+
+use super::constants::MAX_SMD_TRIANGLE;
 
 pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
     let mut res: Vec<Smd> = vec![];
@@ -12,7 +14,7 @@ pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
 
     let old_triangles = smd.triangles.as_ref().unwrap();
 
-    let needed_smd = old_triangles.len() / MAX_TRIANGLE + 1;
+    let needed_smd = old_triangles.len() / MAX_SMD_TRIANGLE + 1;
 
     (0..needed_smd).for_each(|index| {
         let mut new_smd = Smd {
@@ -20,7 +22,7 @@ pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
             skeleton: smd.skeleton.clone(),
             triangles: Some(
                 old_triangles
-                    .chunks(MAX_TRIANGLE)
+                    .chunks(MAX_SMD_TRIANGLE)
                     .nth(index)
                     .unwrap()
                     .to_vec(),

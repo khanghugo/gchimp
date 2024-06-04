@@ -1,8 +1,7 @@
 use std::{
     collections::HashSet,
-    fs,
     path::{Path, PathBuf},
-    process::{Command, Output},
+    process::Output,
     str::from_utf8,
     sync::{Arc, Mutex},
     thread::JoinHandle,
@@ -17,27 +16,20 @@ use img_stuffs::png_to_bmp_par;
 use options::S2GOptions;
 use qc::{BodyGroup, Qc, QcCommand};
 use smd::Smd;
-use utils::fix_backslash;
 
-use crate::modules::s2g::{
-    qc_stuffs::create_goldsrc_base_qc_from_source, smd_stuffs::source_smd_to_goldsrc_smd,
-    utils::find_files_with_ext_in_folder,
-};
-
-use self::{
-    constants::MAX_TRIANGLE,
-    utils::{
-        maybe_add_extension_to_string, relative_to_less_relative, run_command_linux,
-        run_command_linux_with_wine, run_command_windows,
+use crate::utils::{
+    misc::{
+        find_files_with_ext_in_folder, fix_backslash, maybe_add_extension_to_string,
+        relative_to_less_relative, run_command_linux, run_command_linux_with_wine,
+        run_command_windows,
     },
+    qc_stuffs::create_goldsrc_base_qc_from_source,
+    smd_stuffs::source_smd_to_goldsrc_smd,
 };
 
 mod constants;
 mod img_stuffs;
 pub mod options;
-mod qc_stuffs;
-mod smd_stuffs;
-mod utils;
 
 pub struct S2GSettings {
     studiomdl: PathBuf,
@@ -98,21 +90,25 @@ impl S2GSettings {
         }
     }
 
+    #[allow(dead_code)]
     pub fn studiomdl(&mut self, path: &str) -> &mut Self {
         self.studiomdl = path.into();
         self
     }
 
+    #[allow(dead_code)]
     pub fn crowbar(&mut self, path: &str) -> &mut Self {
         self.crowbar = path.into();
         self
     }
 
+    #[allow(dead_code)]
     pub fn no_vtf(&mut self, path: &str) -> &mut Self {
         self.no_vtf = path.into();
         self
     }
 
+    #[allow(dead_code)]
     pub fn wineprefix(&mut self, path: &str) -> &mut Self {
         self.wineprefix = Some(path.into());
         self
@@ -184,12 +180,11 @@ pub struct S2GBuilder {
     path: PathBuf,
     steps: S2GSteps,
     options: S2GOptions,
-    // other stuffs
     process_sync: Option<S2GSync>,
 }
 
-// TODO: fn new() without S2GSettings in the argument.
 impl S2GBuilder {
+    #[allow(dead_code)]
     pub fn new(path: &str) -> Self {
         Self {
             settings: S2GSettings::default(),
@@ -865,6 +860,7 @@ fn run_no_vtf(folder: &Path, settings: &S2GSettings) -> JoinHandle<eyre::Result<
 
 #[derive(Debug)]
 struct SmdInfo {
+    #[allow(dead_code)]
     name: String,
     smd: Smd,
     is_body: bool,

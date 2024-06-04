@@ -1,6 +1,9 @@
-use std::thread::{self, JoinHandle};
-
-use super::*;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::{Command, Output},
+    thread::{self, JoinHandle},
+};
 
 pub fn maybe_add_extension_to_string(s: &str, ext: &str) -> String {
     let ext_with_dot = format!(".{}", ext);
