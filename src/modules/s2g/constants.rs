@@ -1,6 +1,7 @@
 pub static MAX_TRIANGLE: usize = 4080;
 
 pub static GOLDSRC_SUFFIX: &str = "_goldsrc";
+
 pub static STUDIOMDL_BINARY: &str = "studiomdl.exe";
 pub static CROWBAR_BINARY: &str = "CrowbarCommandLineDecomp.exe";
 #[cfg(target_os = "windows")]
@@ -12,3 +13,5 @@ pub static VTX_EXTENSION: &str = "sw.vtx";
 pub static VVD_EXTENSION: &str = "vvd";
 
 pub static STUDIOMDL_ERROR_PATTERN: &str = "************ ERROR ************";
+
+pub static MAX_GAME_TEXTURE_SIZE: u32 = 512;
