@@ -93,16 +93,49 @@ macro_rules! write_dvec {
 
 impl Default for Smd {
     fn default() -> Self {
-        Self::new(1)
+        Self::new()
     }
 }
 
 impl Smd {
-    pub fn new(version: i32) -> Self {
+    /// Creates a new [`Smd`] without any data
+    pub fn new() -> Self {
         Self {
-            version,
+            version: 1,
             nodes: vec![],
             skeleton: vec![],
+            triangles: None,
+            vertex_anim: None,
+        }
+    }
+
+    /// Creates a new [`Smd`] with the following data
+    /// ```
+    /// version 1
+    /// nodes
+    /// 0 "static_prop" -1
+    /// end
+    /// skeleton
+    /// time 0
+    ///   0 0.000000 0.000000 0.000000 0.000000 0.000000 0.000000
+    /// end
+    /// ```
+    pub fn new_basic() -> Self {
+        Self {
+            version: 1,
+            nodes: vec![Node {
+                id: 0,
+                bone_name: "static_prop".to_string(),
+                parent: -1,
+            }],
+            skeleton: vec![Skeleton {
+                time: 0,
+                bones: vec![BonePos {
+                    id: 0,
+                    pos: [0., 0., 0.].into(),
+                    rot: [0., 0., 0.].into(),
+                }],
+            }],
             triangles: None,
             vertex_anim: None,
         }
