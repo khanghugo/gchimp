@@ -559,6 +559,23 @@ impl Qc {
         Self { commands: vec![] }
     }
 
+    /// Basic Qc with $scale, $cbox, $bbox
+    pub fn new_basic() -> Self {
+        let mut qc = Self::new();
+
+        qc.commands.push(QcCommand::Scale(1.));
+        qc.commands.push(QcCommand::CBox(CBox(BBox {
+            mins: DVec3::ZERO,
+            maxs: DVec3::ZERO,
+        })));
+        qc.commands.push(QcCommand::BBox(BBox {
+            mins: DVec3::ZERO,
+            maxs: DVec3::ZERO,
+        }));
+
+        qc
+    }
+
     pub fn from(text: &str) -> eyre::Result<Self> {
         match parse_qc(text) {
             Ok((_, res)) => Ok(res),
@@ -638,7 +655,7 @@ impl Qc {
     }
 
     /// Sets [`QcCommand::ModelName`] if exists or adds new one
-    pub fn set_model_name(&mut self, name: &str) -> &mut Self {
+    pub fn add_model_name(&mut self, name: &str) -> &mut Self {
         let model_name = self
             .commands
             .iter_mut()
@@ -649,6 +666,34 @@ impl Qc {
             self
         } else {
             self.add(QcCommand::ModelName(name.to_string()))
+        }
+    }
+
+    pub fn add_cd(&mut self, cd_path: &str) -> &mut Self {
+        let cd = self
+            .commands
+            .iter_mut()
+            .find(|command| matches!(command, QcCommand::Cd(_)));
+
+        if let Some(QcCommand::Cd(cd)) = cd {
+            *cd = cd_path.to_string();
+            self
+        } else {
+            self.add(QcCommand::Cd(cd_path.to_string()))
+        }
+    }
+
+    pub fn add_cd_texture(&mut self, cd_path: &str) -> &mut Self {
+        let cd = self
+            .commands
+            .iter_mut()
+            .find(|command| matches!(command, QcCommand::CdTexture(_)));
+
+        if let Some(QcCommand::CdTexture(cd)) = cd {
+            *cd = cd_path.to_string();
+            self
+        } else {
+            self.add(QcCommand::CdTexture(cd_path.to_string()))
         }
     }
 }

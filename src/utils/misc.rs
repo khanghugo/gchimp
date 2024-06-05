@@ -1,8 +1,6 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::{Command, Output},
-    thread::{self, JoinHandle},
 };
 
 pub fn maybe_add_extension_to_string(s: &str, ext: &str) -> String {
@@ -27,30 +25,6 @@ pub fn find_files_with_ext_in_folder(path: &Path, ext: &str) -> std::io::Result<
 
 pub fn relative_to_less_relative(root: &Path, relative: &Path) -> PathBuf {
     root.join(relative)
-}
-
-// TODO: spawn another thread
-pub fn run_command_windows(command: Vec<String>) -> JoinHandle<eyre::Result<Output>> {
-    thread::spawn(move || Ok(Command::new("cmd").args(command).output()?))
-}
-
-pub fn run_command_linux(command: Vec<String>) -> JoinHandle<eyre::Result<Output>> {
-    let program = command[0].to_string();
-    let args = command[1..].to_vec();
-
-    thread::spawn(move || Ok(Command::new(program).args(args).output()?))
-}
-
-pub fn run_command_linux_with_wine(
-    command: Vec<String>,
-    wine_prefix: String,
-) -> JoinHandle<eyre::Result<Output>> {
-    thread::spawn(move || {
-        Ok(Command::new("wine")
-            .args(command)
-            .env("WINEPREFIX", wine_prefix)
-            .output()?)
-    })
 }
 
 // i use linux to do things

@@ -16,6 +16,8 @@ type IResult<'a, T> = _IResult<&'a str, T>;
 
 use eyre::eyre;
 
+pub mod extras;
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     pub id: i32,
@@ -236,6 +238,16 @@ impl Smd {
         file.flush()?;
 
         Ok(())
+    }
+
+    pub fn add_triangle(&mut self, tri: Triangle) -> &mut Self {
+        if let Some(triangles) = &mut self.triangles {
+            triangles.push(tri);
+        } else {
+            self.triangles = Some(vec![tri]);
+        }
+
+        self
     }
 }
 

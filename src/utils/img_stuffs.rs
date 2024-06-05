@@ -146,20 +146,18 @@ pub fn rgba8_to_8bpp(rgb8a: RgbaImage) -> eyre::Result<(Vec<u8>, Vec<[u8; 3]>)> 
     Ok((img_bmp_8pp, palette_color_arr))
 }
 
-/// `file_name` should not have extension
+/// `file_name` should have .bmp have extension
 pub fn write_8bpp(
     img: &[u8],
     palette: &[[u8; 3]],
     dimension: (u32, u32),
-    file_name: &str,
+    file_path: &Path,
 ) -> eyre::Result<()> {
-    let path = PathBuf::from(file_name);
-
     let mut out_img = OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
-        .open(path.with_extension("bmp"))?;
+        .open(file_path)?;
 
     let mut encoder = image::codecs::bmp::BmpEncoder::new(&mut out_img);
 

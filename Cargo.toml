@@ -19,6 +19,7 @@ serde = "1.0.202"
 quantette = { version = "0.2.0", features = ["kmeans", "threads", "pipelines", "colorspaces"] }
 image = {version = "0.25.1", features = ["png"]}
 clap = { version = "4.5.4", features = ["derive"] }
+ndarray = "0.15.6"
 
 # egui stuffs
 eframe = "0.27.2"
