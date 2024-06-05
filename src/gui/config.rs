@@ -1,5 +1,6 @@
 //! Parses config file
 
+// TODO move this whole thing out of GUI because CLI can benefit from this as well
 use std::{fs::OpenOptions, io::Read};
 
 use serde::Deserialize;
