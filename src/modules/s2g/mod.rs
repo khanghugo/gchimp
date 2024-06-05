@@ -20,10 +20,10 @@ use crate::utils::{
     img_stuffs::png_to_bmp_folder,
     misc::{
         find_files_with_ext_in_folder, fix_backslash, maybe_add_extension_to_string,
-        relative_to_less_relative, run_command_linux, run_command_linux_with_wine,
-        run_command_windows,
+        relative_to_less_relative,
     },
     qc_stuffs::create_goldsrc_base_qc_from_source,
+    run_bin::{run_crowbar, run_no_vtf, run_studiomdl},
     smd_stuffs::source_smd_to_goldsrc_smd,
 };
 
@@ -314,7 +314,15 @@ impl S2GBuilder {
                 return Err(eyre!(err_str));
             }
 
-            handles.push(run_crowbar(input_file, &self.settings));
+            #[cfg(target_os = "windows")]
+            handles.push(run_crowbar(input_file, &self.settings.crowbar));
+
+            #[cfg(target_os = "linux")]
+            handles.push(run_crowbar(
+                input_file,
+                &self.settings.crowbar,
+                self.settings.wineprefix.as_ref().unwrap(),
+            ));
         }
 
         // // TODO: do something with the output
@@ -334,7 +342,11 @@ impl S2GBuilder {
 
         self.log_info(format!("Running no_vtf over {}", folder_path.display()).as_str());
 
-        let handle = run_no_vtf(folder_path, &self.settings);
+        #[cfg(target_os = "windows")]
+        let handle = run_no_vtf(folder_path, &self.settings.no_vtf);
+
+        #[cfg(target_os = "linux")]
+        let handle = run_no_vtf(folder_path, &self.settings.no_vtf);
 
         // usually it would just work
         // TODO: do somethign when it doesn't just work
@@ -570,12 +582,12 @@ impl S2GBuilder {
             let goldsrc_mdl_path = goldsrc_qc_path.with_extension("mdl");
 
             if self.options.add_suffix {
-                goldsrc_qc.set_model_name(goldsrc_mdl_path.display().to_string().as_str());
+                goldsrc_qc.add_model_name(goldsrc_mdl_path.display().to_string().as_str());
             } else {
                 let goldsrc_model_path = goldsrc_qc_path
                     .with_file_name(qc_path.file_stem().unwrap().to_str().unwrap())
                     .with_extension("mdl");
-                goldsrc_qc.set_model_name(goldsrc_model_path.display().to_string().as_str());
+                goldsrc_qc.add_model_name(goldsrc_model_path.display().to_string().as_str());
             };
 
             goldsrc_qcs.push((goldsrc_qc_path, goldsrc_qc));
@@ -641,7 +653,16 @@ impl S2GBuilder {
         self.log_info(instr_msg.as_str());
 
         for path in compile_able_qcs.iter() {
-            let res = run_studiomdl(path, &self.settings);
+            #[cfg(target_os = "windows")]
+            let res = run_studiomdl(path, &self.settings.studiomdl);
+
+            #[cfg(target_os = "linux")]
+            let res = run_studiomdl(
+                path,
+                &self.settings.studiomdl,
+                self.settings.wineprefix.as_ref().unwrap(),
+            );
+
             match res.join() {
                 Ok(res) => {
                     let output = res?;
@@ -794,67 +815,6 @@ impl S2GBuilder {
 
         Ok(result)
     }
-}
-
-fn run_crowbar(mdl: &Path, settings: &S2GSettings) -> JoinHandle<eyre::Result<Output>> {
-    // Assume that all settings are valid.
-    let crowbar = &settings.crowbar;
-
-    // `./crowbar -p model.mdl`
-    let command = vec![
-        crowbar.display().to_string(),
-        "-p".to_string(),
-        mdl.display().to_string(),
-    ];
-
-    let output = if cfg!(target_os = "windows") {
-        run_command_windows(command)
-    } else {
-        run_command_linux_with_wine(command, settings.wineprefix.as_ref().unwrap().to_string())
-    };
-
-    output
-}
-
-fn run_studiomdl(qc: &Path, settings: &S2GSettings) -> JoinHandle<eyre::Result<Output>> {
-    // Assume that all settings are valid.
-    let studiomdl = &settings.studiomdl;
-
-    // `./studiomdl file.qc`
-    let command = vec![studiomdl.display().to_string(), qc.display().to_string()];
-
-    let output = if cfg!(target_os = "windows") {
-        run_command_windows(command)
-    } else {
-        run_command_linux_with_wine(command, settings.wineprefix.as_ref().unwrap().to_string())
-    };
-
-    output
-}
-
-fn run_no_vtf(folder: &Path, settings: &S2GSettings) -> JoinHandle<eyre::Result<Output>> {
-    // Assume that all settings are valid.
-    let no_vtf = &settings.no_vtf;
-
-    // `./no_vtf <path to input dir> --output-dir <path to input dir again> --ldr-format png --max-resolution 512 --min-resolution 16`
-    let command = vec![
-        no_vtf.display().to_string(),
-        folder.display().to_string(),
-        "--output-dir".to_string(),
-        folder.display().to_string(),
-        "--ldr-format".to_string(),
-        "png".to_string(),
-        "--max-resolution".to_string(),
-        "512".to_string(),
-    ];
-
-    let output = if cfg!(target_os = "windows") {
-        run_command_windows(command)
-    } else {
-        run_command_linux(command)
-    };
-
-    output
 }
 
 #[derive(Debug)]
