@@ -6,9 +6,7 @@ use std::{
 
 use eyre::eyre;
 use image::{imageops, RgbImage, RgbaImage};
-use quantette::{
-    ColorSpace, ImagePipeline, QuantizeMethod,
-};
+use quantette::{ColorSpace, ImagePipeline, QuantizeMethod};
 use rayon::prelude::*;
 
 use crate::utils::constants::MAX_GOLDSRC_TEXTURE_SIZE;

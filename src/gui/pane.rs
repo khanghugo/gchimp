@@ -2,13 +2,14 @@ use eframe::egui::{self, Sense};
 
 use super::{
     config::Config,
-    programs::{map2prop::Map2Prop, s2g::S2GGui},
+    programs::{map2prop::Map2Prop, s2g::S2GGui, skymod::SkyModGui},
     TabProgram,
 };
 
 pub enum Pane {
     Map2Prop(Map2Prop),
     S2G(S2GGui),
+    SkyMod(SkyModGui),
 }
 
 impl Pane {
@@ -16,6 +17,7 @@ impl Pane {
         match self {
             Pane::Map2Prop(m2p) => m2p.tab_title(),
             Pane::S2G(s2g) => s2g.tab_title(),
+            Pane::SkyMod(skymod) => skymod.tab_title(),
         }
     }
 
@@ -23,6 +25,7 @@ impl Pane {
         match self {
             Pane::Map2Prop(m2p) => m2p.tab_ui(ui),
             Pane::S2G(s2g) => s2g.tab_ui(ui),
+            Pane::SkyMod(skymod) => skymod.tab_ui(ui),
         }
     }
 }
@@ -30,10 +33,9 @@ impl Pane {
 pub fn create_tree(app_config: &Option<Config>) -> egui_tiles::Tree<Pane> {
     let mut tiles = egui_tiles::Tiles::default();
 
-    // TODO somehow access the config without doing clone.
-    // add new programs here
     let tabs = vec![
         tiles.insert_pane(Pane::S2G(S2GGui::new(app_config.clone()))),
+        tiles.insert_pane(Pane::SkyMod(SkyModGui::new(app_config.clone()))),
         tiles.insert_pane(Pane::Map2Prop(Map2Prop::default())),
     ];
 
