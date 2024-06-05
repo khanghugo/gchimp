@@ -9,7 +9,7 @@ use crate::{
     gui::{
         config::Config,
         constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
-        utils::preview_files_being_dropped,
+        utils::preview_file_being_dropped,
         TabProgram,
     },
     modules::s2g::{options::S2GOptions, S2GBuilder, S2GSteps, S2GSync},
@@ -66,6 +66,7 @@ impl S2GGui {
         let handle = thread::spawn(move || {
             *sync.is_done().lock().unwrap() = false;
 
+            // TODO fix, this is not respecting config.toml
             let mut s2g = S2GBuilder::new_with_path_to_bin(path.as_str(), "dist");
 
             let S2GSteps {
@@ -224,7 +225,7 @@ impl TabProgram for S2GGui {
         });
 
         let ctx = ui.ctx();
-        preview_files_being_dropped(ctx);
+        preview_file_being_dropped(ctx);
 
         // Collect dropped files:
         ctx.input(|i| {
