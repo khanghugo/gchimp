@@ -18,13 +18,14 @@ toml = "0.8.13"
 serde = "1.0.202"
 quantette = { version = "0.2.0", features = ["kmeans", "threads", "pipelines", "colorspaces"] }
 image = {version = "0.25.1", features = ["png"]}
+clap = { version = "4.5.4", features = ["derive"] }
 
 # egui stuffs
 eframe = "0.27.2"
 env_logger = "0.11.3"
 egui_tiles = "0.8.0"
 rfd = "0.14.1"
-clap = { version = "4.5.4", features = ["derive"] }
+egui_extras = {version = "*", features = ["all_loaders"]}
 
 [workspace]
 members = [".", "map", "smd", "qc" ]
