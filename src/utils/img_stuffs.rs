@@ -6,14 +6,19 @@ use std::{
 
 use eyre::eyre;
 use image::{imageops, RgbImage, RgbaImage};
-use quantette::{ColorSpace, ImagePipeline, QuantizeMethod};
+use quantette::{
+    ColorSpace, ImagePipeline, QuantizeMethod,
+};
 use rayon::prelude::*;
 
 use crate::utils::constants::MAX_GOLDSRC_TEXTURE_SIZE;
 
 type Palette = Vec<quantette::palette::rgb::Rgb<quantette::palette::encoding::Srgb, u8>>;
 
-fn quantize_to_8pp(img: RgbImage) -> eyre::Result<(RgbImage, Palette)> {
+/// The pixels are quantized with following palette.
+///
+/// ## Must convert image to 8bpp with the palette.
+fn quantize_image(img: RgbImage) -> eyre::Result<(RgbImage, Palette)> {
     let pipeline = ImagePipeline::try_from(&img)?
         .palette_size(255)
         .dither(true)
@@ -26,7 +31,7 @@ fn quantize_to_8pp(img: RgbImage) -> eyre::Result<(RgbImage, Palette)> {
     Ok((img, palette))
 }
 
-fn maybe_resize(img: RgbImage) -> RgbImage {
+fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: RgbaImage) -> RgbaImage {
     let (width, height) = img.dimensions();
 
     let bigger_side = if width >= height { width } else { height };
@@ -42,12 +47,12 @@ fn maybe_resize(img: RgbImage) -> RgbImage {
             width,
             height,
             // eh, meow?
-            imageops::FilterType::Nearest,
+            imageops::FilterType::Lanczos3,
         )
     }
 }
 
-fn rgba_to_rgb(img: RgbaImage) -> eyre::Result<RgbImage> {
+fn rgba8_to_rgb8(img: RgbaImage) -> eyre::Result<RgbImage> {
     let (width, height) = img.dimensions();
     let buf = img
         .par_chunks_exact(4)
@@ -69,12 +74,31 @@ fn rgba_to_rgb(img: RgbaImage) -> eyre::Result<RgbImage> {
     Ok(res)
 }
 
+fn format_quantette_palette(palette: Palette) -> Vec<[u8; 3]> {
+    palette
+        .iter()
+        .map(|p| [p.red, p.green, p.blue])
+        .collect::<Vec<[u8; 3]>>()
+}
+
+fn rgb8_to_8bpp(img: RgbImage, palette: &[[u8; 3]]) -> Vec<u8> {
+    img.chunks_exact(3)
+        .map(|p| {
+            // unwrap is guaranteed because img uses palette colors
+            let index_for_color = palette
+                .iter()
+                .position(|pp| *pp == [p[0], p[1], p[2]])
+                .unwrap();
+            index_for_color as u8
+        })
+        .collect::<Vec<u8>>()
+}
+
 pub fn png_to_bmp(img_path: &Path) -> eyre::Result<()> {
     let img = image::open(img_path)?.into_rgba8();
-    let img = rgba_to_rgb(img)?;
-    let img = maybe_resize(img);
-    let (width, height) = img.dimensions();
-    let (img, palette_color) = quantize_to_8pp(img)?;
+    let rgba8 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
+    let (width, height) = rgba8.dimensions();
+    let (eight_bpp, eight_bpp_palette) = rgba8_to_8bpp(rgba8)?;
 
     let mut out_img = OpenOptions::new()
         .create(true)
@@ -84,30 +108,12 @@ pub fn png_to_bmp(img_path: &Path) -> eyre::Result<()> {
 
     let mut encoder = image::codecs::bmp::BmpEncoder::new(&mut out_img);
 
-    let palette_color_arr = palette_color
-        .iter()
-        .map(|p| [p.red, p.green, p.blue])
-        .collect::<Vec<[u8; 3]>>();
-
-    // converting 24bpp into 8bpp with the palette we have
-    let img_bmp_8pp = img
-        .chunks_exact(3)
-        .map(|p| {
-            // unwrap is guaranteed because img uses palette colors
-            let index_for_color = palette_color_arr
-                .iter()
-                .position(|pp| *pp == [p[0], p[1], p[2]])
-                .unwrap();
-            index_for_color as u8
-        })
-        .collect::<Vec<u8>>();
-
     encoder.encode_with_palette(
-        &img_bmp_8pp,
+        &eight_bpp,
         width,
         height,
         image::ExtendedColorType::L8,
-        Some(&palette_color_arr),
+        Some(&eight_bpp_palette),
     )?;
 
     out_img.flush()?;
@@ -128,6 +134,46 @@ pub fn png_to_bmp_folder(paths: &[PathBuf]) -> eyre::Result<()> {
 
         return Err(eyre::eyre!(err_str));
     }
+
+    Ok(())
+}
+
+pub fn rgba8_to_8bpp(rgb8a: RgbaImage) -> eyre::Result<(Vec<u8>, Vec<[u8; 3]>)> {
+    let rgb8 = rgba8_to_rgb8(rgb8a)?;
+    let (rgb8, palette_color) = quantize_image(rgb8)?;
+
+    let palette_color_arr = format_quantette_palette(palette_color);
+    let img_bmp_8pp = rgb8_to_8bpp(rgb8, &palette_color_arr);
+
+    Ok((img_bmp_8pp, palette_color_arr))
+}
+
+/// `file_name` should not have extension
+pub fn write_8bpp(
+    img: &[u8],
+    palette: &[[u8; 3]],
+    dimension: (u32, u32),
+    file_name: &str,
+) -> eyre::Result<()> {
+    let path = PathBuf::from(file_name);
+
+    let mut out_img = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(path.with_extension("bmp"))?;
+
+    let mut encoder = image::codecs::bmp::BmpEncoder::new(&mut out_img);
+
+    encoder.encode_with_palette(
+        img,
+        dimension.0,
+        dimension.1,
+        image::ExtendedColorType::L8,
+        Some(palette),
+    )?;
+
+    out_img.flush()?;
 
     Ok(())
 }

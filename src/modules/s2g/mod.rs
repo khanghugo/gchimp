@@ -17,7 +17,7 @@ use qc::{BodyGroup, Qc, QcCommand};
 use smd::Smd;
 
 use crate::utils::{
-    img_stuffs::png_to_bmp_par,
+    img_stuffs::png_to_bmp_folder,
     misc::{
         find_files_with_ext_in_folder, fix_backslash, maybe_add_extension_to_string,
         relative_to_less_relative, run_command_linux, run_command_linux_with_wine,
@@ -356,7 +356,7 @@ impl S2GBuilder {
 
         self.log_info(format!("Found ({}) texture file(s)", png_files.len()).as_str());
 
-        match png_to_bmp_par(&png_files) {
+        match png_to_bmp_folder(&png_files) {
             Ok(_) => {}
             Err(err) => {
                 let err_str = format!("Problem with converting PNG to BMP: {}", err);
