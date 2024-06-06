@@ -16,8 +16,6 @@ type IResult<'a, T> = _IResult<&'a str, T>;
 
 use eyre::eyre;
 
-pub mod extras;
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     pub id: i32,

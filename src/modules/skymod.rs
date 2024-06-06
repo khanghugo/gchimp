@@ -1,10 +1,10 @@
 use eyre::eyre;
-use glam::DVec3;
+use glam::{DVec2, DVec3};
 use image::{imageops, RgbaImage};
 use qc::Qc;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use smd::{extras::SmdExtras, Smd};
-use std::{f32::consts::PI, ops::Mul, path::PathBuf};
+use smd::{Smd, Triangle, Vertex};
+use std::{f64::consts::PI, path::PathBuf};
 
 use ndarray::prelude::*;
 
@@ -135,7 +135,10 @@ impl SkyModBuilder {
             .collect::<Vec<RgbaImage>>();
 
         if textures.len() != 6 {
-            return Err(eyre!("Cannot parse all texture files"));
+            return Err(eyre!(
+                "Cannot parse all texture files ({}/6)",
+                textures.len()
+            ));
         }
 
         for (index, texture) in textures.iter().enumerate() {
@@ -190,7 +193,7 @@ impl SkyModBuilder {
 
         let min_size = texture_per_side * MIN_TEXTURE_SIZE;
 
-        // writes .bmp
+        // // writes .bmp
         textures
             .into_par_iter()
             .enumerate()
@@ -233,9 +236,9 @@ impl SkyModBuilder {
             });
 
         // skybox size 64 means it goes from +32 to -32
-        let skybox_coord = (self.options.skybox_size / 2) as f32;
+        let skybox_coord = (self.options.skybox_size / 2) as f64;
         // size of the texture in the world, like 64k x 64k
-        let texture_world_size = self.options.skybox_size as f32 / texture_per_side as f32;
+        let texture_world_size = self.options.skybox_size as f64 / texture_per_side as f64;
 
         // write .smd, plural
         let mut new_smd = Smd::new_basic();
@@ -251,48 +254,94 @@ impl SkyModBuilder {
                         _x
                     );
 
-                    let texture_world_min_x = skybox_coord - texture_world_size * _x as f32;
-                    let texture_world_min_y = skybox_coord - texture_world_size * _y as f32;
+                    let texture_world_min_x = skybox_coord - texture_world_size * _x as f64;
+                    let texture_world_min_y = skybox_coord - texture_world_size * _y as f64;
+                    
+                    // triangle with normal vector pointing up
+                    // orientation is "default" where top left is 1 1 and bottom right is -1, -1
+                    // counter-clockwise
+                    // A ---- B
+                    // |      |
+                    // D ---- C
+                    // A has coordinate of `min`
+                    // C has coordinate of `max`
+                    let vert_a = 
+                        array![[texture_world_min_x, texture_world_min_y, -skybox_coord]];
+                    let vert_b = 
+                        array![[texture_world_min_x, texture_world_min_y - texture_world_size, -skybox_coord]];
+                    let vert_c = 
+                        array![[texture_world_min_x - texture_world_size, texture_world_min_y - texture_world_size, -skybox_coord]];
+                    let vert_d = 
+                        array![[texture_world_min_x - texture_world_size, texture_world_min_y, -skybox_coord]];
 
-                    // we will always start the texture with down alignment
-                    // then we rotate the coordinate
-                    // start top left -> +x +y
-                    // z here is negative because we are down alignment
-                    let min =
-                        ndarray::arr2(&[[texture_world_min_x, texture_world_min_y, -skybox_coord]]);
-                    let max = ndarray::arr2(&[[
-                        texture_world_min_x - texture_world_size,
-                        texture_world_min_y - texture_world_size,
-                        -skybox_coord,
-                    ]]);
 
-                    let rot_matrix_for_side = rotating_matrix_relative_from_down(texture_index);
+                    let rot_mat = match texture_index {
+                        0 => array![[-1., 0.], [0., 1.]],
+                        1 => array![[-1., 0.], [0., -1.]],
+                        2 => array![[0., 1.], [-1., 0.]],
+                        3 => array![[1., 0.], [0., 1.]],
+                        4 => array![[0., -1.], [1., 0.]],
+                        5 => array![[1., 0.], [0., 1.]],
+                        _ => unreachable!(),
+                    };
 
-                    let min = min.dot(&rot_matrix_for_side);
-                    let max = max.dot(&rot_matrix_for_side);
+                    let vert_a_uv = array![0., 0.].dot(&rot_mat);
+                    let vert_b_uv = array![0., 1.].dot(&rot_mat);
+                    let vert_c_uv = array![1., 1.].dot(&rot_mat);
+                    let vert_d_uv = array![1., 0.].dot(&rot_mat);
 
-                    // do stuffs over f64 cuz smd wants it
-                    let min = min
-                        .into_iter()
-                        .map(|what| (what as f64).round())
-                        .collect::<Vec<f64>>();
-                    let max = max
-                        .into_iter()
-                        .map(|what| (what as f64).round())
-                        .collect::<Vec<f64>>();
+                    // TODO somehow rotate the whole triangle instead of individual vertex
+                    // idk how to use the library :DDDDDDDDDDDD
+                    let vert_a = rotate_matrix_by_index_relative_to_down(texture_index, vert_a);
+                    let vert_b = rotate_matrix_by_index_relative_to_down(texture_index, vert_b);
+                    let vert_c = rotate_matrix_by_index_relative_to_down(texture_index, vert_c);
+                    let vert_d = rotate_matrix_by_index_relative_to_down(texture_index, vert_d);
 
-                    let norm = map_index_to_norm(texture_index);
+                    let parent = 0;
 
-                    let new_triangles = Smd::square(
-                        texture_file_name.as_str(),
-                        min.as_slice(),
-                        max.as_slice(),
-                        &[norm[0], norm[1], norm[2]],
-                    );
+                    let vert_a = Vertex {
+                        parent,
+                        pos: DVec3::from_slice(vert_a.as_slice().unwrap()),
+                        norm: map_index_to_norm(texture_index),
+                        uv: DVec2::from_slice(vert_a_uv.as_slice().unwrap()),
+                        source: None,
+                    };
+                    let vert_b = Vertex {
+                        parent,
+                        pos: DVec3::from_slice(vert_b.as_slice().unwrap()),
+                        norm: map_index_to_norm(texture_index),
+                        uv: DVec2::from_slice(vert_b_uv.as_slice().unwrap()),
+                        source: None,
+                    };
+                    let vert_c = Vertex {
+                        parent,
+                        pos: DVec3::from_slice(vert_c.as_slice().unwrap()),
+                        norm: map_index_to_norm(texture_index),
+                        uv: DVec2::from_slice(vert_c_uv.as_slice().unwrap()),
+                        source: None,
+                    };
+                    let vert_d = Vertex {
+                        parent,
+                        pos: DVec3::from_slice(vert_d.as_slice().unwrap()),
+                        norm: map_index_to_norm(texture_index),
+                        uv: DVec2::from_slice(vert_d_uv.as_slice().unwrap()),
+                        source: None,
+                    };
 
-                    new_triangles.into_iter().for_each(|tri| {
-                        new_smd.add_triangle(tri);
-                    });
+                    let material = texture_file_name.as_str();
+
+                    let tri1 = Triangle {
+                        material: material.to_owned(),
+                        vertices: vec![vert_a.clone(), vert_c.clone(), vert_b],
+                    };
+
+                    let tri2 = Triangle {
+                        material: material.to_owned(),
+                        vertices: vec![vert_a, vert_d, vert_c],
+                    };
+
+                    new_smd.add_triangle(tri1);
+                    new_smd.add_triangle(tri2);
                 }
             }
         }
@@ -364,7 +413,7 @@ fn map_index_to_norm(i: u32) -> DVec3 {
     }
 }
 
-fn rotx_matrix(theta: f32) -> ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>> {
+fn rotx_matrix(theta: f64) -> ArrayBase<ndarray::OwnedRepr<f64>, Dim<[usize; 2]>> {
     let cos_theta = theta.cos();
     let sin_theta = theta.sin();
 
@@ -375,7 +424,7 @@ fn rotx_matrix(theta: f32) -> ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>
     ]
 }
 
-fn roty_matrix(theta: f32) -> ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>> {
+fn roty_matrix(theta: f64) -> ArrayBase<ndarray::OwnedRepr<f64>, Dim<[usize; 2]>> {
     let cos_theta = theta.cos();
     let sin_theta = theta.sin();
 
@@ -386,7 +435,7 @@ fn roty_matrix(theta: f32) -> ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>
     ]
 }
 
-fn rotz_matrix(theta: f32) -> ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>> {
+fn rotz_matrix(theta: f64) -> ArrayBase<ndarray::OwnedRepr<f64>, Dim<[usize; 2]>> {
     let cos_theta = theta.cos();
     let sin_theta = theta.sin();
 
@@ -397,50 +446,41 @@ fn rotz_matrix(theta: f32) -> ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>
     ]
 }
 
-fn rotating_matrix_relative_from_front(
-    i: u32,
-) -> ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>> {
-    let id = array![[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]];
 
-    let theta = PI / 2.;
-
-    match i {
-        // up
-        0 => roty_matrix(-theta),
-        // left
-        1 => rotz_matrix(theta),
-        // front
-        2 => id,
-        // right
-        3 => rotz_matrix(-theta),
-        // back
-        4 => rotz_matrix(theta).mul(rotz_matrix(theta)),
-        // down
-        5 => roty_matrix(theta),
+fn map_index_to_vertex_order(index: u32) -> bool {
+    match index {
+        0 => false,
+        1 => false,
+        2 => false,
+        3 => false,
+        4 => false,
+        5 => false,
         _ => unreachable!(),
     }
 }
 
-fn rotating_matrix_relative_from_down(
-    i: u32,
-) -> ArrayBase<ndarray::OwnedRepr<f32>, Dim<[usize; 2]>> {
-    let id = array![[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]];
-
+fn rotate_matrix_by_index_relative_to_down(
+    index: u32,
+    vert: ArrayBase<ndarray::OwnedRepr<f64>, Dim<[usize; 2]>>,
+) -> ArrayBase<ndarray::OwnedRepr<f64>, Dim<[usize; 2]>> {
     let theta = PI / 2.;
 
-    match i {
+    match index {
         // up
-        0 => roty_matrix(theta).mul(roty_matrix(theta)),
-        // left
-        1 => rotx_matrix(theta),
+        0 => vert.dot(&rotx_matrix(-theta))
+        .dot(&rotx_matrix(-theta)),
+        // left, wow axis is like normal math
+        1 => vert.dot(&rotx_matrix(-theta)),
         // front
-        2 => roty_matrix(-theta),
+        2 => vert.dot(&roty_matrix(-theta)),
         // right
-        3 => rotx_matrix(-theta),
+        3 => vert.dot(&rotx_matrix(theta)),
         // back
-        4 => roty_matrix(theta),
+        4 => vert
+            .dot(&roty_matrix(theta))
+            ,
         // down
-        5 => id,
+        5 => vert,
         _ => unreachable!(),
     }
 }
@@ -452,19 +492,21 @@ mod test {
     fn run() {
         let mut binding = SkyModBuilder::new();
         let builder = binding
-            .bk("examples/skybox/sky_cloudybk.png")
-            .dn("examples/skybox/sky_cloudydn.png")
-            .ft("examples/skybox/sky_cloudyft.png")
-            .lf("examples/skybox/sky_cloudylf.png")
-            .rt("examples/skybox/sky_cloudyrt.png")
-            .up("examples/skybox/sky_cloudyup.png")
+            .bk("examples/skybox/test2bk.png")
+            .dn("examples/skybox/test2dn.png")
+            .ft("examples/skybox/test2ft.png")
+            .lf("examples/skybox/test2lf.png")
+            .rt("examples/skybox/test2rt.png")
+            .up("examples/skybox/test2up.png")
             .studiomdl("/home/khang/map2prop-rs/dist/studiomdl.exe")
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .output_name("please")
             .skybox_size(512)
-            .texture_per_face(1);
+            .texture_per_face(4);
 
         let res = builder.work();
+
+        // println!("{:?}", res);
 
         assert!(res.is_ok());
     }
