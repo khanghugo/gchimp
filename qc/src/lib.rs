@@ -696,6 +696,15 @@ impl Qc {
             self.add(QcCommand::CdTexture(cd_path.to_string()))
         }
     }
+
+    pub fn add_texrendermode(&mut self, texture: &str, render: RenderMode) -> &mut Self {
+        let command = QcCommand::TextureRenderMode {
+            texture: texture.to_owned(),
+            render,
+        };
+
+        self.add(command)
+    }
 }
 
 fn _number(i: &str) -> IResult<i32> {
