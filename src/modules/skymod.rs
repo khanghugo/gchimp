@@ -16,6 +16,7 @@ use crate::utils::{
 pub struct SkyModOptions {
     skybox_size: u32,
     texture_per_face: u32,
+    convert_texture: bool,
 }
 
 impl Default for SkyModOptions {
@@ -23,6 +24,7 @@ impl Default for SkyModOptions {
         Self {
             skybox_size: 131072,
             texture_per_face: 1,
+            convert_texture: true,
         }
     }
 }
@@ -107,6 +109,11 @@ impl SkyModBuilder {
 
     pub fn skybox_size(&mut self, a: u32) -> &mut Self {
         self.options.skybox_size = a;
+        self
+    }
+
+    pub fn convert_texture(&mut self, a: bool) -> &mut Self {
+        self.options.convert_texture = a;
         self
     }
 
@@ -198,6 +205,10 @@ impl SkyModBuilder {
             .into_par_iter()
             .enumerate()
             .for_each(|(texture_index, texture)| {
+                if !self.options.convert_texture {
+                    return;
+                }
+
                 let (width, _) = texture.dimensions();
 
                 // it is best to resize first then we can crop accordingly to how many textures in a face
@@ -273,7 +284,6 @@ impl SkyModBuilder {
                         array![[texture_world_min_x - texture_world_size, texture_world_min_y - texture_world_size, -skybox_coord]];
                     let vert_d = 
                         array![[texture_world_min_x - texture_world_size, texture_world_min_y, -skybox_coord]];
-
 
                     let rot_mat = match texture_index {
                         0 => array![[-1., 0.], [0., 1.]],
@@ -502,7 +512,8 @@ mod test {
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .output_name("please")
             .skybox_size(512)
-            .texture_per_face(4);
+            .texture_per_face(4)
+            .convert_texture(false);
 
         let res = builder.work();
 
