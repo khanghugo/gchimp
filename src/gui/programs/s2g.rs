@@ -4,10 +4,11 @@ use std::{
 };
 
 use eframe::egui::{self, ScrollArea};
+use eyre::eyre;
 
 use crate::{
+    config::Config,
     gui::{
-        config::Config,
         constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
         utils::preview_file_being_dropped,
         TabProgram,
@@ -45,7 +46,7 @@ pub struct S2GGui {
 
 impl S2GGui {
     // runs in a different thread to avoid blocking
-    fn run(&self) -> JoinHandle<eyre::Result<Vec<PathBuf>>> {
+    fn run(&self) -> eyre::Result<JoinHandle<eyre::Result<Vec<PathBuf>>>> {
         let path = if self.drag_and_drop.use_file {
             self.drag_and_drop.file_path.clone()
         } else {
@@ -55,11 +56,18 @@ impl S2GGui {
         let steps = self.steps.clone();
         let options = self.options.clone();
 
-        let wineprefix = if let Some(app_config) = &self.app_config {
-            app_config.wineprefix.clone()
-        } else {
-            None
-        };
+        if self.app_config.is_none() {
+            let mut lock = self.s2g_sync.stdout().lock().unwrap();
+            *lock += "No config.toml found";
+            return Err(eyre!("No config.toml found"));
+        }
+
+        let Config {
+            studiomdl,
+            crowbar,
+            no_vtf,
+            wineprefix,
+        } = self.app_config.clone().unwrap();
 
         let sync = self.s2g_sync.clone();
 
@@ -67,7 +75,7 @@ impl S2GGui {
             *sync.is_done().lock().unwrap() = false;
 
             // TODO fix, this is not respecting config.toml
-            let mut s2g = S2GBuilder::new_with_path_to_bin(path.as_str(), "dist");
+            let mut s2g = S2GBuilder::new(path.as_str());
 
             let S2GSteps {
                 decompile,
@@ -84,6 +92,14 @@ impl S2GGui {
                 flatshade,
             } = options;
 
+            s2g.settings
+                .studiomdl(&studiomdl)
+                .crowbar(&crowbar)
+                .no_vtf(&no_vtf);
+
+            #[cfg(target_os = "linux")]
+            s2g.settings.wineprefix(wineprefix);
+
             s2g.decompile(decompile)
                 .vtf(vtf)
                 .bmp(bmp)
@@ -95,11 +111,6 @@ impl S2GGui {
                 .ignore_converted(ignore_converted)
                 .flatshade(flatshade);
 
-            #[cfg(target_os = "linux")]
-            if let Some(wineprefix) = wineprefix {
-                s2g.set_wineprefix(wineprefix.as_str());
-            }
-
             let res = s2g.work();
 
             *sync.is_done().lock().unwrap() = true;
@@ -107,7 +118,7 @@ impl S2GGui {
             res
         });
 
-        handle
+        Ok(handle)
     }
 
     pub fn new(app_config: Option<Config>) -> Self {
@@ -208,7 +219,7 @@ Recommended to have it on so textures will be uniformly lit",
             ui.add_enabled_ui(is_done, |ui| {
                 if ui.button("Run").clicked() {
                     self.is_idle = false;
-                    self.run();
+                    let _ = self.run();
                 }
             });
             ui.add_enabled_ui(!is_done, |ui| {

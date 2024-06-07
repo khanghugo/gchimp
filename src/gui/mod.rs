@@ -1,15 +1,13 @@
-use std::path::PathBuf;
-
 use eframe::egui;
 use egui_tiles::Tree;
 
+use crate::config::parse_config;
+
 use self::{
-    config::{parse_config, Config},
-    constants::{CONFIG_FILE_NAME, PROGRAM_HEIGHT, PROGRAM_WIDTH},
+    constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
     pane::{create_tree, Pane, TreeBehavior},
 };
 
-mod config;
 mod constants;
 mod pane;
 mod programs;
@@ -32,7 +30,7 @@ pub fn gui() -> Result<(), eframe::Error> {
     };
 
     eframe::run_native(
-        "My egui App",
+        "gchimp",
         options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
@@ -43,18 +41,17 @@ pub fn gui() -> Result<(), eframe::Error> {
 
 struct MyApp {
     tree: Tree<Pane>,
-    config: Option<Config>,
+    // config: Option<Config>,
 }
 
 impl Default for MyApp {
     fn default() -> Self {
-        let config_path = PathBuf::from(format!("dist/{}", CONFIG_FILE_NAME));
-        let config = parse_config(config_path.display().to_string().as_str());
+        let config = parse_config();
         let config = config.ok();
 
         Self {
             tree: create_tree(&config),
-            config,
+            // config,
         }
     }
 }

@@ -4,7 +4,10 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use crate::modules::s2g::S2GBuilder;
+use crate::{
+    config::{parse_config, Config},
+    modules::s2g::S2GBuilder,
+};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -43,7 +46,7 @@ enum Commands {
         /// WINEPREFIX
         #[arg(long)]
         #[cfg(target_os = "linux")]
-        wineprefix: String,
+        wineprefix: Option<String>,
     },
 }
 
@@ -68,7 +71,20 @@ impl Cli for S2G {
             wineprefix,
         } = cli.command;
 
-        let mut s2g = S2GBuilder::new_with_path_to_bin(path.display().to_string().as_str(), "dist");
+        let mut s2g = S2GBuilder::new(path.display().to_string().as_str());
+
+        let config = parse_config();
+
+        if config.is_err() {
+            println!("Error parsing config.toml");
+        }
+
+        let Config {
+            studiomdl,
+            crowbar,
+            no_vtf,
+            wineprefix: config_wineprefix,
+        } = config.unwrap();
 
         s2g.decompile(!decompile)
             .vtf(!vtf)
@@ -77,8 +93,17 @@ impl Cli for S2G {
             .compile(!compile)
             .force(force);
 
+        s2g.settings
+            .studiomdl(&studiomdl)
+            .crowbar(&crowbar)
+            .no_vtf(&no_vtf);
+
         #[cfg(target_os = "linux")]
-        s2g.set_wineprefix(wineprefix.as_str());
+        s2g.settings.wineprefix(if wineprefix.is_some() {
+            wineprefix
+        } else {
+            config_wineprefix
+        });
 
         if let Err(err) = s2g.work() {
             println!("{:?}", err);

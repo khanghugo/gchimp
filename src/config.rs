@@ -25,7 +25,7 @@ pub static CONFIG_FILE_NAME: &str = "config.toml";
 pub fn parse_config() -> eyre::Result<Config> {
     let path = match env::current_exe() {
         Ok(path) => path.parent().unwrap().join(CONFIG_FILE_NAME),
-        Err(_) => PathBuf::from(format!("{}", CONFIG_FILE_NAME)),
+        Err(_) => PathBuf::from(CONFIG_FILE_NAME),
     };
 
     parse_config_from_file(path.as_path())

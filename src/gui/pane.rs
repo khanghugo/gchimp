@@ -1,7 +1,8 @@
 use eframe::egui::{self, Sense};
 
+use crate::config::Config;
+
 use super::{
-    config::Config,
     programs::{map2prop::Map2Prop, s2g::S2GGui, skymod::SkyModGui},
     TabProgram,
 };

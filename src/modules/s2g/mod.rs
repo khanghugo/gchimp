@@ -108,8 +108,8 @@ impl S2GSettings {
     }
 
     #[allow(dead_code)]
-    pub fn wineprefix(&mut self, path: &str) -> &mut Self {
-        self.wineprefix = Some(path.into());
+    pub fn wineprefix(&mut self, path: Option<String>) -> &mut Self {
+        self.wineprefix = path;
         self
     }
 
@@ -175,7 +175,7 @@ impl Default for S2GSteps {
 }
 
 pub struct S2GBuilder {
-    settings: S2GSettings,
+    pub settings: S2GSettings,
     path: PathBuf,
     steps: S2GSteps,
     options: S2GOptions,
@@ -236,11 +236,6 @@ impl S2GBuilder {
     /// Compiles the new GoldSrc model.
     pub fn compile(&mut self, compile: bool) -> &mut Self {
         self.steps.compile = compile;
-        self
-    }
-
-    pub fn set_wineprefix(&mut self, wine_prefix: &str) -> &mut Self {
-        self.settings.wineprefix(wine_prefix);
         self
     }
 

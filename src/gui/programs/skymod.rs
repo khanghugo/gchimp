@@ -8,8 +8,8 @@ use std::{
 use eframe::egui::{self, ScrollArea};
 
 use crate::{
+    config::Config,
     gui::{
-        config::Config,
         constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
         utils::preview_file_being_dropped,
         TabProgram,
