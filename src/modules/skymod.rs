@@ -448,7 +448,7 @@ impl SkyModBuilder {
                     for _y in 0..texture_per_side {
                         for _x in 0..texture_per_side {
                             let curr_texture_overall_count =
-                                texture_index * 16 + _y * texture_per_side + _x;
+                                texture_index * self.options.texture_per_face + _y * texture_per_side + _x;
                             let new_qc_index = (curr_texture_overall_count
                                 / MAX_GOLDSRC_MODEL_TEXTURE_COUNT)
                                 as usize;
