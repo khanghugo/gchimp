@@ -81,6 +81,7 @@ impl S2GGui {
                 force,
                 add_suffix,
                 ignore_converted,
+                flatshade,
             } = options;
 
             s2g.decompile(decompile)
@@ -91,7 +92,8 @@ impl S2GGui {
                 .sync(sync.clone())
                 .force(force)
                 .add_suffix(add_suffix)
-                .ignore_converted(ignore_converted);
+                .ignore_converted(ignore_converted)
+                .flatshade(flatshade);
 
             #[cfg(target_os = "linux")]
             if let Some(wineprefix) = wineprefix {
@@ -191,6 +193,12 @@ impl TabProgram for S2GGui {
                 .on_hover_text("Adds suffix \"_goldsrc\" to the name of the converted model");
             ui.checkbox(&mut self.options.ignore_converted, "Ignore converted")
                 .on_hover_text("Ignores models with \"_goldsrc\" suffix");
+            ui.checkbox(&mut self.options.flatshade, "Flat shade")
+                .on_hover_text(
+                    "\
+Textures will have flat shade flags \n
+Recommended to have it on so textures will be uniformly lit",
+                )
         });
 
         let is_done = *self.s2g_sync.is_done().lock().unwrap();

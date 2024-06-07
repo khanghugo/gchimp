@@ -8,6 +8,8 @@ pub struct S2GOptions {
     pub add_suffix: bool,
     /// Ignores converted models that have "_goldsrc" suffix.
     pub ignore_converted: bool,
+    /// Mark the texture with flat shade flag
+    pub flatshade: bool,
 }
 
 impl Default for S2GOptions {
@@ -16,6 +18,7 @@ impl Default for S2GOptions {
             force: false,
             add_suffix: true,
             ignore_converted: true,
+            flatshade: true,
         }
     }
 }

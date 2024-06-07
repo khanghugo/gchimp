@@ -244,6 +244,11 @@ impl S2GBuilder {
         self
     }
 
+    pub fn flatshade(&mut self, flatshade: bool) -> &mut Self {
+        self.options.flatshade = flatshade;
+        self
+    }
+
     /// An amateurish way to instrumentation and proper logging.
     fn log_info(&self, what: &str) {
         println!("{}", what);
@@ -482,6 +487,8 @@ impl S2GBuilder {
 
             let linked_smds = linked_smds.unwrap();
 
+            let mut qc_textures = HashSet::<String>::new();
+
             // new smd name will be formated as
             // <old smd name><goldsrc suffix><index>.smd
             // eg: old smd name is `what.smd` -> what_goldsrc0.smd
@@ -506,6 +513,8 @@ impl S2GBuilder {
                                 && !missing_textures.contains(&tri.material)
                             {
                                 missing_textures.insert(tri.material.to_string());
+                            } else {
+                                qc_textures.insert(tri.material.to_string());
                             }
                         })
                     }
@@ -589,6 +598,12 @@ impl S2GBuilder {
                     .with_extension("mdl");
                 goldsrc_qc.add_model_name(goldsrc_model_path.display().to_string().as_str());
             };
+
+            if self.options.flatshade {
+                for texture in qc_textures {
+                    goldsrc_qc.add_texrendermode(texture.as_str(), qc::RenderMode::FlatShade);
+                }
+            }
 
             goldsrc_qcs.push((goldsrc_qc_path, goldsrc_qc));
         }
