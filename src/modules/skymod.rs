@@ -633,7 +633,7 @@ mod test {
             .lf("examples/skybox/test2lf.png")
             .rt("examples/skybox/test2rt.png")
             .up("examples/skybox/test2up.png")
-            .studiomdl("/home/khang/map2prop-rs/dist/studiomdl.exe")
+            .studiomdl("/home/khang/gchimp/dist/studiomdl.exe")
             .wineprefix(Some(
                 "/home/khang/.local/share/wineprefixes/wine32/".to_owned(),
             ))
@@ -659,11 +659,11 @@ mod test {
             .lf("examples/skybox/cyberwaveLF.png")
             .rt("examples/skybox/cyberwaveRT.png")
             .up("examples/skybox/cyberwaveUP.png")
-            .studiomdl("/home/khang/map2prop-rs/dist/studiomdl.exe")
+            .studiomdl("/home/khang/gchimp/dist/studiomdl.exe")
             .wineprefix(Some(
                 "/home/khang/.local/share/wineprefixes/wine32/".to_owned(),
             ))
-            .output_name("cyberwave")
+            .output_name("gchimp_lets_go")
             .skybox_size(2_u32.pow(17))
             .texture_per_face(1)
             .convert_texture(true);
