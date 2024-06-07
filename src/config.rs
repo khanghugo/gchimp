@@ -32,9 +32,7 @@ pub fn parse_config() -> eyre::Result<Config> {
 }
 
 pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .open(path.display().to_string())?;
+    let mut file = OpenOptions::new().read(true).open(path.as_os_str())?;
     let mut buffer = String::new();
 
     file.read_to_string(&mut buffer)?;
@@ -64,6 +62,14 @@ pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
     .to_string();
 
     let no_vtf = PathBuf::from(config.no_vtf);
+
+    #[cfg(target_os = "windows")]
+    let no_vtf = if no_vtf.extension().is_none() {
+        no_vtf.with_extension(".exe")
+    } else {
+        no_vtf
+    };
+
     let no_vtf = if no_vtf.is_relative() {
         root.join(no_vtf)
     } else {

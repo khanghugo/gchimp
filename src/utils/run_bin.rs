@@ -86,7 +86,11 @@ pub fn run_no_vtf(folder: &Path, no_vtf: &Path) -> JoinHandle<eyre::Result<Outpu
 
 #[cfg(target_os = "windows")]
 pub fn run_command_windows(command: Vec<String>) -> JoinHandle<eyre::Result<Output>> {
-    thread::spawn(move || Ok(Command::new("cmd").args(command).output()?))
+    thread::spawn(move || {
+        Ok(Command::new(command[0].clone())
+            .args(&command[1..])
+            .output()?)
+    })
 }
 
 #[cfg(target_os = "linux")]
