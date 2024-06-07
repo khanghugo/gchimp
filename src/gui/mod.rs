@@ -46,11 +46,10 @@ struct MyApp {
 
 impl Default for MyApp {
     fn default() -> Self {
-        let config = parse_config();
-        let config = config.ok();
+        let config = parse_config().unwrap();
 
         Self {
-            tree: create_tree(&config),
+            tree: create_tree(config),
             // config,
         }
     }

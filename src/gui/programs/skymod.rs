@@ -22,7 +22,7 @@ static FACE_SIZE: f32 = 94.;
 static SKY_TEXTURE_SUFFIX: [&str; 6] = ["up", "dn", "lf", "rt", "ft", "bk"];
 
 pub struct SkyModGui {
-    app_config: Option<Config>,
+    app_config: Config,
     // order is: up left front right back down
     textures: Vec<String>,
     options: SkyModOptions,
@@ -33,7 +33,7 @@ pub struct SkyModGui {
 }
 
 impl SkyModGui {
-    pub fn new(app_config: Option<Config>) -> Self {
+    pub fn new(app_config: Config) -> Self {
         Self {
             app_config,
             textures: vec![String::new(); 6],
@@ -51,11 +51,6 @@ impl SkyModGui {
     }
 
     fn run(&mut self) {
-        if self.app_config.is_none() {
-            self.program_output("Error parsing config.toml or no config.toml found");
-            return;
-        }
-
         let texture_per_face = self.texture_per_face.parse::<u32>();
         let skybox_size = self.skybox_size.parse::<u32>();
 
@@ -77,10 +72,8 @@ impl SkyModGui {
         self.idle = false;
 
         let textures = self.textures.clone();
-
-        let app_config = self.app_config.as_ref().unwrap();
-        let studiomdl = app_config.studiomdl.clone();
-        let wineprefix = app_config.wineprefix.clone();
+        let studiomdl = self.app_config.studiomdl.clone();
+        let wineprefix = self.app_config.wineprefix.clone();
 
         let SkyModOptions {
             skybox_size: _,

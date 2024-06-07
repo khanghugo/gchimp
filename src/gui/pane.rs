@@ -31,7 +31,7 @@ impl Pane {
     }
 }
 
-pub fn create_tree(app_config: &Option<Config>) -> egui_tiles::Tree<Pane> {
+pub fn create_tree(app_config: Config) -> egui_tiles::Tree<Pane> {
     let mut tiles = egui_tiles::Tiles::default();
 
     let tabs = vec![

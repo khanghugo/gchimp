@@ -36,7 +36,7 @@ impl Default for DragAndDrop {
 }
 
 pub struct S2GGui {
-    app_config: Option<Config>,
+    app_config: Config,
     s2g_sync: S2GSync,
     drag_and_drop: DragAndDrop,
     steps: S2GSteps,
@@ -56,18 +56,12 @@ impl S2GGui {
         let steps = self.steps.clone();
         let options = self.options.clone();
 
-        if self.app_config.is_none() {
-            let mut lock = self.s2g_sync.stdout().lock().unwrap();
-            *lock += "No config.toml found";
-            return Err(eyre!("No config.toml found"));
-        }
-
         let Config {
             studiomdl,
             crowbar,
             no_vtf,
             wineprefix,
-        } = self.app_config.clone().unwrap();
+        } = self.app_config.clone();
 
         let sync = self.s2g_sync.clone();
 
@@ -121,7 +115,7 @@ impl S2GGui {
         Ok(handle)
     }
 
-    pub fn new(app_config: Option<Config>) -> Self {
+    pub fn new(app_config: Config) -> Self {
         Self {
             app_config,
             s2g_sync: S2GSync::default(),

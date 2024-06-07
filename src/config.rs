@@ -9,6 +9,7 @@ use std::{
 
 use std::env;
 
+use eyre::eyre;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -42,6 +43,11 @@ pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
     let root = path.parent().unwrap();
 
     let studiomdl = PathBuf::from(config.studiomdl);
+
+    if !studiomdl.exists() {
+        return Err(eyre!("Cannot find studiomdl binary"));
+    }
+
     let studiomdl = if studiomdl.is_relative() {
         root.join(studiomdl)
     } else {
@@ -52,6 +58,11 @@ pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
     .to_string();
 
     let crowbar = PathBuf::from(config.crowbar);
+
+    if !crowbar.exists() {
+        return Err(eyre!("Cannot find crowbar binary"));
+    }
+
     let crowbar = if crowbar.is_relative() {
         root.join(crowbar)
     } else {
@@ -64,11 +75,15 @@ pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
     let no_vtf = PathBuf::from(config.no_vtf);
 
     #[cfg(target_os = "windows")]
-    let no_vtf = if no_vtf.extension().is_none() {
-        no_vtf.with_extension(".exe")
+    let no_vtf = if no_vtf.extension().is_none() || no_vtf.extension().unwrap() != "exe" {
+        no_vtf.with_extension("exe")
     } else {
         no_vtf
     };
+
+    if !no_vtf.exists() {
+        return Err(eyre!("Cannot find no_vtf binary"));
+    }
 
     let no_vtf = if no_vtf.is_relative() {
         root.join(no_vtf)
