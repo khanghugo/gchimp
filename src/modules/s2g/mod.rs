@@ -8,8 +8,7 @@ use std::{
 };
 
 use constants::{
-    CROWBAR_BINARY, GOLDSRC_SUFFIX, NO_VTF_BINARY, STUDIOMDL_BINARY, STUDIOMDL_ERROR_PATTERN,
-    VTX_EXTENSION, VVD_EXTENSION,
+    CROWBAR_BINARY, GOLDSRC_SUFFIX, NO_VTF_BINARY, STUDIOMDL_BINARY, VTX_EXTENSION, VVD_EXTENSION,
 };
 use eyre::eyre;
 use options::S2GOptions;
@@ -17,6 +16,7 @@ use qc::{BodyGroup, Qc, QcCommand};
 use smd::Smd;
 
 use crate::utils::{
+    constants::STUDIOMDL_ERROR_PATTERN,
     img_stuffs::png_to_bmp_folder,
     misc::{
         find_files_with_ext_in_folder, fix_backslash, maybe_add_extension_to_string,
