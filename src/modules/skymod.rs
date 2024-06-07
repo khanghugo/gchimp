@@ -283,17 +283,19 @@ impl SkyModBuilder {
                     // triangle with normal vector pointing up
                     // orientation is "default" where top left is 1 1 and bottom right is -1, -1
                     // counter-clockwise
-                    // A ---- B
+                    // A ---- D
                     // |      |
-                    // D ---- C
+                    // B ---- C
                     // A has coordinate of `min`
                     // C has coordinate of `max`
                     let rot_mat = array![[1., 0.], [0., -1.]];
+                    // fix the seam, i guess?
+                    let what: f64 = - 1. / 512.;
 
-                    let vert_a_uv = array![0., 0.].dot(&rot_mat);
-                    let vert_b_uv = array![0., 1.].dot(&rot_mat);
-                    let vert_c_uv = array![1., 1.].dot(&rot_mat);
-                    let vert_d_uv = array![1., 0.].dot(&rot_mat);
+                    let vert_a_uv = array![0. - what, 0. - what].dot(&rot_mat);
+                    let vert_b_uv = array![0. - what, 1. + what].dot(&rot_mat);
+                    let vert_c_uv = array![1. + what, 1. + what].dot(&rot_mat);
+                    let vert_d_uv = array![1. + what, 0. - what].dot(&rot_mat);
 
                     let quad = array![
                         // A
@@ -536,18 +538,6 @@ fn rotz_matrix(theta: f64) -> ArrayBase<ndarray::OwnedRepr<f64>, Dim<[usize; 2]>
     ]
 }
 
-fn map_index_to_vertex_order(index: u32) -> bool {
-    match index {
-        0 => false,
-        1 => false,
-        2 => false,
-        3 => false,
-        4 => false,
-        5 => false,
-        _ => unreachable!(),
-    }
-}
-
 fn rotate_matrix_by_index_relative_to_down(
     index: u32,
     vert: ArrayBase<ndarray::OwnedRepr<f64>, Dim<[usize; 2]>>,
@@ -594,6 +584,7 @@ fn rotate_matrix_by_index_relative_to_down(
 }
 
 mod test {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
@@ -611,11 +602,13 @@ mod test {
                 "/home/khang/.local/share/wineprefixes/wine32/".to_owned(),
             ))
             .output_name("nineface")
-            .skybox_size(2_u32.pow(17))
+            .skybox_size(512)
             .texture_per_face(9)
             .convert_texture(false);
 
         let res = builder.work();
+
+        println!("{:?}", res);
 
         assert!(res.is_ok());
     }
