@@ -71,7 +71,7 @@ jobs:
     - name: Download no_vtf Windows
       if: matrix.os == 'windows-2019'
       run: |
-        wget https://b5327157.srht.site/no_vtf/release/no_vtf-windows_x64.zip
+        curl -O https://b5327157.srht.site/no_vtf/release/no_vtf-windows_x64.zip
         7z x no_vtf-windows_x64.zip
         cp -r no_vtf gchimp/dist/
         
