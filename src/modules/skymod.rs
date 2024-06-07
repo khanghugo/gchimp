@@ -464,6 +464,13 @@ impl SkyModBuilder {
             qc.write(qc_path.to_str().unwrap())?;
 
             // run studiomdl
+            #[cfg(target_os = "windows")]
+            let handle = run_studiomdl(
+                qc_path.as_path(),
+                self.studiomdl.as_ref().unwrap(),
+            );
+
+            #[cfg(target_os = "linux")]
             let handle = run_studiomdl(
                 qc_path.as_path(),
                 self.studiomdl.as_ref().unwrap(),
