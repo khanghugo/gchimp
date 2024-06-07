@@ -1,0 +1,82 @@
+name: Rust
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 1 * *' # Monthly
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-2019]
+        rust: [stable, beta]
+        configuration: [release]
+
+        include:
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            file_name: gchimp
+            label: Ubuntu
+
+          - os: windows-2019
+            file_name: gchimp.exe
+            target: x86_64-pc-windows-msvc
+            label: Windows
+            
+          - configuration: release
+            release-flag: '--release'
+
+    name: ${{ matrix.rust }} - ${{ matrix.label }} - ${{ matrix.configuration }}
+    runs-on: ${{ matrix.os }}
+  
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1.0.6
+      with:
+        profile: minimal
+        override: true
+        toolchain: ${{ matrix.rust }}
+        target: ${{ matrix.target }}
+        
+    - uses: Swatinem/rust-cache@v2.7.3
+        
+    - name: Build
+      uses: actions-rs/cargo@v1.0.1
+      with:
+        command: build
+        args: --target ${{ matrix.target }} ${{ matrix.release-flag }}
+      
+    - name: Preparing upload
+      run: |
+        mkdir gchimp
+        cp target/${{ matrix.target }}/${{ matrix.configuration }}/${{ matrix.filename }} gchimp/${{ matrix.filename }}
+        cp -r dist gchimp/
+        mv gchimp/dist/config.toml gchimp/config.toml
+
+    - name: Download no_vtf Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        wget https://b5327157.srht.site/no_vtf/release/no_vtf-linux_x64.tar.xz
+        tar -xf no_vtf-linux_x64.tar.xz
+        cp -r no_vtf gchimp/dist/
+
+    - name: Download no_vtf Windows
+      if: matrix.os == 'windows-2019'
+      run: |
+        wget https://b5327157.srht.site/no_vtf/release/no_vtf-windows_x64.zip
+        7z x no_vtf-windows_x64.zip
+        cp -r no_vtf gchimp/dist/
+        
+    - uses: actions/upload-artifact@v4.3.3
+      if: matrix.rust == 'stable'
+      with:
+        name: gchimp-${{ runner.os }}-${{ matrix.configuration }}
+        path: gchimp
