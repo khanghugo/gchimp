@@ -4,19 +4,23 @@ use image::{imageops, RgbaImage};
 use qc::Qc;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use smd::{Smd, Triangle, Vertex};
-use std::{f64::consts::PI, path::PathBuf};
+use std::{f64::consts::PI, path::PathBuf, str::from_utf8};
 
 use ndarray::prelude::*;
 
 use crate::utils::{
+    constants::STUDIOMDL_ERROR_PATTERN,
     img_stuffs::{rgba8_to_8bpp, write_8bpp},
     run_bin::run_studiomdl,
 };
 
+#[derive(Clone)]
 pub struct SkyModOptions {
-    skybox_size: u32,
-    texture_per_face: u32,
-    convert_texture: bool,
+    pub skybox_size: u32,
+    pub texture_per_face: u32,
+    pub convert_texture: bool,
+    pub flatshade: bool,
+    pub output_name: String,
 }
 
 impl Default for SkyModOptions {
@@ -25,6 +29,8 @@ impl Default for SkyModOptions {
             skybox_size: 131072,
             texture_per_face: 1,
             convert_texture: true,
+            flatshade: true,
+            output_name: "skybox".to_string(),
         }
     }
 }
@@ -35,7 +41,6 @@ pub struct SkyModBuilder {
     // order is: 0 up 1 left 2 front 3 right 4 back 5 down
     textures: Vec<String>,
     options: SkyModOptions,
-    output_name: String,
     studiomdl: Option<PathBuf>,
     wineprefix: Option<String>,
 }
@@ -51,7 +56,6 @@ impl SkyModBuilder {
         Self {
             textures: vec![String::new(); 6],
             options: SkyModOptions::default(),
-            output_name: "".to_string(),
             studiomdl: None,
             wineprefix: None,
         }
@@ -92,13 +96,13 @@ impl SkyModBuilder {
         self
     }
 
-    pub fn wineprefix(&mut self, a: &str) -> &mut Self {
-        self.wineprefix = Some(a.into());
+    pub fn wineprefix(&mut self, a: Option<String>) -> &mut Self {
+        self.wineprefix = a;
         self
     }
 
     pub fn output_name(&mut self, a: &str) -> &mut Self {
-        self.output_name = a.to_string();
+        self.options.output_name = a.to_string();
         self
     }
 
@@ -114,6 +118,11 @@ impl SkyModBuilder {
 
     pub fn convert_texture(&mut self, a: bool) -> &mut Self {
         self.options.convert_texture = a;
+        self
+    }
+
+    pub fn flat_shade(&mut self, a: bool) -> &mut Self {
+        self.options.flatshade = a;
         self
     }
 
@@ -173,7 +182,7 @@ impl SkyModBuilder {
         let side = textures[0].dimensions().0;
         let same_dimension_all_texture = textures
             .iter()
-            .fold(true, |acc, e| e.dimensions().0 == side && true);
+            .fold(true, |acc, e| e.dimensions().0 == side && acc);
         if !same_dimension_all_texture {
             return Err(eyre!(
                 "Does not support individual texture with different dimension from another"
@@ -181,7 +190,9 @@ impl SkyModBuilder {
         }
 
         let texture_per_side = (self.options.texture_per_face as f32).sqrt().floor() as u32;
-        if texture_per_side * texture_per_side != self.options.texture_per_face {
+        if texture_per_side * texture_per_side != self.options.texture_per_face
+            || self.options.texture_per_face == 0
+        {
             return Err(eyre!(
                 "Chosen texture per face is not a valid number. Use n^2."
             ));
@@ -225,7 +236,7 @@ impl SkyModBuilder {
 
                         let texture_file_name = format!(
                             "{}{}{}{}.bmp",
-                            self.output_name,
+                            self.options.output_name,
                             map_index_to_suffix(texture_index as u32),
                             _x,
                             _y
@@ -260,7 +271,7 @@ impl SkyModBuilder {
                 for _x in 0..texture_per_side {
                     let texture_file_name = format!(
                         "{}{}{}{}.bmp",
-                        self.output_name,
+                        self.options.output_name,
                         map_index_to_suffix(texture_index as u32),
                         _x,
                         _y
@@ -391,7 +402,7 @@ impl SkyModBuilder {
 
         new_smd.write(
             root_path
-                .join(format!("{}.smd", self.output_name))
+                .join(format!("{}.smd", self.options.output_name))
                 .to_str()
                 .unwrap(),
         )?;
@@ -404,33 +415,35 @@ impl SkyModBuilder {
         let mut qc = Qc::new_basic();
 
         let model_name = first_texture_path
-            .with_file_name(&self.output_name)
+            .with_file_name(&self.options.output_name)
             .with_extension("mdl");
 
         qc.add_model_name(model_name.to_str().unwrap());
         qc.add_cd(root_path.to_str().unwrap());
         qc.add_cd_texture(root_path.to_str().unwrap());
 
-        for texture_index in 0..6 {
-            for _y in 0..texture_per_side {
-                for _x in 0..texture_per_side {
-                    let texture_file_name = format!(
-                        "{}{}{}{}.bmp",
-                        self.output_name,
-                        map_index_to_suffix(texture_index as u32),
-                        _x,
-                        _y
-                    );
+        if self.options.flatshade {
+            for texture_index in 0..6 {
+                for _y in 0..texture_per_side {
+                    for _x in 0..texture_per_side {
+                        let texture_file_name = format!(
+                            "{}{}{}{}.bmp",
+                            self.options.output_name,
+                            map_index_to_suffix(texture_index as u32),
+                            _x,
+                            _y
+                        );
 
-                    qc.add_texrendermode(&texture_file_name, qc::RenderMode::FlatShade);
+                        qc.add_texrendermode(&texture_file_name, qc::RenderMode::FlatShade);
+                    }
                 }
             }
         }
 
-        qc.add_body("studio0", &self.output_name, false, None);
+        qc.add_body("studio0", &self.options.output_name, false, None);
         qc.add_sequence("idle", "idle", vec![]);
 
-        let qc_path = root_path.join(format!("{}.qc", self.output_name));
+        let qc_path = root_path.join(format!("{}.qc", self.options.output_name));
 
         qc.write(qc_path.to_str().unwrap())?;
 
@@ -441,7 +454,25 @@ impl SkyModBuilder {
             self.wineprefix.as_ref().unwrap(),
         );
 
-        let _ = handle.join().unwrap()?;
+        match handle.join() {
+            Ok(res) => {
+                let output = res?;
+                let stdout = from_utf8(&output.stdout).unwrap();
+
+                let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
+
+                if let Some(err_index) = maybe_err {
+                    let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
+                    let err_str = format!("Cannot compile: {}", err.trim());
+                    return Err(eyre!(err_str));
+                }
+            }
+            Err(_) => {
+                let err_str = "No idea what happens with running studiomdl. Probably just a dream.";
+
+                return Err(eyre!(err_str));
+            }
+        };
 
         Ok(())
     }
@@ -576,15 +607,15 @@ mod test {
             .rt("examples/skybox/test2rt.png")
             .up("examples/skybox/test2up.png")
             .studiomdl("/home/khang/map2prop-rs/dist/studiomdl.exe")
-            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
+            .wineprefix(Some(
+                "/home/khang/.local/share/wineprefixes/wine32/".to_owned(),
+            ))
             .output_name("nineface")
             .skybox_size(2_u32.pow(17))
             .texture_per_face(9)
             .convert_texture(false);
 
         let res = builder.work();
-
-        // println!("{:?}", res);
 
         assert!(res.is_ok());
     }

@@ -1,44 +1,35 @@
-use std::io::Read;
+use std::{
+    io::Read,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    thread,
+};
 
-use eframe::egui::{self, load::ImageLoader, Response};
+use eframe::egui::{self, ScrollArea};
 
 use crate::{
     gui::{
         config::Config,
-        utils::{preview_file_being_dropped, preview_files_being_dropped_min_max_file},
+        constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
+        utils::preview_file_being_dropped,
         TabProgram,
     },
     include_image,
+    modules::skymod::{SkyModBuilder, SkyModOptions},
 };
 
-enum FacePos {
-    Front,
-    Back,
-    Left,
-    Right,
-    Up,
-    Down,
-}
-
-impl FacePos {
-    fn get_vec() -> Vec<Self> {
-        vec![
-            Self::Front,
-            Self::Back,
-            Self::Left,
-            Self::Right,
-            Self::Up,
-            Self::Down,
-        ]
-    }
-}
-
 static FACE_SIZE: f32 = 94.;
+static SKY_TEXTURE_SUFFIX: [&str; 6] = ["up", "dn", "lf", "rt", "ft", "bk"];
 
 pub struct SkyModGui {
     app_config: Option<Config>,
     // order is: up left front right back down
     textures: Vec<String>,
+    options: SkyModOptions,
+    skybox_size: String,
+    texture_per_face: String,
+    idle: bool,
+    program_output: Arc<Mutex<String>>,
 }
 
 impl SkyModGui {
@@ -46,7 +37,92 @@ impl SkyModGui {
         Self {
             app_config,
             textures: vec![String::new(); 6],
+            options: SkyModOptions::default(),
+            skybox_size: String::from("131072"),
+            texture_per_face: String::from("1"),
+            idle: true,
+            program_output: Arc::new(Mutex::new(String::from("Idle"))),
         }
+    }
+
+    fn program_output(&mut self, s: &str) {
+        let mut lock = self.program_output.lock().unwrap();
+        *lock = s.to_string();
+    }
+
+    fn run(&mut self) {
+        if self.app_config.is_none() {
+            self.program_output("Error parsing config.toml or no config.toml found");
+            return;
+        }
+
+        let texture_per_face = self.texture_per_face.parse::<u32>();
+        let skybox_size = self.skybox_size.parse::<u32>();
+
+        if texture_per_face.is_err() {
+            self.program_output("Texture per face is not a number");
+            return;
+        }
+
+        if skybox_size.is_err() {
+            self.program_output("Skybox size is not a number");
+            return;
+        }
+
+        if self.options.output_name.is_empty() {
+            self.program_output("Output name is empty");
+            return;
+        }
+
+        self.idle = false;
+
+        let textures = self.textures.clone();
+
+        let app_config = self.app_config.as_ref().unwrap();
+        let studiomdl = app_config.studiomdl.clone();
+        let wineprefix = app_config.wineprefix.clone();
+
+        let SkyModOptions {
+            skybox_size: _,
+            texture_per_face: _,
+            convert_texture,
+            flatshade,
+            output_name,
+        } = self.options.clone();
+
+        let handle = thread::spawn(move || {
+            let mut binding = SkyModBuilder::new();
+
+            let skymod = binding
+                .up(&textures[0])
+                .lf(&textures[1])
+                .ft(&textures[2])
+                .rt(&textures[3])
+                .bk(&textures[4])
+                .dn(&textures[5])
+                .skybox_size(skybox_size.unwrap())
+                .texture_per_face(texture_per_face.unwrap())
+                .studiomdl(studiomdl.as_str())
+                .output_name(output_name.as_str())
+                .convert_texture(convert_texture)
+                .flat_shade(flatshade);
+
+            #[cfg(target_os = "linux")]
+            skymod.wineprefix(wineprefix);
+
+            skymod.work()
+        });
+
+        match handle.join().unwrap() {
+            Ok(_) => {
+                self.program_output("OK");
+                self.idle = true;
+            }
+            Err(err) => {
+                self.program_output(err.to_string().as_str());
+                self.idle = true;
+            }
+        };
     }
 
     fn selectable_face(&mut self, ui: &mut eframe::egui::Ui, index: usize, text: &str) {
@@ -55,7 +131,7 @@ impl SkyModGui {
         } else {
             ui.add_sized(
                 [FACE_SIZE, FACE_SIZE],
-                egui::ImageButton::new(include_image!(&self.textures[index])),
+                egui::ImageButton::new(include_image!(&self.textures[index])).frame(false),
             )
         };
 
@@ -83,15 +159,19 @@ impl TabProgram for SkyModGui {
             .spacing([1., 1.])
             .show(ui, |ui| {
                 ui.label("");
+                if ui.button("Reset").clicked() {
+                    self.textures.iter_mut().for_each(|tex| tex.clear());
+                };
                 self.selectable_face(ui, 0, "U");
                 ui.end_row();
 
                 self.selectable_face(ui, 1, "L");
-                self.selectable_face(ui, 2, "F");
-                self.selectable_face(ui, 3, "R");
                 self.selectable_face(ui, 4, "B");
+                self.selectable_face(ui, 3, "R");
+                self.selectable_face(ui, 2, "F");
                 ui.end_row();
 
+                ui.label("");
                 ui.label("");
                 self.selectable_face(ui, 5, "D");
                 ui.end_row();
@@ -100,15 +180,137 @@ impl TabProgram for SkyModGui {
         ui.separator();
         ui.label("Options:");
         ui.horizontal(|ui| {
-            ui.label("Texture per face:");
-            // ui.text_edit_singleline("text")
-            // ui.checkbox(&mut self.options.force, "Force")
-            //     .on_hover_text("Continues with the process even when there is error.");
-            // ui.checkbox(&mut self.options.add_suffix, "Add suffix")
-            //     .on_hover_text("Adds suffix \"_goldsrc\" to the name of the converted model");
-            // ui.checkbox(&mut self.options.ignore_converted, "Ignore converted")
-            //     .on_hover_text("Ignores models with \"_goldsrc\" suffix");
+            egui::Grid::new("option grid")
+                .num_columns(4)
+                .show(ui, |ui| {
+                    ui.label("Texture per face:");
+                    ui.text_edit_singleline(&mut self.texture_per_face)
+                        .on_hover_text(
+                            "\
+How many textures should each skybox face have? \n
+It should be a perfect square (such as 2, 4, 9, 16, ..)",
+                        );
+                    ui.label("Skybox size:");
+                    ui.text_edit_singleline(&mut self.skybox_size)
+                        .on_hover_text("The size of the model");
+                });
         });
+
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.options.convert_texture, "Convert texture")
+                .on_hover_text(
+                    "\
+Converts most image format into compliant BMP. \n
+Processes textures into suitable format for other settings. \n
+Recommended to leave it checked.
+",
+                );
+
+            ui.checkbox(&mut self.options.flatshade, "Flat shade")
+                .on_hover_text(
+                    "\
+Mark texture with flatshade flag. \n
+Recommeded to leave it checked for uniformly lit texture.",
+                );
+
+            ui.label("Output name: ");
+            ui.text_edit_singleline(&mut self.options.output_name)
+        });
+
+        ui.separator();
+
+        ui.horizontal(|ui| {
+            ui.horizontal(|ui| {
+                ui.add_enabled_ui(self.idle, |ui| {
+                    if ui.button("Run").clicked() {
+                        self.run();
+                    }
+                });
+                ui.add_enabled_ui(!self.idle, |ui| {
+                    if ui.button("Cancel").clicked() {
+                        self.idle = true;
+                    }
+                });
+            });
+        });
+
+        ui.separator();
+
+        let binding = self.program_output.lock().unwrap();
+        let mut readonly_buffer = binding.as_str();
+
+        ScrollArea::vertical().show(ui, |ui| {
+            ui.add_sized(
+                egui::vec2(PROGRAM_WIDTH, PROGRAM_HEIGHT / 16.),
+                egui::TextEdit::multiline(&mut readonly_buffer),
+            );
+        });
+
+        // drag and drop stuff
+        let ctx = ui.ctx();
+        preview_file_being_dropped(ctx);
+
+        // Collect dropped files:
+        ctx.input(|i| {
+            if i.raw.dropped_files.len() == 6 {
+                let items = i.raw.dropped_files.clone();
+                let paths = items
+                    .iter()
+                    .filter_map(|e| e.path.clone())
+                    .collect::<Vec<PathBuf>>();
+
+                if paths.len() != 6 {
+                    return;
+                }
+
+                let is_valid = paths.iter().all(|p| {
+                    let a = p.file_stem().unwrap().to_str().unwrap();
+                    SKY_TEXTURE_SUFFIX.iter().any(|suffix| a.ends_with(suffix))
+                });
+
+                if !is_valid {
+                    return;
+                }
+
+                self.textures[0] = paths
+                    .iter()
+                    .find(|p| p.file_stem().unwrap().to_str().unwrap().ends_with("up"))
+                    .unwrap()
+                    .display()
+                    .to_string();
+                self.textures[1] = paths
+                    .iter()
+                    .find(|p| p.file_stem().unwrap().to_str().unwrap().ends_with("lf"))
+                    .unwrap()
+                    .display()
+                    .to_string();
+                self.textures[2] = paths
+                    .iter()
+                    .find(|p| p.file_stem().unwrap().to_str().unwrap().ends_with("ft"))
+                    .unwrap()
+                    .display()
+                    .to_string();
+                self.textures[3] = paths
+                    .iter()
+                    .find(|p| p.file_stem().unwrap().to_str().unwrap().ends_with("rt"))
+                    .unwrap()
+                    .display()
+                    .to_string();
+                self.textures[4] = paths
+                    .iter()
+                    .find(|p| p.file_stem().unwrap().to_str().unwrap().ends_with("bk"))
+                    .unwrap()
+                    .display()
+                    .to_string();
+                self.textures[5] = paths
+                    .iter()
+                    .find(|p| p.file_stem().unwrap().to_str().unwrap().ends_with("dn"))
+                    .unwrap()
+                    .display()
+                    .to_string();
+            }
+        });
+
         // Make it non drag-able
         egui_tiles::UiResponse::None
     }
