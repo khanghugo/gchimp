@@ -1,5 +1,5 @@
 [package]
-name = "map2prop-rs"
+name = "gchimp"
 authors = [ "Lê Hàn Minh Khang (Khang Le) <mkhangle20@gmail.com>" ]
 version = "0.1.0"
 edition = "2021"
