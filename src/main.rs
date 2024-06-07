@@ -1,7 +1,8 @@
 mod cli;
+mod config;
 mod gui;
-mod modules;
-mod utils;
+pub mod modules;
+pub mod utils;
 
 fn main() {
     if !cli::cli() {
