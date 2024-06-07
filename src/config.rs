@@ -1,7 +1,13 @@
 //! Parses config file
 
 // TODO move this whole thing out of GUI because CLI can benefit from this as well
-use std::{fs::OpenOptions, io::Read, path::PathBuf};
+use std::{
+    fs::OpenOptions,
+    io::Read,
+    path::{Path, PathBuf},
+};
+
+use std::env;
 
 use serde::Deserialize;
 
@@ -13,16 +19,29 @@ pub struct Config {
     pub wineprefix: Option<String>,
 }
 
-pub fn parse_config(filename: &str) -> eyre::Result<Config> {
-    let mut file = OpenOptions::new().read(true).open(filename)?;
+pub static CONFIG_FILE_NAME: &str = "config.toml";
+
+/// Parse `config.toml` in the same folder as the binary
+pub fn parse_config() -> eyre::Result<Config> {
+    let path = match env::current_exe() {
+        Ok(path) => path.parent().unwrap().join(CONFIG_FILE_NAME),
+        Err(_) => PathBuf::from(format!("{}", CONFIG_FILE_NAME)),
+    };
+
+    parse_config_from_file(path.as_path())
+}
+
+pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .open(path.display().to_string())?;
     let mut buffer = String::new();
 
     file.read_to_string(&mut buffer)?;
 
     let config: Config = toml::from_str(&buffer)?;
 
-    let binding = PathBuf::from(filename);
-    let root = binding.parent().unwrap();
+    let root = path.parent().unwrap();
 
     let studiomdl = PathBuf::from(config.studiomdl);
     let studiomdl = if studiomdl.is_relative() {
