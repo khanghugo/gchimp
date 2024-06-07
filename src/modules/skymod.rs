@@ -9,7 +9,7 @@ use std::{f64::consts::PI, path::PathBuf, str::from_utf8};
 use ndarray::prelude::*;
 
 use crate::utils::{
-    constants::STUDIOMDL_ERROR_PATTERN,
+    constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
     img_stuffs::{rgba8_to_8bpp, write_8bpp},
     run_bin::run_studiomdl,
 };
@@ -264,7 +264,10 @@ impl SkyModBuilder {
         let texture_world_size = self.options.skybox_size as f64 / texture_per_side as f64;
 
         // write .smd, plural
-        let mut new_smd = Smd::new_basic();
+        let texture_count = self.options.texture_per_face * 6;
+        let model_count = texture_count / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
+
+        let mut new_smds = vec![Smd::new_basic(); model_count as usize];
 
         for texture_index in 0..6 {
             for _y in 0..texture_per_side {
@@ -276,6 +279,14 @@ impl SkyModBuilder {
                         _x,
                         _y
                     );
+
+                    // sequentially, what is the order of this texture
+                    // if it is over MAX_GOLDSRC_MODEL_TEXTURE_COUNT then add the quad
+                    // in a different smd
+                    let curr_texture_overall_count =
+                        texture_index * 16 + _y * texture_per_side + _x;
+                    let new_smd_index =
+                        (curr_texture_overall_count / MAX_GOLDSRC_MODEL_TEXTURE_COUNT) as usize;
 
                     let texture_world_min_x = skybox_coord - texture_world_size * _x as f64;
                     let texture_world_min_y = skybox_coord - texture_world_size * _y as f64;
@@ -289,8 +300,10 @@ impl SkyModBuilder {
                     // A has coordinate of `min`
                     // C has coordinate of `max`
                     let rot_mat = array![[1., 0.], [0., -1.]];
+
                     // fix the seam, i guess?
-                    let what: f64 = - 1. / 512.;
+                    // zoom everything in so that the original size is 1 pixel outward diagonally for every corner
+                    let what: f64 = -1. / MIN_TEXTURE_SIZE as f64;
 
                     let vert_a_uv = array![0. - what, 0. - what].dot(&rot_mat);
                     let vert_b_uv = array![0. - what, 1. + what].dot(&rot_mat);
@@ -396,85 +409,106 @@ impl SkyModBuilder {
                         vertices: vec![vert_a, vert_c, vert_d],
                     };
 
-                    new_smd.add_triangle(tri1);
-                    new_smd.add_triangle(tri2);
+                    new_smds[new_smd_index].add_triangle(tri1);
+                    new_smds[new_smd_index].add_triangle(tri2);
                 }
             }
         }
 
-        new_smd.write(
-            root_path
-                .join(format!("{}.smd", self.options.output_name))
-                .to_str()
-                .unwrap(),
-        )?;
+        for (smd_index, new_smd) in new_smds.into_iter().enumerate() {
+            new_smd.write(
+                root_path
+                    .join(format!("{}{}.smd", self.options.output_name, smd_index))
+                    .to_str()
+                    .unwrap(),
+            )?;
+        }
 
+        // can reuse idle sequence for multiple smds
         // idle sequence to be compliant
         let idle_smd = Smd::new_basic();
         idle_smd.write(root_path.join("idle.smd").to_str().unwrap())?;
 
-        // write qc
-        let mut qc = Qc::new_basic();
+        for model_index in 0..model_count {
+            // write qc
+            let mut qc = Qc::new_basic();
 
-        let model_name = first_texture_path
-            .with_file_name(&self.options.output_name)
-            .with_extension("mdl");
+            let model_name = first_texture_path
+                .with_file_name(format!("{}{}", &self.options.output_name, model_index))
+                .with_extension("mdl");
 
-        qc.add_model_name(model_name.to_str().unwrap());
-        qc.add_cd(root_path.to_str().unwrap());
-        qc.add_cd_texture(root_path.to_str().unwrap());
+            qc.add_model_name(model_name.to_str().unwrap());
+            qc.add_cd(root_path.to_str().unwrap());
+            qc.add_cd_texture(root_path.to_str().unwrap());
 
-        if self.options.flatshade {
-            for texture_index in 0..6 {
-                for _y in 0..texture_per_side {
-                    for _x in 0..texture_per_side {
-                        let texture_file_name = format!(
-                            "{}{}{}{}.bmp",
-                            self.options.output_name,
-                            map_index_to_suffix(texture_index as u32),
-                            _x,
-                            _y
-                        );
+            if self.options.flatshade {
+                for texture_index in 0..6 {
+                    for _y in 0..texture_per_side {
+                        for _x in 0..texture_per_side {
+                            let curr_texture_overall_count =
+                                texture_index * 16 + _y * texture_per_side + _x;
+                            let new_qc_index = (curr_texture_overall_count
+                                / MAX_GOLDSRC_MODEL_TEXTURE_COUNT)
+                                as usize;
 
-                        qc.add_texrendermode(&texture_file_name, qc::RenderMode::FlatShade);
+                            if new_qc_index != model_index as usize {
+                                continue;
+                            }
+
+                            let texture_file_name = format!(
+                                "{}{}{}{}.bmp",
+                                self.options.output_name,
+                                map_index_to_suffix(texture_index as u32),
+                                _x,
+                                _y
+                            );
+
+                            qc.add_texrendermode(&texture_file_name, qc::RenderMode::FlatShade);
+                        }
                     }
                 }
             }
-        }
 
-        qc.add_body("studio0", &self.options.output_name, false, None);
-        qc.add_sequence("idle", "idle", vec![]);
+            qc.add_body(
+                "studio0",
+                format!("{}{}", self.options.output_name, model_index).as_str(),
+                false,
+                None,
+            );
+            qc.add_sequence("idle", "idle", vec![]);
 
-        let qc_path = root_path.join(format!("{}.qc", self.options.output_name));
+            let qc_path = root_path.join(format!("{}{}.qc", self.options.output_name, model_index));
 
-        qc.write(qc_path.to_str().unwrap())?;
+            qc.write(qc_path.to_str().unwrap())?;
 
-        // run studiomdl
-        let handle = run_studiomdl(
-            qc_path.as_path(),
-            self.studiomdl.as_ref().unwrap(),
-            self.wineprefix.as_ref().unwrap(),
-        );
+            // run studiomdl
+            let handle = run_studiomdl(
+                qc_path.as_path(),
+                self.studiomdl.as_ref().unwrap(),
+                self.wineprefix.as_ref().unwrap(),
+            );
 
-        match handle.join() {
-            Ok(res) => {
-                let output = res?;
-                let stdout = from_utf8(&output.stdout).unwrap();
+            match handle.join() {
+                Ok(res) => {
+                    let output = res?;
+                    let stdout = from_utf8(&output.stdout).unwrap();
 
-                let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
+                    let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
 
-                if let Some(err_index) = maybe_err {
-                    let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
-                    let err_str = format!("Cannot compile: {}", err.trim());
+                    if let Some(err_index) = maybe_err {
+                        let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
+                        let err_str = format!("Cannot compile: {}", err.trim());
+                        return Err(eyre!(err_str));
+                    }
+                }
+                Err(_) => {
+                    let err_str =
+                        "No idea what happens with running studiomdl. Probably just a dream.";
+
                     return Err(eyre!(err_str));
                 }
-            }
-            Err(_) => {
-                let err_str = "No idea what happens with running studiomdl. Probably just a dream.";
-
-                return Err(eyre!(err_str));
-            }
-        };
+            };
+        }
 
         Ok(())
     }
@@ -604,6 +638,32 @@ mod test {
             .output_name("nineface")
             .skybox_size(512)
             .texture_per_face(9)
+            .convert_texture(false);
+
+        let res = builder.work();
+
+        println!("{:?}", res);
+
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn run2() {
+        let mut binding = SkyModBuilder::new();
+        let builder = binding
+            .bk("examples/skybox/cyberwaveBK.png")
+            .dn("examples/skybox/cyberwaveDN.png")
+            .ft("examples/skybox/cyberwaveFT.png")
+            .lf("examples/skybox/cyberwaveLF.png")
+            .rt("examples/skybox/cyberwaveRT.png")
+            .up("examples/skybox/cyberwaveUP.png")
+            .studiomdl("/home/khang/map2prop-rs/dist/studiomdl.exe")
+            .wineprefix(Some(
+                "/home/khang/.local/share/wineprefixes/wine32/".to_owned(),
+            ))
+            .output_name("cyberwave")
+            .skybox_size(2_u32.pow(17))
+            .texture_per_face(16)
             .convert_texture(false);
 
         let res = builder.work();

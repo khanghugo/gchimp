@@ -274,37 +274,79 @@ Recommeded to leave it checked for uniformly lit texture.",
 
                 self.textures[0] = paths
                     .iter()
-                    .find(|p| p.file_stem().unwrap().to_str().unwrap().to_lowercase().ends_with("up"))
+                    .find(|p| {
+                        p.file_stem()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_lowercase()
+                            .ends_with("up")
+                    })
                     .unwrap()
                     .display()
                     .to_string();
                 self.textures[1] = paths
                     .iter()
-                    .find(|p| p.file_stem().unwrap().to_str().unwrap().to_lowercase().ends_with("lf"))
+                    .find(|p| {
+                        p.file_stem()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_lowercase()
+                            .ends_with("lf")
+                    })
                     .unwrap()
                     .display()
                     .to_string();
                 self.textures[2] = paths
                     .iter()
-                    .find(|p| p.file_stem().unwrap().to_str().unwrap().to_lowercase().ends_with("ft"))
+                    .find(|p| {
+                        p.file_stem()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_lowercase()
+                            .ends_with("ft")
+                    })
                     .unwrap()
                     .display()
                     .to_string();
                 self.textures[3] = paths
                     .iter()
-                    .find(|p| p.file_stem().unwrap().to_str().unwrap().to_lowercase().ends_with("rt"))
+                    .find(|p| {
+                        p.file_stem()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_lowercase()
+                            .ends_with("rt")
+                    })
                     .unwrap()
                     .display()
                     .to_string();
                 self.textures[4] = paths
                     .iter()
-                    .find(|p| p.file_stem().unwrap().to_str().unwrap().to_lowercase().ends_with("bk"))
+                    .find(|p| {
+                        p.file_stem()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_lowercase()
+                            .ends_with("bk")
+                    })
                     .unwrap()
                     .display()
                     .to_string();
                 self.textures[5] = paths
                     .iter()
-                    .find(|p| p.file_stem().unwrap().to_str().unwrap().to_lowercase().ends_with("dn"))
+                    .find(|p| {
+                        p.file_stem()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_lowercase()
+                            .ends_with("dn")
+                    })
                     .unwrap()
                     .display()
                     .to_string();
