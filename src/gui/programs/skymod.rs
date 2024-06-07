@@ -276,7 +276,12 @@ Recommeded to leave it checked for uniformly lit texture.",
                     return;
                 }
 
-                self.options.output_name = paths[0].file_stem().unwrap().to_str().unwrap().replace("bk", "");
+                self.options.output_name = paths[0]
+                    .file_stem()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .replace("bk", "");
 
                 self.textures[0] = paths
                     .iter()

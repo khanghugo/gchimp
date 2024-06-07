@@ -167,15 +167,13 @@ impl SkyModBuilder {
                     height,
                     self.textures[index]
                 ));
-            } else {
-                if width % MIN_TEXTURE_SIZE != 0 {
-                    return Err(eyre!(
-                        "Does not support textures with size not multiple of {} ({}): {}",
-                        MIN_TEXTURE_SIZE,
-                        width,
-                        self.textures[index]
-                    ));
-                }
+            } else if width % MIN_TEXTURE_SIZE != 0 {
+                return Err(eyre!(
+                    "Does not support textures with size not multiple of {} ({}): {}",
+                    MIN_TEXTURE_SIZE,
+                    width,
+                    self.textures[index]
+                ));
             }
         }
 
@@ -275,7 +273,7 @@ impl SkyModBuilder {
                     let texture_file_name = format!(
                         "{}{}{}{}.bmp",
                         self.options.output_name,
-                        map_index_to_suffix(texture_index as u32),
+                        map_index_to_suffix(texture_index),
                         _x,
                         _y
                     );
@@ -342,57 +340,37 @@ impl SkyModBuilder {
                     let vert_c = quad.next().unwrap();
                     let vert_d = quad.next().unwrap();
 
-                    let vert_a = vert_a
-                        .as_slice()
-                        .unwrap()
-                        .into_iter()
-                        .map(|v| *v)
-                        .collect::<Vec<f64>>();
-                    let vert_b = vert_b
-                        .as_slice()
-                        .unwrap()
-                        .into_iter()
-                        .map(|v| *v)
-                        .collect::<Vec<f64>>();
-                    let vert_c = vert_c
-                        .as_slice()
-                        .unwrap()
-                        .into_iter()
-                        .map(|v| *v)
-                        .collect::<Vec<f64>>();
-                    let vert_d = vert_d
-                        .as_slice()
-                        .unwrap()
-                        .into_iter()
-                        .map(|v| *v)
-                        .collect::<Vec<f64>>();
+                    let vert_a = vert_a.as_slice().unwrap();
+                    let vert_b = vert_b.as_slice().unwrap();
+                    let vert_c = vert_c.as_slice().unwrap();
+                    let vert_d = vert_d.as_slice().unwrap();
 
                     let parent = 0;
 
                     let vert_a = Vertex {
                         parent,
-                        pos: DVec3::from_slice(vert_a.as_slice()),
+                        pos: DVec3::from_slice(vert_a),
                         norm: map_index_to_norm(texture_index),
                         uv: DVec2::from_slice(vert_a_uv.as_slice().unwrap()),
                         source: None,
                     };
                     let vert_b = Vertex {
                         parent,
-                        pos: DVec3::from_slice(vert_b.as_slice()),
+                        pos: DVec3::from_slice(vert_b),
                         norm: map_index_to_norm(texture_index),
                         uv: DVec2::from_slice(vert_b_uv.as_slice().unwrap()),
                         source: None,
                     };
                     let vert_c = Vertex {
                         parent,
-                        pos: DVec3::from_slice(vert_c.as_slice()),
+                        pos: DVec3::from_slice(vert_c),
                         norm: map_index_to_norm(texture_index),
                         uv: DVec2::from_slice(vert_c_uv.as_slice().unwrap()),
                         source: None,
                     };
                     let vert_d = Vertex {
                         parent,
-                        pos: DVec3::from_slice(vert_d.as_slice()),
+                        pos: DVec3::from_slice(vert_d),
                         norm: map_index_to_norm(texture_index),
                         uv: DVec2::from_slice(vert_d_uv.as_slice().unwrap()),
                         source: None,
@@ -447,8 +425,10 @@ impl SkyModBuilder {
                 for texture_index in 0..6 {
                     for _y in 0..texture_per_side {
                         for _x in 0..texture_per_side {
-                            let curr_texture_overall_count =
-                                texture_index * self.options.texture_per_face + _y * texture_per_side + _x;
+                            let curr_texture_overall_count = texture_index
+                                * self.options.texture_per_face
+                                + _y * texture_per_side
+                                + _x;
                             let new_qc_index = (curr_texture_overall_count
                                 / MAX_GOLDSRC_MODEL_TEXTURE_COUNT)
                                 as usize;
@@ -460,7 +440,7 @@ impl SkyModBuilder {
                             let texture_file_name = format!(
                                 "{}{}{}{}.bmp",
                                 self.options.output_name,
-                                map_index_to_suffix(texture_index as u32),
+                                map_index_to_suffix(texture_index),
                                 _x,
                                 _y
                             );

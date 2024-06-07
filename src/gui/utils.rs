@@ -41,9 +41,9 @@ macro_rules! include_image {
 
         let cow = format!("bytes://{}", $path);
 
-        crate::gui::egui::ImageSource::Bytes {
+        $crate::gui::egui::ImageSource::Bytes {
             uri: ::std::borrow::Cow::Borrowed(cow.leak()),
-            bytes: crate::gui::egui::load::Bytes::Static(buf.leak()),
+            bytes: $crate::gui::egui::load::Bytes::Static(buf.leak()),
         }
     }};
 }
