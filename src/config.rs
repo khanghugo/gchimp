@@ -29,6 +29,12 @@ pub fn parse_config() -> eyre::Result<Config> {
         Err(_) => PathBuf::from(CONFIG_FILE_NAME),
     };
 
+    if !path.exists() {
+        return Err(eyre!(
+            "Cannot find config.toml in the same folder as gchimp"
+        ));
+    }
+
     parse_config_from_file(path.as_path())
 }
 
@@ -43,34 +49,32 @@ pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
     let root = path.parent().unwrap();
 
     let studiomdl = PathBuf::from(config.studiomdl);
-
-    if !studiomdl.exists() {
-        return Err(eyre!("Cannot find studiomdl binary"));
-    }
-
     let studiomdl = if studiomdl.is_relative() {
         root.join(studiomdl)
     } else {
         studiomdl
     }
-    .canonicalize()?
-    .display()
-    .to_string();
+    .canonicalize();
 
-    let crowbar = PathBuf::from(config.crowbar);
-
-    if !crowbar.exists() {
-        return Err(eyre!("Cannot find crowbar binary"));
+    if studiomdl.is_err() {
+        return Err(eyre!("Cannot find studiomdl binary"));
     }
 
+    let studiomdl = studiomdl.unwrap().display().to_string();
+
+    let crowbar = PathBuf::from(config.crowbar);
     let crowbar = if crowbar.is_relative() {
         root.join(crowbar)
     } else {
         crowbar
     }
-    .canonicalize()?
-    .display()
-    .to_string();
+    .canonicalize();
+
+    if crowbar.is_err() {
+        return Err(eyre!("Cannot find crowbar binary"));
+    }
+
+    let crowbar = crowbar.unwrap().display().to_string();
 
     let no_vtf = PathBuf::from(config.no_vtf);
 
@@ -81,18 +85,18 @@ pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
         no_vtf
     };
 
-    if !no_vtf.exists() {
-        return Err(eyre!("Cannot find no_vtf binary"));
-    }
-
     let no_vtf = if no_vtf.is_relative() {
         root.join(no_vtf)
     } else {
         no_vtf
     }
-    .canonicalize()?
-    .display()
-    .to_string();
+    .canonicalize();
+
+    if no_vtf.is_err() {
+        return Err(eyre!("Cannot find no_vtf binary"));
+    }
+
+    let no_vtf = no_vtf.unwrap().display().to_string();
 
     Ok(Config {
         studiomdl,
