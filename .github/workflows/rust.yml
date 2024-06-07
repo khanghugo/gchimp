@@ -21,11 +21,11 @@ jobs:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            file_name: gchimp
+            filename: gchimp
             label: Ubuntu
 
           - os: windows-2019
-            file_name: gchimp.exe
+            filename: gchimp.exe
             target: x86_64-pc-windows-msvc
             label: Windows
             
