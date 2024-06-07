@@ -284,7 +284,8 @@ impl SkyModBuilder {
                     // if it is over MAX_GOLDSRC_MODEL_TEXTURE_COUNT then add the quad
                     // in a different smd
                     let curr_texture_overall_count =
-                        texture_index * 16 + _y * texture_per_side + _x;
+                        texture_index * self.options.texture_per_face + _y * texture_per_side + _x;
+
                     let new_smd_index =
                         (curr_texture_overall_count / MAX_GOLDSRC_MODEL_TEXTURE_COUNT) as usize;
 
@@ -429,6 +430,7 @@ impl SkyModBuilder {
         let idle_smd = Smd::new_basic();
         idle_smd.write(root_path.join("idle.smd").to_str().unwrap())?;
 
+        // TODO dont add 0 at the end for 1 model
         for model_index in 0..model_count {
             // write qc
             let mut qc = Qc::new_basic();
@@ -663,8 +665,8 @@ mod test {
             ))
             .output_name("cyberwave")
             .skybox_size(2_u32.pow(17))
-            .texture_per_face(16)
-            .convert_texture(false);
+            .texture_per_face(1)
+            .convert_texture(true);
 
         let res = builder.work();
 

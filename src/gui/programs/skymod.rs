@@ -188,7 +188,8 @@ impl TabProgram for SkyModGui {
                         .on_hover_text(
                             "\
 How many textures should each skybox face have? \n
-It should be a perfect square (such as 2, 4, 9, 16, ..)",
+It should be a perfect square (such as 2, 4, 9, 16, ..) \n
+If a model has more than 64 textures, it will be split into smaller models",
                         );
                     ui.label("Skybox size:");
                     ui.text_edit_singleline(&mut self.skybox_size)
@@ -223,6 +224,9 @@ Recommeded to leave it checked for uniformly lit texture.",
             ui.horizontal(|ui| {
                 ui.add_enabled_ui(self.idle, |ui| {
                     if ui.button("Run").clicked() {
+                        // TODO make it truly multithreaded like s2g
+                        // kindda lazy to do it tbh
+                        // it works ok enough and there isn't much on the output to report
                         self.run();
                     }
                 });
@@ -271,6 +275,8 @@ Recommeded to leave it checked for uniformly lit texture.",
                 if !is_valid {
                     return;
                 }
+
+                self.options.output_name = paths[0].file_stem().unwrap().to_str().unwrap().replace("bk", "");
 
                 self.textures[0] = paths
                     .iter()
