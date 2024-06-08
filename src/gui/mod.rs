@@ -1,7 +1,7 @@
 use eframe::egui;
 use egui_tiles::Tree;
 
-use crate::config::parse_config;
+use crate::config::{parse_config, parse_config_from_file};
 
 use self::{
     constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
@@ -40,17 +40,24 @@ pub fn gui() -> Result<(), eframe::Error> {
 }
 
 struct MyApp {
-    tree: Tree<Pane>,
-    // config: Option<Config>,
+    tree: Option<Tree<Pane>>,
+    _no_config_status: String,
 }
 
 impl Default for MyApp {
     fn default() -> Self {
-        let config = parse_config().unwrap();
+        let config = parse_config();
+
+        if let Err(err) = config {
+            return Self {
+                tree: None,
+                _no_config_status: format!("Error with parsing config.toml: {}", err),
+            };
+        }
 
         Self {
-            tree: create_tree(config),
-            // config,
+            tree: Some(create_tree(config.unwrap())),
+            _no_config_status: "".to_string(),
         }
     }
 }
@@ -58,8 +65,24 @@ impl Default for MyApp {
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            let mut behavior = TreeBehavior {};
-            self.tree.ui(&mut behavior, ui);
+            if let Some(tree) = &mut self.tree {
+                let mut behavior = TreeBehavior {};
+                tree.ui(&mut behavior, ui);
+            } else {
+                if ui.button("Add config.toml").highlight().clicked() {
+                    if let Some(path) = rfd::FileDialog::new().pick_file() {
+                        let config = parse_config_from_file(path.as_path());
+
+                        match config {
+                            Err(err) => self._no_config_status = err.to_string(),
+                            Ok(config) => self.tree = Some(create_tree(config)),
+                        }
+                    }
+                }
+
+                let mut readonly_buffer = self._no_config_status.as_str();
+                ui.add(egui::TextEdit::multiline(&mut readonly_buffer));
+            }
         });
     }
 }
