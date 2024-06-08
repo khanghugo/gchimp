@@ -12,25 +12,18 @@ Usually it would just work out of the box. If there is any problem, try starting
 
 ## Features
 
-### S2G
+### [S2G: Source to GoldSrc model converter](https://github.com/khanghugo/gchimp/wiki/S2G)
 
-Source to GoldSrc models converter. Supports folder conversion.
+### [SkyMod: Creates skybox model out of images](https://github.com/khanghugo/gchimp/wiki/SkyMod)
 
-### SkyMod
+### [Command line interface: You can do this instead of GUI](https://github.com/khanghugo/gchimp/wiki/Command%E2%80%90line-interface)
 
-Creates skybox as a model. Supports texture size bigger than the typical 512x512.
-
-### Command line interface
-
-Some functionalities have command line as well as graphical supports. There is also .rhai scripting for a selected few functionalities.
-
-### QC, SMD, MAP
-
-You can write your own functionalities with these included libraries.
+### [Custom Scripting: Write your own functionality](https://github.com/khanghugo/gchimp/wiki/Custom-Scripting)
 
 ### Planned features
 
 - [ ] A functional enough Wally to edit WAD files 
+- [ ] Texture filters such as tiling because tiling is nice to preserve overall detail for highly scaled texture
 - [ ] [map2prop](https://erty-gamedev.github.io/Docs-Map2Prop/) clone that hopefully goes open source before the original project
 
 ## Build
