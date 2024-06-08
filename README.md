@@ -12,13 +12,13 @@ Usually it would just work out of the box. If there is any problem, try starting
 
 ## Features
 
-### [S2G: Source to GoldSrc model converter](https://github.com/khanghugo/gchimp/wiki/S2G)
+- [S2G: Source to GoldSrc model converter](https://github.com/khanghugo/gchimp/wiki/S2G)
 
-### [SkyMod: Creates skybox model out of images](https://github.com/khanghugo/gchimp/wiki/SkyMod)
+- [SkyMod: Creates skybox model out of images](https://github.com/khanghugo/gchimp/wiki/SkyMod)
 
-### [Command line interface: You can do this instead of GUI](https://github.com/khanghugo/gchimp/wiki/Command%E2%80%90line-interface)
+- [Command line interface: You can do this instead of GUI](https://github.com/khanghugo/gchimp/wiki/Command%E2%80%90line-interface)
 
-### [Custom Scripting: Write your own functionality](https://github.com/khanghugo/gchimp/wiki/Custom-Scripting)
+- [Custom Scripting: Write your own functionality](https://github.com/khanghugo/gchimp/wiki/Custom-Scripting)
 
 ### Planned features
 
