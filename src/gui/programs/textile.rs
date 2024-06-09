@@ -14,8 +14,6 @@ use crate::{
 pub struct TexTileGui {
     items: Vec<PathBuf>,
     options: TexTileOptions,
-    tiling_scalar: String,
-    transparent_threshold: String,
     extensions: String,
     sync: TexTileSync,
 }
@@ -25,8 +23,6 @@ impl Default for TexTileGui {
         let options = TexTileOptions::default();
         Self {
             items: vec![],
-            tiling_scalar: options.tiling_scalar.to_string(),
-            transparent_threshold: options.transparent_threshold.to_string(),
             options,
             extensions: String::from("png jpeg jpg"),
             sync: TexTileSync::default(),
@@ -59,28 +55,15 @@ impl TexTileGui {
         let TexTileOptions {
             extensions: _,
             is_tiling,
-            tiling_scalar: _,
+            tiling_scalar,
             is_transparent,
-            transparent_threshold: _,
+            transparent_threshold,
             change_name,
         } = self.options;
 
         let items = self.items.clone();
         let sync = self.sync.clone();
         let extensions = self.options.extensions.clone();
-
-        let tiling_scalar = self.tiling_scalar.parse::<u32>();
-        if let Err(err) = tiling_scalar {
-            *sync.status().lock().unwrap() = format!("Tiling scalar is not a number: {}", err);
-            return;
-        }
-
-        let transparent_threshold = self.transparent_threshold.parse::<f32>();
-        if let Err(err) = transparent_threshold {
-            *sync.status().lock().unwrap() =
-                format!("Transparent threshold is not a number: {}", err);
-            return;
-        }
 
         let _ = thread::spawn(move || {
             let mut binding = TexTileBuilder::new(items);
@@ -89,9 +72,9 @@ impl TexTileGui {
                 .extension(&extensions)
                 .change_name(change_name)
                 .tiling(is_tiling)
-                .tiling_scalar(tiling_scalar.unwrap())
+                .tiling_scalar(tiling_scalar)
                 .transparent(is_transparent)
-                .transparent_threshold(transparent_threshold.unwrap())
+                .transparent_threshold(transparent_threshold)
                 .sync(sync.clone());
 
             *sync.done().lock().unwrap() = false;
@@ -118,7 +101,7 @@ impl TabProgram for TexTileGui {
             ui.label("Image extensions");
             ui.text_edit_singleline(&mut self.extensions).on_hover_text(
                 "\
-Converts only textures with specified file extension(s) \n
+Converts only textures with specified file extension(s)
 Space seperated",
             );
         });
@@ -127,14 +110,25 @@ Space seperated",
             .num_columns(6)
             .show(ui, |ui| {
                 ui.checkbox(&mut self.options.is_tiling, "Tiling");
-                ui.add_enabled_ui(self.options.is_tiling, |ui| {
-                    ui.text_edit_singleline(&mut self.tiling_scalar);
-                });
+                ui.add_enabled(
+                    self.options.is_tiling,
+                    egui::DragValue::new(&mut self.options.tiling_scalar).clamp_range(0.0..=100.0),
+                )
+                .on_hover_text("The dimensions of a texture will multiply by this number.");
 
                 ui.checkbox(&mut self.options.is_transparent, "Transparent");
-                ui.add_enabled_ui(self.options.is_transparent, |ui| {
-                    ui.text_edit_singleline(&mut self.transparent_threshold);
-                });
+                ui.add_enabled(
+                    self.options.is_transparent,
+                    egui::DragValue::new(&mut self.options.transparent_threshold)
+                        .clamp_range(0.0..=1.0)
+                        .speed(0.01),
+                )
+                .on_hover_text(
+                    "\
+The threshold to decide whether a texture is transparent. \n
+If the dominant color of an image exceeds this threshold, 
+it will be chosen as transparent mask.",
+                );
 
                 ui.checkbox(&mut self.options.change_name, "Change file name")
                     .on_hover_text(
