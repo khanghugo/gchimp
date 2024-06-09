@@ -59,6 +59,7 @@ impl S2GGui {
             studiomdl,
             crowbar,
             no_vtf,
+            #[cfg(target_os = "linux")]
             wineprefix,
         } = self.app_config.clone();
 

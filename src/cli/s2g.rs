@@ -83,7 +83,8 @@ impl Cli for S2G {
             studiomdl,
             crowbar,
             no_vtf,
-            wineprefix: config_wineprefix,
+            #[cfg(target_os = "linux")]
+                wineprefix: config_wineprefix,
         } = config.unwrap();
 
         s2g.decompile(!decompile)

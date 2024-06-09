@@ -17,6 +17,7 @@ pub struct Config {
     pub studiomdl: String,
     pub crowbar: String,
     pub no_vtf: String,
+    #[cfg(target_os = "linux")]
     pub wineprefix: Option<String>,
 }
 
@@ -102,6 +103,7 @@ pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
         studiomdl,
         crowbar,
         no_vtf,
+        #[cfg(target_os = "linux")]
         wineprefix: config.wineprefix,
     })
 }

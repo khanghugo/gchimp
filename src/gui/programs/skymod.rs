@@ -73,6 +73,8 @@ impl SkyModGui {
 
         let textures = self.textures.clone();
         let studiomdl = self.app_config.studiomdl.clone();
+
+        #[cfg(target_os = "linux")]
         let wineprefix = self.app_config.wineprefix.clone();
 
         let SkyModOptions {
