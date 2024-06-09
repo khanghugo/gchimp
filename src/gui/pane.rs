@@ -3,7 +3,7 @@ use eframe::egui::{self, Sense};
 use crate::config::Config;
 
 use super::{
-    programs::{map2prop::Map2Prop, s2g::S2GGui, skymod::SkyModGui},
+    programs::{map2prop::Map2Prop, s2g::S2GGui, skymod::SkyModGui, textile::TexTileGui},
     TabProgram,
 };
 
@@ -11,6 +11,7 @@ pub enum Pane {
     Map2Prop(Map2Prop),
     S2G(S2GGui),
     SkyMod(SkyModGui),
+    TexTile(TexTileGui),
 }
 
 impl Pane {
@@ -19,6 +20,7 @@ impl Pane {
             Pane::Map2Prop(m2p) => m2p.tab_title(),
             Pane::S2G(s2g) => s2g.tab_title(),
             Pane::SkyMod(skymod) => skymod.tab_title(),
+            Pane::TexTile(textile) => textile.tab_title(),
         }
     }
 
@@ -27,6 +29,7 @@ impl Pane {
             Pane::Map2Prop(m2p) => m2p.tab_ui(ui),
             Pane::S2G(s2g) => s2g.tab_ui(ui),
             Pane::SkyMod(skymod) => skymod.tab_ui(ui),
+            Pane::TexTile(textile) => textile.tab_ui(ui),
         }
     }
 }
@@ -37,6 +40,7 @@ pub fn create_tree(app_config: Config) -> egui_tiles::Tree<Pane> {
     let tabs = vec![
         tiles.insert_pane(Pane::S2G(S2GGui::new(app_config.clone()))),
         tiles.insert_pane(Pane::SkyMod(SkyModGui::new(app_config.clone()))),
+        tiles.insert_pane(Pane::TexTile(TexTileGui::default())),
         tiles.insert_pane(Pane::Map2Prop(Map2Prop::default())),
     ];
 

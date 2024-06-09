@@ -10,7 +10,7 @@ use ndarray::prelude::*;
 
 use crate::utils::{
     constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
-    img_stuffs::{rgba8_to_8bpp, write_8bpp},
+    img_stuffs::{rgba8_to_8bpp, write_8bpp, GoldSrcBmp},
     run_bin::run_studiomdl,
 };
 
@@ -243,12 +243,16 @@ impl SkyModBuilder {
                         let section =
                             imageops::crop_imm(&texture, x, y, MIN_TEXTURE_SIZE, MIN_TEXTURE_SIZE)
                                 .to_image();
-                        let (img, palette) = rgba8_to_8bpp(section).unwrap();
+                        let GoldSrcBmp {
+                            img,
+                            palette,
+                            dimension,
+                        } = rgba8_to_8bpp(section).unwrap();
 
                         write_8bpp(
                             &img,
                             &palette,
-                            (MIN_TEXTURE_SIZE, MIN_TEXTURE_SIZE),
+                            dimension,
                             root_path.join(texture_file_name).as_path(),
                         )
                         .unwrap();
