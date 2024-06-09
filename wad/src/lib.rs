@@ -241,8 +241,7 @@ impl Wad {
                     }
                 }
 
-                // apparently, WE BYTES NEED TO BE ALIGNED HERE
-                // this is not documented anywhere
+                // // apparently, if we want compatibility with Wally, we need to align the bytes
                 let offset_bytes_needed = writer.get_offset() % 4;
 
                 for _ in 0..offset_bytes_needed {
