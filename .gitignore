@@ -19,3 +19,5 @@
 
 /Cargo.lock
 /dist/no_vtf
+
+/wad/test/out
