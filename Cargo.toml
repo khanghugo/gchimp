@@ -7,12 +7,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-glam = "0.27.0"
+# local
+smd = { path = "smd" }
 map = { path = "map" }
-qc = { version = "0.1.0", path = "qc" }
+qc = { path = "qc" }
+wad = {path = "wad" }
+
+# dependencies
+glam = "0.27.0"
 rayon = "1.10.0"
 rhai = "1.17.1"
-smd = { path = "smd" }
 eyre = "0.6.12"
 toml = { version = "0.8.13", features = ["default"]}
 serde = { version = "1.0.202", features = ["derive"] }
@@ -29,4 +33,4 @@ rfd = "0.14.1"
 egui_extras = {version = "*", features = ["all_loaders"]}
 
 [workspace]
-members = [".", "map", "smd", "qc" ]
+members = [".", "map", "smd", "qc" , "wad"]
