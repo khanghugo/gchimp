@@ -16,6 +16,8 @@ Usually it would just work out of the box. If there is any problem, try starting
 
 - [SkyMod: Creates skybox model out of images](https://github.com/khanghugo/gchimp/wiki/SkyMod)
 
+- [TexTile: Tiles your texture and some more](https://github.com/khanghugo/gchimp/wiki/TexTile)
+
 - [Command line interface: You can do this instead of GUI](https://github.com/khanghugo/gchimp/wiki/Command%E2%80%90line-interface)
 
 - [Custom Scripting: Write your own functionality](https://github.com/khanghugo/gchimp/wiki/Custom-Scripting)
@@ -23,10 +25,10 @@ Usually it would just work out of the box. If there is any problem, try starting
 ### Planned features
 
 - [ ] A functional enough Wally to edit WAD files 
-- [ ] Texture filters such as tiling because tiling is nice to preserve overall detail for highly scaled texture
+- [x] Texture filters such as tiling because tiling is nice to preserve overall detail for highly scaled texture
 - [ ] [map2prop](https://erty-gamedev.github.io/Docs-Map2Prop/) clone that hopefully goes open source before the original project
 
-## Build
+## Building
 
 After building the project, put `config.toml` from `dist` folder into the same folder as the binary `gchimp`
 
