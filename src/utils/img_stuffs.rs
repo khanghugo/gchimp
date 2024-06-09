@@ -285,6 +285,7 @@ pub fn eight_bpp_transparent_img(
     (new_img, new_palette)
 }
 
+#[derive(Debug)]
 pub struct GoldSrcBmp {
     pub img: Vec<u8>,
     pub palette: Vec<[u8; 3]>,
