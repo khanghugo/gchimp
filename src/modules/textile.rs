@@ -7,6 +7,8 @@ use std::{
 use eyre::eyre;
 use image::RgbaImage;
 
+use rayon::prelude::*;
+
 use crate::utils::img_stuffs::{
     eight_bpp_transparent_img, rgba8_to_8bpp, tile_and_resize, write_8bpp, GoldSrcBmp,
 };
@@ -38,7 +40,7 @@ impl Default for TexTileOptions {
             is_tiling: true,
             tiling_scalar: 2,
             is_transparent: false,
-            transparent_threshold: 75.,
+            transparent_threshold: 0.75,
             change_name: true,
         }
     }
@@ -204,48 +206,83 @@ impl TexTileBuilder {
         }
 
         // load the images into rgba8
-        let mut rgba_images: Vec<RgbaImage> = vec![];
+        let rgba_images: Vec<eyre::Result<(PathBuf, RgbaImage)>> = work_items
+            .into_par_iter()
+            .map(|work_item| {
+                let new_img = image::open(&work_item);
 
-        for work_item in &work_items {
-            let new_img = image::open(work_item);
+                if new_img.is_err() {
+                    let log = format!(
+                        "Cannot open image {}: {}",
+                        work_item.display(),
+                        new_img.unwrap_err()
+                    );
 
-            if new_img.is_err() {
-                let log = format!(
-                    "Cannot open image {}: {}",
-                    work_item.display(),
-                    new_img.unwrap_err()
-                );
+                    return Err(eyre!(log));
+                }
 
-                self.log(&log);
+                Ok((work_item, new_img.unwrap().into_rgba8()))
+            })
+            .collect();
 
-                return Err(eyre!(log));
-            }
+        if let Some(Err(err)) = rgba_images.iter().find(|res| res.is_err()) {
+            let err_str = err.to_string();
 
-            rgba_images.push(new_img.unwrap().into_rgba8());
+            self.log(&err_str);
+
+            return Err(eyre!(err_str));
         }
 
+        let mut rgba_images: Vec<(PathBuf, RgbaImage)> =
+            rgba_images.into_iter().map(|res| res.unwrap()).collect();
+
         if self.options.is_tiling {
-            rgba_images.iter_mut().for_each(|img| {
+            rgba_images.par_iter_mut().for_each(|(_, img)| {
                 *img = tile_and_resize(img, self.options.tiling_scalar);
             });
         }
 
         // with all of the things processing rgba8 done, now we convert them to 8bpp for other steps
-        let mut eight_bpps: Vec<GoldSrcBmp> = vec![];
+        let eight_bpps = rgba_images
+            .into_par_iter()
+            .map(|(path, img)| {
+                let new_img = rgba8_to_8bpp(img);
 
-        for image in rgba_images {
-            let goldsrc_bmp = rgba8_to_8bpp(image)?;
+                if new_img.is_err() {
+                    let log = format!(
+                        "Cannot convert {} to 8bpp: {}",
+                        path.display(),
+                        new_img.unwrap_err()
+                    );
 
-            eight_bpps.push(goldsrc_bmp);
+                    return Err(eyre!(log));
+                }
+
+                Ok((path, new_img.unwrap()))
+            })
+            .collect::<Vec<eyre::Result<(PathBuf, GoldSrcBmp)>>>();
+
+        if let Some(Err(err)) = eight_bpps.iter().find(|res| res.is_err()) {
+            let err_str = err.to_string();
+
+            self.log(&err_str);
+
+            return Err(eyre!(err_str));
         }
 
+        let mut eight_bpps: Vec<(PathBuf, GoldSrcBmp)> =
+            eight_bpps.into_iter().map(|res| res.unwrap()).collect();
+
         if self.options.is_transparent {
-            eight_bpps.iter_mut().for_each(
-                |GoldSrcBmp {
-                     img,
-                     palette,
-                     dimension: _,
-                 }| {
+            eight_bpps.par_iter_mut().for_each(
+                |(
+                    _,
+                    GoldSrcBmp {
+                        img,
+                        palette,
+                        dimension: _,
+                    },
+                )| {
                     let (new_img, new_palette) =
                         eight_bpp_transparent_img(img, palette, self.options.transparent_threshold);
 
@@ -255,43 +292,57 @@ impl TexTileBuilder {
             );
         }
 
-        for index in 0..eight_bpps.len() {
-            let GoldSrcBmp {
-                img,
-                palette,
-                dimension,
-            } = &eight_bpps[index];
-            // this one does not have .bmp at the end
-            let path = work_items[index].as_path();
+        let write_res = eight_bpps
+            .into_par_iter()
+            .map(
+                |(
+                    path,
+                    GoldSrcBmp {
+                        img,
+                        palette,
+                        dimension,
+                    },
+                )| {
+                    // with_file_name would overwrite the extension
+                    // regardless, we will overwrite the extension at the end
+                    let path = if self.options.is_tiling {
+                        let current_file_name =
+                            path.file_stem().unwrap().to_str().unwrap().to_string();
+                        path.with_file_name(format!(
+                            "{}_{}",
+                            current_file_name, self.options.tiling_scalar
+                        ))
+                    } else {
+                        path.to_path_buf()
+                    };
 
-            // with_file_name would overwrite the extension
-            // regardless, we will overwrite the extension at the end
-            let path = if self.options.is_tiling {
-                let current_file_name = path.file_stem().unwrap().to_str().unwrap().to_string();
-                path.with_file_name(format!(
-                    "{}_{}",
-                    current_file_name, self.options.tiling_scalar
-                ))
-            } else {
-                path.to_path_buf()
-            };
+                    let path = if self.options.is_transparent {
+                        let current_file_name =
+                            path.file_stem().unwrap().to_str().unwrap().to_string();
+                        path.with_file_name(format!("{{{}", current_file_name))
+                    } else {
+                        path
+                    };
 
-            let path = if self.options.is_transparent {
-                let current_file_name = path.file_stem().unwrap().to_str().unwrap().to_string();
-                path.with_file_name(format!("{{{}", current_file_name))
-            } else {
-                path
-            };
+                    let path = path.with_extension("bmp");
 
-            let path = path.with_extension("bmp");
+                    if let Err(err) = write_8bpp(&img, &palette, dimension, &path) {
+                        let err_str = format!("Error writing file {}: {}", path.display(), err);
 
-            if let Err(err) = write_8bpp(img, palette, *dimension, &path) {
-                let err_str = format!("Error writing file {}: {}", path.display(), err);
+                        return Err(eyre!(err_str));
+                    }
 
-                self.log(&err_str);
+                    Ok(())
+                },
+            )
+            .collect::<Vec<eyre::Result<()>>>();
 
-                return Err(eyre!(err_str));
-            }
+        if let Some(Err(err)) = write_res.iter().find(|res| res.is_err()) {
+            let err_str = err.to_string();
+
+            self.log(&err_str);
+
+            return Err(eyre!(err_str));
         }
 
         if let Some(sync) = &self.sync {
