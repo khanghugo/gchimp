@@ -4,7 +4,6 @@ use std::{
 };
 
 use eframe::egui::{self, ScrollArea};
-use eyre::eyre;
 
 use crate::{
     config::Config,
