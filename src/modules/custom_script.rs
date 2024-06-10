@@ -75,7 +75,9 @@ pub fn custom_script(rhai_file: &Path) {
 
     engine
         .register_type_with_name::<qc::Qc>("Qc")
-        .register_fn("new_qc", |file_name: String| qc::Qc::from_file(file_name).unwrap())
+        .register_fn("new_qc", |file_name: String| {
+            qc::Qc::from_file(file_name).unwrap()
+        })
         .register_fn("write", |qc, out: String| {
             let _ = qc::Qc::write(qc, out);
         });
