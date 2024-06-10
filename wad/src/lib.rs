@@ -54,10 +54,10 @@ impl TextureName {
 }
 
 #[derive(Debug)]
-pub struct Image(Vec<Vec<u8>>);
+pub struct Image(Vec<u8>);
 
 impl Image {
-    pub fn get_bytes(&self) -> &Vec<Vec<u8>> {
+    pub fn get_bytes(&self) -> &Vec<u8> {
         &self.0
     }
 }
@@ -227,9 +227,7 @@ impl Wad {
 
                         // mip images
                         for image in mip_images {
-                            for row in image.data.get_bytes() {
-                                writer.append_u8_slice(row);
-                            }
+                            writer.append_u8_slice(&image.data.get_bytes());
                         }
 
                         // colors_used
@@ -325,7 +323,7 @@ fn parse_directory_entry(i: &[u8]) -> IResult<DirectoryEntry> {
 
 fn parse_qpic(i: &[u8]) -> IResult<Qpic> {
     let (i, (width, height)) = tuple((le_i32, le_i32))(i)?;
-    let (i, data) = count(count(le_u8, width as usize), height as usize)(i)?;
+    let (i, data) = count(le_u8, (width * height) as usize)(i)?;
     let (i, colors_used) = le_i16(i)?;
     let (i, palette) = count(count(le_u8, 3), colors_used as usize)(i)?;
 
@@ -349,24 +347,20 @@ fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
     let (i, mip_offsets) = count(le_u32, 4)(i)?;
 
     // offset relatively from where we start with the struct
-    let (_, miptex0) = count(count(le_u8, width as usize), height as usize)(
-        &struct_start[(mip_offsets[0] as usize)..],
-    )?;
+    let (_, miptex0) =
+        count(le_u8, (width * height) as usize)(&struct_start[(mip_offsets[0] as usize)..])?;
 
-    let (_, miptex1) = count(count(le_u8, width as usize / 2), height as usize / 2)(
-        &struct_start[(mip_offsets[1] as usize)..],
-    )?;
+    let (_, miptex1) =
+        count(le_u8, (width * height / 4) as usize)(&struct_start[(mip_offsets[1] as usize)..])?;
 
-    let (_, miptex2) = count(
-        count(le_u8, width as usize / 2 / 2),
-        height as usize / 2 / 2,
-    )(&struct_start[(mip_offsets[2] as usize)..])?;
+    let (_, miptex2) = count(le_u8, (width * height / 4 / 4) as usize)(
+        &struct_start[(mip_offsets[2] as usize)..],
+    )?;
 
     // we get the palette start from the end of 4th miptex
-    let (palette_start, miptex3) = count(
-        count(le_u8, width as usize / 2 / 2 / 2),
-        height as usize / 2 / 2 / 2,
-    )(&struct_start[(mip_offsets[3] as usize)..])?;
+    let (palette_start, miptex3) = count(le_u8, (width * height / 4 / 4 / 4) as usize)(
+        &struct_start[(mip_offsets[3] as usize)..],
+    )?;
 
     // colors_used is always 256
     let (palette_start, colors_used) = le_i16(palette_start)?;
