@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::OpenOptions,
-    io::Write,
+    io::{BufWriter, Write},
     path::{Path, PathBuf},
 };
 
@@ -203,7 +203,8 @@ pub fn write_8bpp_to_file(
         .write(true)
         .open(file_path)?;
 
-    let mut encoder = image::codecs::bmp::BmpEncoder::new(&mut out_img);
+    let mut writer = BufWriter::new(&mut out_img);
+    let mut encoder = image::codecs::bmp::BmpEncoder::new(&mut writer);
 
     encoder.encode_with_palette(
         img,
@@ -213,7 +214,7 @@ pub fn write_8bpp_to_file(
         Some(palette),
     )?;
 
-    out_img.flush()?;
+    writer.flush()?;
 
     Ok(())
 }
