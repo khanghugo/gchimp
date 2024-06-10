@@ -219,6 +219,26 @@ pub fn write_8bpp_to_file(
     Ok(())
 }
 
+// need to encode it into a format so it has all the info to easily display every where
+pub fn encode_8bpp_bitmap(
+    img: &[u8],
+    palette: &[[u8; 3]],
+    dimension: (u32, u32),
+) -> eyre::Result<Vec<u8>> {
+    let mut buf: Vec<u8> = Vec::new();
+    let mut encoder = image::codecs::bmp::BmpEncoder::new(&mut buf);
+
+    encoder.encode_with_palette(
+        img,
+        dimension.0,
+        dimension.1,
+        image::ExtendedColorType::L8,
+        Some(palette),
+    )?;
+
+    Ok(buf)
+}
+
 // tile the image in a way that the resulting image has the same dimension as the original
 pub fn tile_and_resize(img: &RgbaImage, scalar: u32) -> RgbaImage {
     let (width, height) = img.dimensions();
