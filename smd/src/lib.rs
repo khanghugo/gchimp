@@ -1,6 +1,6 @@
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use glam::{DVec2, DVec3};
 use nom::bytes::complete::take_till;
@@ -148,16 +148,13 @@ impl Smd {
         }
     }
 
-    pub fn from_file(file_name: &str) -> eyre::Result<Self> {
-        let path = Path::new(file_name);
+    pub fn from_file(path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<Self> {
         let text = std::fs::read_to_string(path)?;
 
         Self::from(&text)
     }
 
-    pub fn write(&self, file_name: &str) -> io::Result<()> {
-        let path = Path::new(file_name);
-
+    pub fn write(&self, path: impl AsRef<Path> + Into<PathBuf>) -> io::Result<()> {
         let file = OpenOptions::new()
             .create(true)
             .write(true)

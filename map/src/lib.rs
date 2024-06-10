@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     fs::OpenOptions,
     io::{self, BufWriter, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use glam::{DVec3, DVec4};
@@ -75,16 +75,13 @@ impl Map {
         }
     }
 
-    pub fn from_file(file_name: &str) -> eyre::Result<Self> {
-        let path = Path::new(file_name);
+    pub fn from_file(path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<Self> {
         let text = std::fs::read_to_string(path)?;
 
         Self::from(&text)
     }
 
-    pub fn write(&self, file_name: &str) -> io::Result<()> {
-        let path = Path::new(file_name);
-
+    pub fn write(&self, path: impl AsRef<Path> + Into<PathBuf>) -> io::Result<()> {
         let file = OpenOptions::new()
             .create(true)
             .write(true)
