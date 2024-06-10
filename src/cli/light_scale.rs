@@ -7,7 +7,7 @@ use super::Cli;
 pub struct LightScale;
 impl Cli for LightScale {
     fn name(&self) -> &'static str {
-        "texture_scale"
+        "light_scale"
     }
 
     // In, Out, Scale
