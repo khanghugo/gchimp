@@ -306,7 +306,7 @@ impl SkyModBuilder {
 
                     // fix the seam, i guess?
                     // zoom everything in so that the original size is 1 pixel outward diagonally for every corner
-                    let what: f64 = -1. / MIN_TEXTURE_SIZE as f64;
+                    let what: f64 = -2. / MIN_TEXTURE_SIZE as f64;
 
                     let vert_a_uv = array![0. - what, 0. - what].dot(&rot_mat);
                     let vert_b_uv = array![0. - what, 1. + what].dot(&rot_mat);
@@ -607,8 +607,8 @@ fn rotate_matrix_by_index_relative_to_down(
     }
 }
 
+#[cfg(test)]
 mod test {
-    #[allow(unused_imports)]
     use super::*;
 
     #[test]
@@ -652,8 +652,8 @@ mod test {
                 "/home/khang/.local/share/wineprefixes/wine32/".to_owned(),
             ))
             .output_name("gchimp_lets_go")
-            .skybox_size(2_u32.pow(17))
-            .texture_per_face(1)
+            .skybox_size(512)
+            .texture_per_face(16)
             .convert_texture(true);
 
         let res = builder.work();
