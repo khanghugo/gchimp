@@ -1,3 +1,4 @@
+pub mod check_missing_texture;
 pub mod custom_script;
 pub mod duplicate_triangle;
 pub mod light_scale;

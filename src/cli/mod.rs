@@ -1,5 +1,6 @@
 use map::Map;
 
+mod check_missing_texture;
 mod custom_script;
 mod light_scale;
 mod rotate_prop_static;
@@ -31,6 +32,7 @@ pub fn cli() -> bool {
         &rotate_prop_static::RotatePropStatic,
         &texture_scale::TextureScale,
         &s2g::S2G,
+        &check_missing_texture::CheckMissingTexture,
     ];
 
     let help = || {
