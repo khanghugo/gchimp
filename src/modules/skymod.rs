@@ -10,7 +10,7 @@ use ndarray::prelude::*;
 
 use crate::utils::{
     constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
-    img_stuffs::{rgba8_to_8bpp, write_8bpp, GoldSrcBmp},
+    img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
     run_bin::run_studiomdl,
 };
 
@@ -249,7 +249,7 @@ impl SkyModBuilder {
                             dimension,
                         } = rgba8_to_8bpp(section).unwrap();
 
-                        write_8bpp(
+                        write_8bpp_to_file(
                             &img,
                             &palette,
                             dimension,

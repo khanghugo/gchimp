@@ -188,7 +188,7 @@ pub fn rgba8_to_8bpp(rgb8a: RgbaImage) -> eyre::Result<GoldSrcBmp> {
 }
 
 /// `file_name` should have .bmp have extension
-pub fn write_8bpp(
+pub fn write_8bpp_to_file(
     img: &[u8],
     palette: &[[u8; 3]],
     dimension: (u32, u32),

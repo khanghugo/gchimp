@@ -10,7 +10,7 @@ use image::RgbaImage;
 use rayon::prelude::*;
 
 use crate::utils::img_stuffs::{
-    eight_bpp_transparent_img, rgba8_to_8bpp, tile_and_resize, write_8bpp, GoldSrcBmp,
+    eight_bpp_transparent_img, rgba8_to_8bpp, tile_and_resize, write_8bpp_to_file, GoldSrcBmp,
 };
 
 pub struct TexTileBuilder {
@@ -326,7 +326,7 @@ impl TexTileBuilder {
 
                     let path = path.with_extension("bmp");
 
-                    if let Err(err) = write_8bpp(&img, &palette, dimension, &path) {
+                    if let Err(err) = write_8bpp_to_file(&img, &palette, dimension, &path) {
                         let err_str = format!("Error writing file {}: {}", path.display(), err);
 
                         return Err(eyre!(err_str));
