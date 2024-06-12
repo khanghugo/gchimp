@@ -7,10 +7,12 @@ use std::{
     fs::OpenOptions,
     io::Write,
     path::{Path, PathBuf},
+    str::from_utf8,
 };
 
 use byte_writer::ByteWriter;
 use nom::{
+    bytes::complete::take,
     combinator::{fail, map},
     error::context,
     multi::count,
@@ -27,7 +29,7 @@ type IResult<'a, T> = _IResult<&'a [u8], T>;
 
 #[derive(Debug)]
 pub struct Header {
-    pub magic: Vec<i8>,
+    pub magic: Vec<u8>,
     pub num_dirs: i32,
     pub dir_offset: i32,
 }
@@ -44,12 +46,62 @@ pub struct DirectoryEntry {
     pub texture_name: TextureName,
 }
 
+impl DirectoryEntry {
+    /// Creates a new Directory Entry for MipTex with just texture name
+    pub fn new(s: impl AsRef<str> + Into<String>) -> Self {
+        Self {
+            entry_offset: 0,
+            disk_size: 0,
+            entry_size: 0,
+            file_type: 0x43,
+            compressed: false,
+            padding: 256,
+            texture_name: TextureName::from_string(s),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct TextureName(Vec<u8>);
 
 impl TextureName {
+    // impl Debug has its own to_string.....
+    pub fn get_string(&self) -> String {
+        let mut res: Vec<u8> = vec![];
+
+        for c in self.get_bytes() {
+            if *c == 0 {
+                break;
+            }
+
+            res.push(*c);
+        }
+
+        from_utf8(&res).unwrap().to_string()
+    }
+
+    pub fn from_string(s: impl AsRef<str> + Into<String>) -> Self {
+        let mut res = vec![0u8; 16];
+
+        res[..s.as_ref().len()].copy_from_slice(s.as_ref().as_bytes());
+
+        Self(res)
+    }
+
     pub fn get_bytes(&self) -> &Vec<u8> {
         &self.0
+    }
+
+    pub fn set_name(&mut self, s: impl AsRef<str> + Into<String>) -> eyre::Result<()> {
+        if s.as_ref().len() >= 16 {
+            return Err(eyre!("Max length for name is 15 characters."));
+        }
+
+        self.0[..s.as_ref().len()].copy_from_slice(s.as_ref().as_bytes());
+
+        self.0[s.as_ref().len()] = 0;
+
+        Ok(())
     }
 }
 
@@ -57,16 +109,24 @@ impl TextureName {
 pub struct Image(Vec<u8>);
 
 impl Image {
+    pub fn new(s: impl AsRef<[u8]> + Into<Vec<u8>>) -> Self {
+        Self(s.into())
+    }
+
     pub fn get_bytes(&self) -> &Vec<u8> {
         &self.0
     }
 }
 
 #[derive(Debug)]
-pub struct Palette(Vec<Vec<u8>>);
+pub struct Palette(Vec<[u8; 3]>);
 
 impl Palette {
-    pub fn get_bytes(&self) -> &Vec<Vec<u8>> {
+    pub fn new(s: impl Into<Vec<[u8; 3]>>) -> Self {
+        Self(s.into())
+    }
+
+    pub fn get_bytes(&self) -> &Vec<[u8; 3]> {
         &self.0
     }
 }
@@ -88,8 +148,8 @@ impl Display for TextureName {
 
 #[derive(Debug)]
 pub struct Qpic {
-    pub width: i32,
-    pub height: i32,
+    pub width: u32,
+    pub height: u32,
     // [[u8; width]; height]
     pub data: Image,
     pub colors_used: i16,
@@ -101,6 +161,14 @@ pub struct Qpic {
 pub struct MipMap {
     // [[u8; width]; height]
     pub data: Image,
+}
+
+impl MipMap {
+    pub fn new(s: impl Into<Vec<u8>>) -> Self {
+        Self {
+            data: Image::new(s.into()),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -121,6 +189,57 @@ pub struct MipTex {
     pub palette: Palette,
 }
 
+impl MipTex {
+    /// Only creates the biggest mipmap
+    pub fn new(
+        s: impl AsRef<str> + Into<String>,
+        (width, height): (u32, u32),
+        images: &[&[u8]],
+        palette: impl Into<Vec<[u8; 3]>>,
+    ) -> Self {
+        let mip0_len = (width * height) as usize;
+
+        let mip0 = MipMap::new(images[0]);
+        let mip1 = MipMap::new(images[1]);
+        let mip2 = MipMap::new(images[2]);
+        let mip3 = MipMap::new(images[3]);
+
+        let mip0_offset = 16 + 4 + 4 + 4 * 4;
+        let mip1_offset = (mip0_offset + mip0_len) as u32;
+        let mip2_offset = (mip0_offset + mip0_len + mip0_len / 4) as u32;
+        let mip3_offset = (mip0_offset + mip0_len + mip0_len / 4 + mip0_len / 4 / 4) as u32;
+
+        Self {
+            texture_name: TextureName::from_string(s),
+            width,
+            height,
+            mip_offsets: vec![mip0_offset as u32, mip1_offset, mip2_offset, mip3_offset],
+            mip_images: vec![mip0, mip1, mip2, mip3],
+            colors_used: 256,
+            palette: Palette::new(palette),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CharInfo {
+    pub startoffset: i16,
+    pub charwidth: i16,
+}
+
+#[derive(Debug)]
+pub struct Font {
+    pub width: u32,
+    pub height: u32,
+    pub row_count: u32,
+    pub row_height: u32,
+    // [CharInfo; 256]
+    pub font_info: Vec<CharInfo>,
+    pub data: Image,
+    pub colors_used: i16,
+    pub palette: Palette,
+}
+
 // this is not how it looks in file
 #[derive(Debug)]
 pub struct Entry {
@@ -128,10 +247,76 @@ pub struct Entry {
     pub file_entry: FileEntry,
 }
 
+impl Entry {
+    pub fn new(
+        texture_name: impl AsRef<str> + Into<String>,
+        dimensions: (u32, u32),
+        images: &[&[u8]],
+        palette: impl Into<Vec<[u8; 3]>> + AsRef<[[u8; 3]]>,
+    ) -> Self {
+        Self {
+            directory_entry: DirectoryEntry::new(texture_name.as_ref()),
+            file_entry: FileEntry::new_miptex(texture_name, images, dimensions, palette),
+        }
+    }
+
+    pub fn texture_name(&self) -> String {
+        self.directory_entry.texture_name.get_string()
+    }
+
+    pub fn set_name(&mut self, s: impl AsRef<str> + Into<String> + Clone) -> eyre::Result<()> {
+        self.directory_entry.texture_name.set_name(s.clone())?;
+
+        match &mut self.file_entry {
+            FileEntry::Qpic(_) => (),
+            FileEntry::MipTex(miptex) => miptex.texture_name.set_name(s)?,
+            FileEntry::Font(_) => (),
+        }
+
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub enum FileEntry {
     Qpic(Qpic),
     MipTex(MipTex),
+    Font(Font),
+}
+
+impl FileEntry {
+    pub fn new_miptex(
+        texture_name: impl AsRef<str> + Into<String>,
+        images: &[&[u8]],
+        dimensions: (u32, u32),
+        palette: impl Into<Vec<[u8; 3]>>,
+    ) -> Self {
+        Self::MipTex(MipTex::new(texture_name, dimensions, images, palette))
+    }
+
+    pub fn dimensions(&self) -> (u32, u32) {
+        match &self {
+            Self::Qpic(qpic) => (qpic.width, qpic.height),
+            Self::MipTex(miptex) => (miptex.width, miptex.height),
+            Self::Font(font) => (font.width, font.height),
+        }
+    }
+
+    pub fn image(&self) -> &Vec<u8> {
+        match &self {
+            Self::Qpic(qpic) => qpic.data.get_bytes(),
+            Self::MipTex(miptex) => miptex.mip_images[0].data.get_bytes(),
+            Self::Font(font) => font.data.get_bytes(),
+        }
+    }
+
+    pub fn palette(&self) -> &Vec<[u8; 3]> {
+        match &self {
+            Self::Qpic(qpic) => qpic.palette.get_bytes(),
+            Self::MipTex(miptex) => miptex.palette.get_bytes(),
+            Self::Font(font) => font.palette.get_bytes(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -141,7 +326,7 @@ pub struct Wad {
 }
 
 impl Wad {
-    pub fn from(bytes: &[u8]) -> eyre::Result<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> eyre::Result<Self> {
         match parse_wad(bytes) {
             Ok((_, res)) => Ok(res),
             Err(err) => Err(eyre!("Cannot parse bytes: {}", err)),
@@ -151,7 +336,11 @@ impl Wad {
     pub fn from_file(path: impl AsRef<Path> + AsRef<OsStr>) -> eyre::Result<Self> {
         let bytes = std::fs::read(path)?;
 
-        Self::from(&bytes)
+        let res = Self::from_bytes(&bytes);
+
+        drop(bytes);
+
+        res
     }
 
     pub fn write_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
@@ -176,7 +365,7 @@ impl Wad {
         // write header
         let header = &self.header;
 
-        writer.append_i8_slice(&header.magic);
+        writer.append_u8_slice(&header.magic);
         writer.append_i32(header.num_dirs);
         // just a dummy offset at this point.
         let dir_offset_index = writer.get_offset();
@@ -227,7 +416,7 @@ impl Wad {
 
                         // mip images
                         for image in mip_images {
-                            writer.append_u8_slice(&image.data.get_bytes());
+                            writer.append_u8_slice(image.data.get_bytes());
                         }
 
                         // colors_used
@@ -236,10 +425,14 @@ impl Wad {
                         for row in palette.get_bytes() {
                             writer.append_u8_slice(row);
                         }
+
+                        // pad palette to correctly have 256 colors
+                        writer.append_u8_slice(&vec![0u8; (256 - palette.get_bytes().len()) * 3]);
                     }
+                    FileEntry::Font(_) => todo!(),
                 }
 
-                // // apparently, if we want compatibility with Wally, we need to align the bytes
+                // apparently, if we want compatibility with Wally, we need to align the bytes
                 let offset_bytes_needed = writer.get_offset() % 4;
 
                 for _ in 0..offset_bytes_needed {
@@ -287,7 +480,7 @@ impl Wad {
 
 fn parse_header(i: &[u8]) -> IResult<Header> {
     map(
-        tuple((count(le_i8, 4), le_i32, le_i32)),
+        tuple((count(le_u8, 4), le_i32, le_i32)),
         |(magic, num_dirs, dir_offset)| Header {
             magic,
             num_dirs,
@@ -322,10 +515,13 @@ fn parse_directory_entry(i: &[u8]) -> IResult<DirectoryEntry> {
 }
 
 fn parse_qpic(i: &[u8]) -> IResult<Qpic> {
-    let (i, (width, height)) = tuple((le_i32, le_i32))(i)?;
+    let (i, (width, height)) = tuple((le_u32, le_u32))(i)?;
     let (i, data) = count(le_u8, (width * height) as usize)(i)?;
     let (i, colors_used) = le_i16(i)?;
-    let (i, palette) = count(count(le_u8, 3), colors_used as usize)(i)?;
+    let (i, palette) = count(
+        map(take(3usize), |res: &[u8]| [res[0], res[1], res[2]]),
+        colors_used as usize,
+    )(i)?;
 
     Ok((
         i,
@@ -366,7 +562,10 @@ fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
     let (palette_start, colors_used) = le_i16(palette_start)?;
 
     // hard code it to be 256 just to be safe
-    let (_, palette) = count(count(le_u8, 3), 256)(palette_start)?;
+    let (_, palette) = count(
+        map(take(3usize), |res: &[u8]| [res[0], res[1], res[2]]),
+        colors_used as usize,
+    )(palette_start)?;
 
     Ok((
         i, // i here is pretty useless
@@ -389,6 +588,42 @@ fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
                     data: Image(miptex3),
                 },
             ],
+            colors_used,
+            palette: Palette(palette),
+        },
+    ))
+}
+
+fn parse_font(i: &[u8]) -> IResult<Font> {
+    let (i, (width, height)) = tuple((le_u32, le_u32))(i)?;
+    let (i, (row_count, row_height)) = tuple((le_u32, le_u32))(i)?;
+
+    let (i, font_info) = count(
+        map(tuple((le_i16, le_i16)), |(startoffset, charwidth)| {
+            CharInfo {
+                startoffset,
+                charwidth,
+            }
+        }),
+        256,
+    )(i)?;
+
+    let (i, data) = count(le_u8, (width * height) as usize)(i)?;
+    let (i, colors_used) = le_i16(i)?;
+    let (i, palette) = count(
+        map(take(3usize), |res: &[u8]| [res[0], res[1], res[2]]),
+        colors_used as usize,
+    )(i)?;
+
+    Ok((
+        i,
+        Font {
+            width,
+            height,
+            row_count,
+            row_height,
+            font_info,
+            data: Image(data),
             colors_used,
             palette: Palette(palette),
         },
@@ -432,17 +667,6 @@ fn parse_wad(i: &[u8]) -> IResult<Wad> {
         return context(err_str, fail)(b"");
     };
 
-    if directory_entries
-        .iter()
-        .any(|entry| entry.file_type == 0x45)
-    {
-        let err_str = "Does not support parsing font (yet).";
-
-        println!("{}", err_str);
-
-        return context(err_str, fail)(b"");
-    };
-
     let file_entries = directory_entries
         .iter()
         .filter_map(|directory_entry| {
@@ -452,6 +676,7 @@ fn parse_wad(i: &[u8]) -> IResult<Wad> {
             let file_entry = match directory_entry.file_type {
                 0x42 => FileEntry::Qpic(parse_qpic(file_entry_start).ok()?.1),
                 0x43 => FileEntry::MipTex(parse_miptex(file_entry_start).ok()?.1),
+                0x45 => FileEntry::Font(parse_font(file_entry_start).ok()?.1),
                 _ => unreachable!(""),
             };
 
@@ -500,7 +725,7 @@ mod test {
         let entry = &file.entries[0];
 
         assert!(entry.directory_entry.file_type == 0x43);
-        assert!(entry.directory_entry.texture_name.to_string() == "white");
+        assert!(entry.directory_entry.texture_name.get_string() == "white");
     }
 
     #[test]
@@ -517,12 +742,12 @@ mod test {
         let entry = &file.entries[0];
 
         assert!(entry.directory_entry.file_type == 0x43);
-        assert!(entry.directory_entry.texture_name.to_string() == "white");
+        assert!(entry.directory_entry.texture_name.get_string() == "white");
 
         let entry = &file.entries[1];
 
         assert!(entry.directory_entry.file_type == 0x43);
-        assert!(entry.directory_entry.texture_name.to_string() == "black");
+        assert!(entry.directory_entry.texture_name.get_string() == "black");
     }
 
     #[test]
@@ -540,7 +765,7 @@ mod test {
 
         assert_eq!(entry.directory_entry.file_type, 0x43);
         assert_eq!(
-            entry.directory_entry.texture_name.to_string(),
+            entry.directory_entry.texture_name.get_string(),
             "Sci_fi_metal_fl"
         );
 
@@ -549,13 +774,13 @@ mod test {
         if let FileEntry::MipTex(file) = &entry.file_entry {
             assert_eq!(file.height, file.width);
             assert_eq!(file.height, 512);
-            assert_eq!(file.texture_name.to_string(), "Sci_fi_metal_fl");
+            assert_eq!(file.texture_name.get_string(), "Sci_fi_metal_fl");
         }
 
         let entry = &file.entries[21];
 
         assert_eq!(entry.directory_entry.file_type, 0x43);
-        assert_eq!(entry.directory_entry.texture_name.to_string(), "emp_ball1");
+        assert_eq!(entry.directory_entry.texture_name.get_string(), "emp_ball1");
 
         assert!(matches!(entry.file_entry, FileEntry::MipTex(_)));
 
@@ -565,7 +790,7 @@ mod test {
             // Don't assert this because it fails.
             // left: "emp_ball1ing.."
             // right: "emp_ball1"
-            // assert_eq!(file.texture_name.to_string(), "emp_ball1");
+            // assert_eq!(file.texture_name.get_string(), "emp_ball1");
         }
     }
 
@@ -606,5 +831,14 @@ mod test {
         let res = wad.write_to_file("test/out/surf_cyberwave_out.wad");
 
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn parse_big() {
+        let _wad = Wad::from_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
+        let _wad2 = Wad::from_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
+
+        // check the memory usage
+        std::thread::sleep(std::time::Duration::from_secs(5));
     }
 }
