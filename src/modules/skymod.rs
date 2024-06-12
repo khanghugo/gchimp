@@ -244,9 +244,9 @@ impl SkyModBuilder {
                             imageops::crop_imm(&texture, x, y, MIN_TEXTURE_SIZE, MIN_TEXTURE_SIZE)
                                 .to_image();
                         let GoldSrcBmp {
-                            img,
+                            image: img,
                             palette,
-                            dimension,
+                            dimensions: dimension,
                         } = rgba8_to_8bpp(section).unwrap();
 
                         write_8bpp_to_file(

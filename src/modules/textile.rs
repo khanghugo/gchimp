@@ -278,9 +278,9 @@ impl TexTileBuilder {
                 |(
                     _,
                     GoldSrcBmp {
-                        img,
+                        image: img,
                         palette,
-                        dimension: _,
+                        dimensions: _,
                     },
                 )| {
                     let (new_img, new_palette) =
@@ -298,9 +298,9 @@ impl TexTileBuilder {
                 |(
                     path,
                     GoldSrcBmp {
-                        img,
+                        image: img,
                         palette,
-                        dimension,
+                        dimensions: dimension,
                     },
                 )| {
                     // with_file_name would overwrite the extension

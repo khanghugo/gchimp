@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     fs::OpenOptions,
-    io::{BufWriter, Write},
+    io::{BufWriter, Cursor, Write},
     path::{Path, PathBuf},
 };
 
@@ -124,20 +124,22 @@ fn rgb8_to_8bpp(img: RgbImage, palette: &[[u8; 3]]) -> Vec<u8> {
         .collect::<Vec<u8>>()
 }
 
-pub fn png_to_bmp(img_path: &Path) -> eyre::Result<()> {
-    let img = image::open(img_path)?.into_rgba8();
+pub fn any_format_to_bmp_write_to_file(
+    img_path: impl AsRef<Path> + Into<PathBuf>,
+) -> eyre::Result<()> {
+    let img = image::open(img_path.as_ref())?.into_rgba8();
     let rgba8 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
     let GoldSrcBmp {
-        img,
+        image: img,
         palette,
-        dimension,
+        dimensions: dimension,
     } = rgba8_to_8bpp(rgba8)?;
 
     let mut out_img = OpenOptions::new()
         .create(true)
         .truncate(true)
         .write(true)
-        .open(img_path.with_extension("bmp"))?;
+        .open(img_path.as_ref().with_extension("bmp"))?;
 
     let mut encoder = image::codecs::bmp::BmpEncoder::new(&mut out_img);
 
@@ -154,10 +156,28 @@ pub fn png_to_bmp(img_path: &Path) -> eyre::Result<()> {
     Ok(())
 }
 
+pub fn any_format_to_png(img_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<Vec<u8>> {
+    let img = image::open(img_path.as_ref())?;
+
+    let mut buf: Vec<u8> = vec![];
+
+    img.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png)?;
+
+    Ok(buf)
+}
+
+pub fn any_format_to_8bpp(img_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<GoldSrcBmp> {
+    let img = image::open(img_path.as_ref())?.into_rgba8();
+    let rgba8 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
+    let res = rgba8_to_8bpp(rgba8)?;
+
+    Ok(res)
+}
+
 pub fn png_to_bmp_folder(paths: &[PathBuf]) -> eyre::Result<()> {
     let err: Vec<eyre::Error> = paths
         .par_iter()
-        .filter_map(|path| png_to_bmp(path).err())
+        .filter_map(|path| any_format_to_bmp_write_to_file(path).err())
         .collect();
 
     if !err.is_empty() {
@@ -181,9 +201,9 @@ pub fn rgba8_to_8bpp(rgb8a: RgbaImage) -> eyre::Result<GoldSrcBmp> {
     let img_bmp_8pp = rgb8_to_8bpp(rgb8, &palette_color_arr);
 
     Ok(GoldSrcBmp {
-        img: img_bmp_8pp,
+        image: img_bmp_8pp,
         palette: palette_color_arr,
-        dimension,
+        dimensions: dimension,
     })
 }
 
@@ -220,7 +240,7 @@ pub fn write_8bpp_to_file(
 }
 
 // need to encode it into a format so it has all the info to easily display every where
-pub fn encode_8bpp_bitmap(
+pub fn encode_8bpp_to_bitmap(
     img: &[u8],
     palette: &[[u8; 3]],
     dimension: (u32, u32),
@@ -237,6 +257,24 @@ pub fn encode_8bpp_bitmap(
     )?;
 
     Ok(buf)
+}
+
+// egui doesn't take bitmap, what in tarnation?
+pub fn eight_bpp_bitmap_to_png_bytes(
+    img: &[u8],
+    palette: &[[u8; 3]],
+    (width, height): (u32, u32),
+) -> eyre::Result<Vec<u8>> {
+    let img_buffer = img
+        .iter()
+        .flat_map(|palette_index| palette[*palette_index as usize])
+        .collect::<Vec<u8>>();
+    let img_buffer = RgbImage::from_vec(width, height, img_buffer).unwrap();
+
+    let mut bytes: Vec<u8> = Vec::new();
+    img_buffer.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)?;
+
+    Ok(bytes)
 }
 
 // tile the image in a way that the resulting image has the same dimension as the original
@@ -306,9 +344,46 @@ pub fn eight_bpp_transparent_img(
     (new_img, new_palette)
 }
 
+// TODO: better mipmaps generation because this is very SHIT
+#[allow(clippy::type_complexity)]
+pub fn generate_mipmaps(
+    img_path: impl AsRef<Path> + Into<PathBuf>,
+) -> eyre::Result<([Vec<u8>; 4], Vec<[u8; 3]>, (u32, u32))> {
+    let img = image::open(img_path.as_ref())?.into_rgba8();
+    let mip0 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
+
+    let mip0 = rgba8_to_rgb8_blended(mip0)?;
+    let (mip0, palette_color) = quantize_image(mip0)?;
+
+    let (width, height) = mip0.dimensions();
+
+    let palette = format_quantette_palette(palette_color);
+
+    let mip1 = imageops::resize(&mip0, width / 2, height / 2, imageops::FilterType::Nearest);
+    let mip2 = imageops::resize(
+        &mip0,
+        width / 2 / 2,
+        height / 2 / 2,
+        imageops::FilterType::Nearest,
+    );
+    let mip3 = imageops::resize(
+        &mip0,
+        width / 2 / 2 / 2,
+        height / 2 / 2 / 2,
+        imageops::FilterType::Nearest,
+    );
+
+    let mip0 = rgb8_to_8bpp(mip0, &palette);
+    let mip1 = rgb8_to_8bpp(mip1, &palette);
+    let mip2 = rgb8_to_8bpp(mip2, &palette);
+    let mip3 = rgb8_to_8bpp(mip3, &palette);
+
+    Ok(([mip0, mip1, mip2, mip3], palette, (width, height)))
+}
+
 #[derive(Debug)]
 pub struct GoldSrcBmp {
-    pub img: Vec<u8>,
+    pub image: Vec<u8>,
     pub palette: Vec<[u8; 3]>,
-    pub dimension: (u32, u32),
+    pub dimensions: (u32, u32),
 }
