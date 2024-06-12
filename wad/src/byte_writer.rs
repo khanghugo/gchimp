@@ -51,12 +51,6 @@ impl ByteWriter {
         self.offset(i.len());
     }
 
-    pub fn append_i8_slice(&mut self, i: &[i8]) {
-        for what in i {
-            self.append_u8(*what as u8);
-        }
-    }
-
     pub fn replace(&mut self, start: usize, length: usize, slice: &[u8]) {
         self.data[start..(length + start)].copy_from_slice(&slice[..length]);
     }
