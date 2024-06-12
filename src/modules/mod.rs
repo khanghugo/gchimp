@@ -7,3 +7,4 @@ pub mod s2g;
 pub mod skymod;
 pub mod textile;
 pub mod texture_scale;
+pub mod waddy;
