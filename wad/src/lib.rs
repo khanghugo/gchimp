@@ -34,6 +34,22 @@ pub struct Header {
     pub dir_offset: i32,
 }
 
+impl Header {
+    pub fn new() -> Self {
+        Self {
+            magic: "WAD3".as_bytes().to_owned(),
+            num_dirs: 0,
+            dir_offset: 0,
+        }
+    }
+}
+
+impl Default for Header {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug)]
 pub struct DirectoryEntry {
     pub entry_offset: i32,
@@ -62,6 +78,9 @@ impl DirectoryEntry {
 }
 
 #[derive(Debug)]
+/// Don't use to_string() method.
+///
+/// Use get_string() instead
 pub struct TextureName(Vec<u8>);
 
 impl TextureName {
@@ -70,7 +89,7 @@ impl TextureName {
         let mut res: Vec<u8> = vec![];
 
         for c in self.get_bytes() {
-            if *c == 0 {
+            if *c == 0 || *c < 32 || *c > 127 {
                 break;
             }
 
@@ -325,7 +344,21 @@ pub struct Wad {
     pub entries: Vec<Entry>,
 }
 
+impl Default for Wad {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Wad {
+    /// Creates a new WAD file without any information
+    pub fn new() -> Self {
+        Self {
+            header: Header::default(),
+            entries: vec![],
+        }
+    }
+
     pub fn from_bytes(bytes: &[u8]) -> eyre::Result<Self> {
         match parse_wad(bytes) {
             Ok((_, res)) => Ok(res),
