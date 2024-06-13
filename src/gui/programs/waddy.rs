@@ -23,15 +23,20 @@ struct ExtraImageViewports {
 }
 
 struct WaddyInstance {
-    path: PathBuf,
+    path: Option<PathBuf>,
     waddy: Waddy,
     texture_tiles: Vec<TextureTile>,
+}
+
+struct LoadedImage {
+    uri: String,
+    image: egui::Image<'static>,
 }
 
 struct TextureTile {
     index: usize,
     name: String,
-    texture_bytes: &'static [u8],
+    image: LoadedImage,
     dimensions: (u32, u32),
     in_rename: bool,
     prev_name: String,
@@ -41,13 +46,13 @@ impl TextureTile {
     fn new(
         index: usize,
         name: impl AsRef<str> + Into<String>,
-        texture_bytes: &'static [u8],
+        image: LoadedImage,
         dimensions: (u32, u32),
     ) -> Self {
         Self {
             index,
             name: name.into(),
-            texture_bytes,
+            image,
             dimensions,
             in_rename: false,
             prev_name: String::new(),
@@ -86,23 +91,13 @@ impl WaddyGui {
             .max_col_width(IMAGE_TILE_SIZE)
             .spacing([0., 0.])
             .show(ui, |ui| {
-                let uri_name = format!(
-                    "{}-{}-{}-{}x{}",
-                    instance_index,
-                    texture_tile.index,
-                    texture_tile.name,
-                    texture_tile.dimensions.0,
-                    texture_tile.dimensions.1
-                );
-                let uri = format!("bytes://{}", uri_name);
-                let image = egui::Image::from_bytes(
-                    uri.clone(),
-                    egui::load::Bytes::Static(texture_tile.texture_bytes),
-                );
-
                 let clickable_image = ui.add_sized(
                     [IMAGE_TILE_SIZE, IMAGE_TILE_SIZE],
-                    egui::ImageButton::new(image).frame(false).selected(false),
+                    egui::ImageButton::new(egui::Image::new(
+                        texture_tile.image.image.source().clone(),
+                    ))
+                    .frame(false)
+                    .selected(false),
                 );
 
                 let mut context_menu_clicked = false;
@@ -143,8 +138,8 @@ impl WaddyGui {
 
                 if clickable_image.double_clicked() {
                     self.extra_image_viewports.push(ExtraImageViewports {
-                        uri,
-                        name: uri_name,
+                        uri: texture_tile.image.uri.clone(),
+                        name: texture_tile.name.clone(),
                     });
                 };
 
@@ -240,22 +235,30 @@ impl WaddyGui {
     }
 
     // gui when there's WAD loaded
-    fn editor_gui(&mut self, ui: &mut Ui, index: usize) {
+    fn editor_gui(&mut self, ui: &mut Ui, instance_index: usize) {
+        // should close to short-circuit the GUI and avoid accessing non existing info
         let mut should_close = false;
 
         ui.separator();
 
         ui.horizontal(|ui| {
-            if self.editor_menu(ui, index) {
+            if self.editor_menu(ui, instance_index) {
                 should_close = true;
                 return;
             }
 
-            ui.label(self.instances[index].path.display().to_string())
-                .on_hover_text(format!(
+            if let Some(path) = &self.instances[instance_index].path {
+                ui.label(path.display().to_string()).on_hover_text(format!(
                     "{} textures",
-                    self.instances[index].texture_tiles.len()
+                    self.instances[instance_index].texture_tiles.len()
                 ));
+            } else {
+                ui.label("New WAD");
+                ui.label(format!(
+                    "{} textures",
+                    self.instances[instance_index].texture_tiles.len()
+                ));
+            }
         });
 
         if should_close {
@@ -263,7 +266,7 @@ impl WaddyGui {
         }
 
         ui.separator();
-        self.texture_grid(ui, index);
+        self.texture_grid(ui, instance_index);
 
         let ctx = ui.ctx();
 
@@ -281,20 +284,34 @@ impl WaddyGui {
 
                     if let Some(ext) = path.extension() {
                         if ext == "wad" {
-                            if let Err(err) = self.start_waddy_instance(path) {
+                            if let Err(err) = self.start_waddy_instance(Some(path)) {
                                 // TODO TOAST
                                 println!("{}", err);
                             }
                         } else if SUPPORTED_TEXTURE_FORMATS.contains(&ext.to_str().unwrap()) {
-                            if let Err(err) = self.instances[index].waddy.add_texture(path) {
+                            if let Err(err) = self.instances[instance_index].waddy.add_texture(path)
+                            {
                                 println!("{}", err);
                             } else if let Ok(bytes) = any_format_to_png(path) {
-                                self.instances[index].texture_tiles.push(TextureTile::new(
-                                    index,
-                                    path.file_stem().unwrap().to_str().unwrap(),
-                                    Box::leak(Box::new(bytes)),
-                                    (512, 512),
-                                ))
+                                let uri = format!(
+                                    "bytes://{}-{}-{}",
+                                    instance_index,
+                                    self.instances[instance_index].texture_tiles.len(),
+                                    path.file_stem().unwrap().to_str().unwrap()
+                                );
+                                let loaded_image = load_image_from_bytes(&bytes, uri);
+
+                                let texture_name =
+                                    &path.file_stem().unwrap().to_str().unwrap()[..15];
+
+                                self.instances[instance_index]
+                                    .texture_tiles
+                                    .push(TextureTile::new(
+                                        instance_index,
+                                        texture_name,
+                                        loaded_image,
+                                        (512, 512),
+                                    ))
                             }
                         }
                     }
@@ -304,21 +321,29 @@ impl WaddyGui {
     }
 
     // FIXME: it is ram guzzler
-    fn start_waddy_instance(&mut self, path: &Path) -> eyre::Result<()> {
-        let waddy = Waddy::from_file(path)?;
-        let textures = waddy.dump_textures_to_png_bytes()?;
+    fn start_waddy_instance(&mut self, path: Option<&Path>) -> eyre::Result<()> {
+        let waddy = if let Some(path) = path {
+            Waddy::from_file(path)?
+        } else {
+            Waddy::new()
+        };
 
-        let texture_tiles = textures
+        let texture_tiles = waddy
+            .dump_textures_to_png_bytes()?
             .into_iter()
-            .map(|(index, texture)| {
-                // let leaked_bytes = texture.leak();
-
-                let texture_bytes = Box::leak(Box::new(texture));
+            .map(|(index, texture_bytes)| {
+                let uri = format!(
+                    "bytes://{}-{}-{}",
+                    self.instances.len(),
+                    index,
+                    waddy.wad().entries[index].texture_name()
+                );
+                let loaded_image = load_image_from_bytes(&texture_bytes, uri);
 
                 TextureTile::new(
                     index,
                     waddy.wad().entries[index].texture_name(),
-                    texture_bytes,
+                    loaded_image,
                     waddy.wad().entries[index].file_entry.dimensions(),
                 )
             })
@@ -330,7 +355,7 @@ impl WaddyGui {
         }
 
         self.instances.push(WaddyInstance {
-            path: path.to_path_buf(),
+            path: path.map(|path| path.to_owned()),
             waddy,
             texture_tiles,
         });
@@ -342,7 +367,7 @@ impl WaddyGui {
         if let Some(path) = rfd::FileDialog::new().pick_file() {
             if path.extension().unwrap().to_str().unwrap() == "wad" {
                 // todo toast
-                if let Err(err) = self.start_waddy_instance(path.as_path()) {
+                if let Err(err) = self.start_waddy_instance(Some(path.as_path())) {
                     println!("{}", err);
                 } else {
                     return true;
@@ -358,7 +383,9 @@ impl WaddyGui {
 
         ui.menu_button("Menu", |ui| {
             if ui.button("New").clicked() {
-                todo!()
+                let _ = self.start_waddy_instance(None);
+
+                ui.close_menu();
             }
 
             if ui.button("Open").clicked() {
@@ -367,48 +394,36 @@ impl WaddyGui {
                 ui.close_menu();
             }
 
-            // short circuit here so we won't render with the wrong `instance` next line.
-            if should_close {
-                return;
-            }
-
-            let instance = &mut self.instances[instance_index];
-
             if ui.button("Save").clicked() {
-                // TODO TOAST TOAST
-                if let Err(err) = instance.waddy.wad().write_to_file(instance.path.as_path()) {
-                    println!("{}", err);
+                if let Some(path) = &self.instances[instance_index].path {
+                    // TODO TOAST TOAST
+                    if let Err(err) = self.instances[instance_index]
+                        .waddy
+                        .wad()
+                        .write_to_file(path.as_path())
+                    {
+                        println!("{}", err);
+                    }
+                } else {
+                    self.menu_save_as_dialogue(instance_index);
                 }
 
                 ui.close_menu();
             }
 
             if ui.button("Save As").clicked() {
-                if let Some(path) = rfd::FileDialog::new()
-                    .add_filter("All Files", &["wad"])
-                    .set_file_name(instance.path.file_stem().unwrap().to_str().unwrap())
-                    .save_file()
-                {
-                    // TODO TOAST TOAST
-                    if let Err(err) = instance
-                        .waddy
-                        .wad()
-                        .write_to_file(path.with_extension("wad"))
-                    {
-                        println!("{}", err);
-                    } else {
-                        // Change path to the current WAD file if we use Save As
-                        instance.path = path;
-                    }
-                }
+                self.menu_save_as_dialogue(instance_index);
 
                 ui.close_menu();
             }
 
             if ui.button("Close").clicked() {
-                instance.texture_tiles.iter_mut().for_each(|tile| {
-                    Box::into_raw(Box::new(tile.texture_bytes));
-                });
+                self.instances[instance_index]
+                    .texture_tiles
+                    .iter_mut()
+                    .for_each(|tile| {
+                        // tile.
+                    });
                 self.instances.remove(instance_index);
 
                 should_close = true;
@@ -418,6 +433,30 @@ impl WaddyGui {
         });
 
         should_close
+    }
+
+    fn menu_save_as_dialogue(&mut self, instance_index: usize) {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter("All Files", &["wad"])
+            .set_file_name(if let Some(path) = &self.instances[instance_index].path {
+                path.file_stem().unwrap().to_str().unwrap()
+            } else {
+                ""
+            })
+            .save_file()
+        {
+            // TODO TOAST TOAST
+            if let Err(err) = self.instances[instance_index]
+                .waddy
+                .wad()
+                .write_to_file(path.with_extension("wad"))
+            {
+                println!("{}", err);
+            } else {
+                // Change path to the current WAD file if we use Save As
+                self.instances[instance_index].path = Some(path);
+            }
+        }
     }
 }
 
@@ -431,11 +470,21 @@ impl TabProgram for WaddyGui {
             self.editor_gui(ui, 0);
         } else {
             ui.separator();
-            // UI when there is nothing
-            if ui.button("Open").clicked() {
-                self.menu_open();
-            }
+            ui.menu_button("Menu", |ui| {
+                if ui.button("New").clicked() {
+                    let _ = self.start_waddy_instance(None);
 
+                    ui.close_menu();
+                }
+
+                if ui.button("Open").clicked() {
+                    self.menu_open();
+
+                    ui.close_menu();
+                }
+            });
+
+            ui.separator();
             ui.label("You can drag and drop too.");
 
             let ctx = ui.ctx();
@@ -452,7 +501,7 @@ impl TabProgram for WaddyGui {
 
                         if let Some(ext) = path.extension() {
                             if ext == "wad" {
-                                if let Err(err) = self.start_waddy_instance(path) {
+                                if let Err(err) = self.start_waddy_instance(Some(path)) {
                                     // TODO TOAST
                                     println!("{}", err);
                                 }
@@ -470,4 +519,13 @@ impl TabProgram for WaddyGui {
 
 fn custom_font(s: impl Into<String>) -> RichText {
     egui::RichText::new(s).size(11.).small_raised().strong()
+}
+
+fn load_image_from_bytes(bytes: &[u8], uri: impl AsRef<str>) -> LoadedImage {
+    let image = egui::Image::from_bytes(uri.as_ref().to_owned(), bytes.to_owned());
+
+    LoadedImage {
+        uri: uri.as_ref().to_string(),
+        image,
+    }
 }

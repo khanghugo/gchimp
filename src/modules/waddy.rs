@@ -17,7 +17,17 @@ pub struct Waddy {
     wad: Wad,
 }
 
+impl Default for Waddy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Waddy {
+    pub fn new() -> Self {
+        Self { wad: Wad::new() }
+    }
+
     pub fn from_file(path: impl AsRef<Path> + Into<PathBuf> + AsRef<OsStr>) -> eyre::Result<Self> {
         let wad = Wad::from_file(path)?;
 
