@@ -18,13 +18,15 @@ Usually it would just work out of the box. If there is any problem, try starting
 
 - [TexTile: Tiles your texture and some more](https://github.com/khanghugo/gchimp/wiki/TexTile)
 
-- [Command line interface: You can do this instead of GUI](https://github.com/khanghugo/gchimp/wiki/Command%E2%80%90line-interface)
+- [Waddy: A simple WAD editor](https://github.com/khanghugo/gchimp/wiki/Waddy)
+
+- [Command line interface: Some other features that don't deserve GUI treatment (or do deserve CLI treatment)](https://github.com/khanghugo/gchimp/wiki/Command%E2%80%90line-interface)
 
 - [Custom Scripting: Write your own functionality](https://github.com/khanghugo/gchimp/wiki/Custom-Scripting)
 
 ### Planned features
 
-- [ ] A functional enough Wally to edit WAD files 
+- [x] A functional enough Wally to edit WAD files 
 - [x] Texture filters such as tiling because tiling is nice to preserve overall detail for highly scaled texture
 - [ ] [map2prop](https://erty-gamedev.github.io/Docs-Map2Prop/) clone that hopefully goes open source before the original project
 
