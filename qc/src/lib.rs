@@ -366,6 +366,7 @@ pub enum QcCommand {
         physics: String,
         options: Vec<CollisionModelOption>,
     },
+    MostlyOpaque,
 }
 
 impl QcCommand {
@@ -400,6 +401,7 @@ impl QcCommand {
             QcCommand::DefineBone { .. } => "$definebone",
             QcCommand::CollisionModel { .. } => "$collisionmodel",
             QcCommand::CdMaterials(_) => "$cdmaterials",
+            QcCommand::MostlyOpaque => "$mostlyopaque",
         }
         .to_string()
     }
@@ -516,6 +518,7 @@ impl fmt::Display for QcCommand {
             QcCommand::IllumPosition { .. } => todo!(),
             QcCommand::DefineBone { .. } => todo!(),
             QcCommand::CollisionModel { .. } => todo!(),
+            QcCommand::MostlyOpaque => todo!(),
         }
     }
 }
@@ -954,16 +957,23 @@ fn parse_sequence_option(i: &str) -> IResult<SequenceOption> {
             sequence_option("noanimation", take(0usize), |_| SequenceOption::NoAnimation),
             sequence_option("fadein", double, SequenceOption::FadeIn),
             sequence_option("fadeout", double, SequenceOption::FadeOut),
-            // This should be last because it will match anything.
-            // TODO i dont understnad the format
-            // map(
-            //     tuple((name_string, opt(number), preceded(space0, between_space))),
-            //     |(motion, endframe, axis)| SequenceOption::MotionExtractAxis {
-            //         motion: motion.to_string(),
-            //         endframe,
-            //         axis: axis.to_string(),
-            //     },
-            // ),
+            sequence_option(
+                "activity",
+                tuple((name_string, double)),
+                |(name, weight)| SequenceOption::Activity {
+                    name: name.to_string(),
+                    weight,
+                },
+            ), // This should be last because it will match anything.
+               // TODO i dont understnad the format
+               // map(
+               //     tuple((name_string, opt(number), preceded(space0, between_space))),
+               //     |(motion, endframe, axis)| SequenceOption::MotionExtractAxis {
+               //         motion: motion.to_string(),
+               //         endframe,
+               //         axis: axis.to_string(),
+               //     },
+               // ),
         )),
     )(i)
 }
@@ -986,13 +996,21 @@ fn parse_sequence(i: &str) -> CResult {
     let (i, smd, options) = if is_bracket {
         let (i, between) = between_braces(rest)(i)?;
 
+        // TODO for the time being we won't care about activity being the first thing
+        let (between, _) = opt(tag("activity"))(between)?;
+
         let (between, smd) = delimited(multispace0, name_string, multispace0)(between)?;
 
         let (between, options) =
             many0(delimited(multispace0, parse_sequence_option, multispace0))(between)?;
 
         // just in case
-        assert!(between.is_empty());
+        if !between.is_empty() {
+            return context(
+                format!("Sequence parse between bracket did not consume all: {between}").leak(),
+                fail,
+            )(i);
+        }
 
         (i, smd, options)
     } else {
@@ -1162,6 +1180,10 @@ fn parse_collision_model(i: &str) -> CResult {
     )(i)
 }
 
+fn parse_mostly_opaque(i: &str) -> CResult {
+    qc_command("$mostlyopaque", take(0usize), |_| QcCommand::MostlyOpaque)(i)
+}
+
 // Main functions
 fn parse_qc_command(i: &str) -> CResult {
     context(
@@ -1192,6 +1214,7 @@ fn parse_qc_command(i: &str) -> CResult {
             parse_texture_group,
             parse_define_bone,
             parse_collision_model,
+            parse_mostly_opaque,
         )),
     )(i)
 }
