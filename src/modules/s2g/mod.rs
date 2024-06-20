@@ -1,10 +1,8 @@
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
-    process::Output,
     str::from_utf8,
     sync::{Arc, Mutex},
-    thread::JoinHandle,
 };
 
 use constants::{
@@ -14,6 +12,8 @@ use eyre::eyre;
 use options::S2GOptions;
 use qc::{BodyGroup, Qc, QcCommand};
 use smd::Smd;
+
+use rayon::prelude::*;
 
 use crate::utils::{
     constants::STUDIOMDL_ERROR_PATTERN,
@@ -285,11 +285,9 @@ impl S2GBuilder {
     }
 
     fn work_decompile(&mut self, input_files: &[PathBuf]) -> eyre::Result<()> {
-        let mut handles: Vec<JoinHandle<eyre::Result<Output>>> = vec![];
-
         self.log_info("Decompiling model");
 
-        for input_file in input_files.iter() {
+        let res = input_files.par_iter().map(|input_file| {
             let mut err_str = String::new();
 
             let mut vvd_path = input_file.clone();
@@ -314,20 +312,22 @@ impl S2GBuilder {
                 return Err(eyre!(err_str));
             }
 
+            // TODO make good
             #[cfg(target_os = "windows")]
-            handles.push(run_crowbar(input_file, &self.settings.crowbar));
+            run_crowbar(input_file, &self.settings.crowbar);
 
             #[cfg(target_os = "linux")]
-            handles.push(run_crowbar(
+            run_crowbar(
                 input_file,
                 &self.settings.crowbar,
                 self.settings.wineprefix.as_ref().unwrap(),
-            ));
-        }
+            );
 
-        // // TODO: do something with the output
-        for handle in handles {
-            let _ = handle.join();
+            Ok(())
+        });
+
+        if res.filter_map(|a| a.err()).count() > 0 {
+            return Err(eyre!("Error with running crowbar"));
         }
 
         Ok(())
@@ -654,15 +654,16 @@ impl S2GBuilder {
 
     fn work_compile(&mut self, compile_able_qcs: &[PathBuf]) -> eyre::Result<Vec<PathBuf>> {
         let mut result: Vec<PathBuf> = vec![];
-        let mut instr_msg = format!("Compiling {} model(s): \n", compile_able_qcs.len());
+        let mut instr_msg = format!("Compiling {} model(s):", compile_able_qcs.len());
 
         compile_able_qcs.iter().for_each(|path| {
+            instr_msg += "\n";
             instr_msg += path.display().to_string().as_str();
         });
 
         self.log_info(instr_msg.as_str());
 
-        for path in compile_able_qcs.iter() {
+        let res = compile_able_qcs.par_iter().map(|path| {
             #[cfg(target_os = "windows")]
             let res = run_studiomdl(path, &self.settings.studiomdl);
 
@@ -675,7 +676,7 @@ impl S2GBuilder {
 
             match res.join() {
                 Ok(res) => {
-                    let output = res?;
+                    let output = res.unwrap();
                     let stdout = from_utf8(&output.stdout).unwrap();
 
                     let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
@@ -685,10 +686,10 @@ impl S2GBuilder {
                         let err_str = format!("Cannot compile {}: {}", path.display(), err.trim());
                         self.log_err(&err_str);
 
-                        if !self.options.force {
-                            return Err(eyre!(err_str));
-                        }
+                        return Err(eyre!(err_str));
                     }
+
+                    Ok(())
                 }
                 Err(_) => {
                     let err_str =
@@ -696,11 +697,22 @@ impl S2GBuilder {
 
                     self.log_err(err_str);
 
-                    if !self.options.force {
-                        return Err(eyre!(err_str));
-                    }
+                    return Err(eyre!(err_str));
                 }
-            };
+            }
+        });
+
+        let res = res.filter_map(|a| a.err()).map(|a| a.to_string()).reduce(
+            || String::new(),
+            |mut acc, e| {
+                acc += &e;
+                acc += "\n";
+                acc
+            },
+        );
+
+        if !res.is_empty() && !self.options.force {
+            return Err(eyre!(res));
         }
 
         let mut goldsrc_mdl_path = compile_able_qcs
