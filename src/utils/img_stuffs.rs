@@ -53,45 +53,28 @@ fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: RgbaImage) -> Rgb
     }
 }
 
-fn rgba8_to_rgb8_blended(img: RgbaImage) -> eyre::Result<RgbImage> {
+// if alpha is 0, then replace it with transparent color
+// otherwise, linearly blend the pixel
+fn rgba8_to_rgb8(img: RgbaImage) -> eyre::Result<RgbImage> {
     let (width, height) = img.dimensions();
     let buf = img
         .par_chunks_exact(4)
         .flat_map(|p| {
-            let opacity = p[3] as f32 / 255.;
-            [
-                (p[0] as f32 * opacity).round() as u8,
-                (p[1] as f32 * opacity).round() as u8,
-                (p[2] as f32 * opacity).round() as u8,
-            ]
-        })
-        .collect::<Vec<u8>>();
-
-    let res = match RgbImage::from_vec(width, height, buf) {
-        Some(buf) => Ok(buf),
-        None => Err(eyre!("Cannot convert Rgba to Rgb")),
-    }?;
-
-    Ok(res)
-}
-
-#[allow(dead_code)]
-// Replace any transparent pixel with a color if alpha channel is below the threshold
-fn rgba8_to_rgb8_replace(
-    img: RgbaImage,
-    replacement: &[u8],
-    threshold: u8,
-) -> eyre::Result<RgbImage> {
-    let (width, height) = img.dimensions();
-    let buf = img
-        .par_chunks_exact(4)
-        .flat_map(|p| {
-            let should_replace = threshold >= p[3];
+            let should_replace = p[3] == 0;
 
             if should_replace {
-                [replacement[0], replacement[1], replacement[2]]
+                [
+                    PALETTE_TRANSPARENT_COLOR[0],
+                    PALETTE_TRANSPARENT_COLOR[1],
+                    PALETTE_TRANSPARENT_COLOR[2],
+                ]
             } else {
-                [p[0], p[1], p[2]]
+                let opacity = p[3] as f32 / 255.;
+                [
+                    (p[0] as f32 * opacity).round() as u8,
+                    (p[1] as f32 * opacity).round() as u8,
+                    (p[2] as f32 * opacity).round() as u8,
+                ]
             }
         })
         .collect::<Vec<u8>>();
@@ -196,7 +179,7 @@ pub fn png_to_bmp_folder(paths: &[PathBuf]) -> eyre::Result<()> {
 
 pub fn rgba8_to_8bpp(rgb8a: RgbaImage) -> eyre::Result<GoldSrcBmp> {
     // TODO convert totally opaque pixel into transparent pixel
-    let rgb8 = rgba8_to_rgb8_blended(rgb8a)?;
+    let rgb8 = rgba8_to_rgb8(rgb8a)?;
     let (rgb8, palette_color) = quantize_image(rgb8)?;
 
     let dimension = rgb8.dimensions();
@@ -356,7 +339,7 @@ pub fn generate_mipmaps(
     let img = image::open(img_path.as_ref())?.into_rgba8();
     let mip0 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
 
-    let mip0 = rgba8_to_rgb8_blended(mip0)?;
+    let mip0 = rgba8_to_rgb8(mip0)?;
     let (mip0, palette_color) = quantize_image(mip0)?;
 
     let (width, height) = mip0.dimensions();
