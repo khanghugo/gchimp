@@ -27,6 +27,8 @@ mod byte_writer;
 
 type IResult<'a, T> = _IResult<&'a [u8], T>;
 
+static MAX_TEXTURE_NAME_LENGTH: usize = 15;
+
 #[derive(Debug)]
 pub struct Header {
     pub magic: Vec<u8>,
@@ -100,9 +102,10 @@ impl TextureName {
     }
 
     pub fn from_string(s: impl AsRef<str> + Into<String>) -> Self {
-        let mut res = vec![0u8; 16];
+        let mut res = vec![0u8; MAX_TEXTURE_NAME_LENGTH + 1];
+        let texture_name_length = s.as_ref().len().min(MAX_TEXTURE_NAME_LENGTH);
 
-        res[..s.as_ref().len()].copy_from_slice(s.as_ref().as_bytes());
+        res[..texture_name_length].copy_from_slice(&s.as_ref().as_bytes()[..texture_name_length]);
 
         Self(res)
     }
