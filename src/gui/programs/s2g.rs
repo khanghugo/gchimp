@@ -221,6 +221,13 @@ Recommended to have it on so textures will be uniformly lit",
                     self.is_idle = true;
                 }
             });
+            if ui
+                .button("Clear")
+                .on_hover_text("Click to clear output text")
+                .clicked()
+            {
+                *self.s2g_sync.stdout().lock().unwrap() = "".to_string();
+            }
         });
 
         ui.separator();
