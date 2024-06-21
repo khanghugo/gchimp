@@ -292,7 +292,7 @@ impl WaddyGui {
                             if let Err(err) = self.instances[instance_index].waddy.add_texture(path)
                             {
                                 println!("{}", err);
-                            } else if let Ok(bytes) = any_format_to_png(path) {
+                            } else if let Ok((bytes, dimensions)) = any_format_to_png(path) {
                                 let uri = format!(
                                     "bytes://{}-{}-{}",
                                     instance_index,
@@ -301,8 +301,8 @@ impl WaddyGui {
                                 );
                                 let loaded_image = load_image_from_bytes(&bytes, uri);
 
-                                let texture_name =
-                                    &path.file_stem().unwrap().to_str().unwrap()[..15];
+                                let texture_name = &path.file_stem().unwrap().to_str().unwrap();
+                                let texture_name = &texture_name[..texture_name.len().min(15)];
 
                                 self.instances[instance_index]
                                     .texture_tiles
@@ -310,7 +310,7 @@ impl WaddyGui {
                                         instance_index,
                                         texture_name,
                                         loaded_image,
-                                        (512, 512),
+                                        dimensions,
                                     ))
                             }
                         }

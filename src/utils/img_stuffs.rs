@@ -6,7 +6,7 @@ use std::{
 };
 
 use eyre::eyre;
-use image::{imageops, RgbImage, RgbaImage};
+use image::{imageops, GenericImageView, RgbImage, RgbaImage};
 use quantette::{ColorSpace, ImagePipeline, QuantizeMethod};
 use rayon::prelude::*;
 
@@ -156,14 +156,17 @@ pub fn any_format_to_bmp_write_to_file(
     Ok(())
 }
 
-pub fn any_format_to_png(img_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<Vec<u8>> {
+pub fn any_format_to_png(
+    img_path: impl AsRef<Path> + Into<PathBuf>,
+) -> eyre::Result<(Vec<u8>, (u32, u32))> {
     let img = image::open(img_path.as_ref())?;
+    let dimensions = img.dimensions();
 
     let mut buf: Vec<u8> = vec![];
 
     img.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png)?;
 
-    Ok(buf)
+    Ok((buf, dimensions))
 }
 
 pub fn any_format_to_8bpp(img_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<GoldSrcBmp> {
@@ -192,6 +195,7 @@ pub fn png_to_bmp_folder(paths: &[PathBuf]) -> eyre::Result<()> {
 }
 
 pub fn rgba8_to_8bpp(rgb8a: RgbaImage) -> eyre::Result<GoldSrcBmp> {
+    // TODO convert totally opaque pixel into transparent pixel
     let rgb8 = rgba8_to_rgb8_blended(rgb8a)?;
     let (rgb8, palette_color) = quantize_image(rgb8)?;
 
