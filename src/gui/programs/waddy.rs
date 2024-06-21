@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use eframe::egui::{self, Context, RichText, ScrollArea, Ui};
+use eframe::egui::{self, Context, Modifiers, RichText, ScrollArea, Sense, Ui};
 
 use crate::{
     gui::{
@@ -103,7 +103,18 @@ impl WaddyGui {
                 let mut context_menu_clicked = false;
 
                 clickable_image.context_menu(|ui| {
-                    ui.add_enabled(false, egui::Label::new(&texture_tile.name));
+                    // if clicked then copy the name of the texture
+                    if ui
+                        .add(
+                            egui::Label::new(&texture_tile.name)
+                                .selectable(false)
+                                .sense(Sense::click()),
+                        )
+                        .clicked()
+                    {
+                        ui.output_mut(|o| o.copied_text = texture_tile.name.to_string());
+                        ui.close_menu();
+                    }
 
                     if ui.button("Rename").clicked() {
                         texture_tile.in_rename = true;
@@ -272,6 +283,13 @@ impl WaddyGui {
 
         self.display_image_viewports(ctx);
 
+        // CTRL+S
+        ui.input(|i| {
+            if i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::S) {
+                self.menu_save(instance_index);
+            }
+        });
+
         preview_file_being_dropped(ctx);
 
         // Collect dropped files:
@@ -394,19 +412,8 @@ impl WaddyGui {
                 ui.close_menu();
             }
 
-            if ui.button("Save").clicked() {
-                if let Some(path) = &self.instances[instance_index].path {
-                    // TODO TOAST TOAST
-                    if let Err(err) = self.instances[instance_index]
-                        .waddy
-                        .wad()
-                        .write_to_file(path.as_path())
-                    {
-                        println!("{}", err);
-                    }
-                } else {
-                    self.menu_save_as_dialogue(instance_index);
-                }
+            if ui.button("Save (Ctrl+S)").clicked() {
+                self.menu_save(instance_index);
 
                 ui.close_menu();
             }
@@ -433,6 +440,21 @@ impl WaddyGui {
         });
 
         should_close
+    }
+
+    fn menu_save(&mut self, instance_index: usize) {
+        if let Some(path) = &self.instances[instance_index].path {
+            // TODO TOAST TOAST
+            if let Err(err) = self.instances[instance_index]
+                .waddy
+                .wad()
+                .write_to_file(path.as_path())
+            {
+                println!("{}", err);
+            }
+        } else {
+            self.menu_save_as_dialogue(instance_index);
+        }
     }
 
     fn menu_save_as_dialogue(&mut self, instance_index: usize) {
