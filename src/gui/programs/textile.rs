@@ -175,6 +175,10 @@ Append \"_<scalar>\" if tiling",
                     }
                 }
             }
+
+            if ui.button("Clear").clicked() {
+                self.items.clear();
+            }
         });
 
         let mut remove_index: Option<usize> = None;
