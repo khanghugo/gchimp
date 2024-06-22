@@ -459,6 +459,8 @@ impl WaddyGui {
                         println!("{}", err);
                     }
                 }
+
+                ui.close_menu();
             }
 
             ui.separator();
