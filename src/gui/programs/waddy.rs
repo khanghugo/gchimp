@@ -26,6 +26,8 @@ struct WaddyInstance {
     path: Option<PathBuf>,
     waddy: Waddy,
     texture_tiles: Vec<TextureTile>,
+    // so the user can save the file
+    is_changed: bool,
 }
 
 struct LoadedImage {
@@ -74,6 +76,7 @@ static IMAGE_TILE_SIZE: f32 = 96.0;
 static SUPPORTED_TEXTURE_FORMATS: &[&str] = &["png", "jpeg", "jpg", "bmp"];
 
 impl WaddyGui {
+    /// Returns index of texture to delete
     fn texture_tile(
         &mut self,
         ui: &mut Ui,
@@ -186,6 +189,9 @@ impl WaddyGui {
                             println!("Texture name is too long");
 
                             texture_tile.name.clone_from(&texture_tile.prev_name);
+                        } else {
+                            // this means things are good
+                            instance.is_changed = true;
                         }
                     }
                 } else {
@@ -238,6 +244,7 @@ impl WaddyGui {
                             self.instances[instance_index]
                                 .waddy
                                 .remove_texture(texture_tile_index);
+                            self.instances[instance_index].is_changed = true;
                             break;
                         }
                     }
@@ -259,7 +266,20 @@ impl WaddyGui {
             }
 
             if let Some(path) = &self.instances[instance_index].path {
-                ui.label(path.display().to_string()).on_hover_text(format!(
+                let wad_file_name = path.display().to_string();
+
+                let wad_file_name = if self.instances[instance_index].is_changed {
+                    format!("*{wad_file_name}")
+                } else {
+                    wad_file_name
+                };
+
+                ui.add(
+                    egui::Label::new(wad_file_name)
+                        .sense(Sense::hover())
+                        .truncate(true),
+                )
+                .on_hover_text(format!(
                     "{} textures",
                     self.instances[instance_index].texture_tiles.len()
                 ));
@@ -322,14 +342,16 @@ impl WaddyGui {
                                 let texture_name = &path.file_stem().unwrap().to_str().unwrap();
                                 let texture_name = &texture_name[..texture_name.len().min(15)];
 
-                                self.instances[instance_index]
-                                    .texture_tiles
-                                    .push(TextureTile::new(
+                                self.instances[instance_index].texture_tiles.push(
+                                    TextureTile::new(
                                         instance_index,
                                         texture_name,
                                         loaded_image,
                                         dimensions,
-                                    ))
+                                    ),
+                                );
+
+                                self.instances[instance_index].is_changed = true;
                             }
                         }
                     }
@@ -376,6 +398,7 @@ impl WaddyGui {
             path: path.map(|path| path.to_owned()),
             waddy,
             texture_tiles,
+            is_changed: false,
         });
 
         Ok(())
@@ -412,6 +435,8 @@ impl WaddyGui {
                 ui.close_menu();
             }
 
+            ui.separator();
+
             if ui.button("Save (Ctrl+S)").clicked() {
                 self.menu_save(instance_index);
 
@@ -423,6 +448,20 @@ impl WaddyGui {
 
                 ui.close_menu();
             }
+
+            if ui.button("Export").clicked() {
+                if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                    // TODO TOAST TOAST
+                    if let Err(err) = self.instances[instance_index]
+                        .waddy
+                        .dump_textures_to_files(path)
+                    {
+                        println!("{}", err);
+                    }
+                }
+            }
+
+            ui.separator();
 
             if ui.button("Close").clicked() {
                 self.instances[instance_index]
@@ -451,6 +490,8 @@ impl WaddyGui {
                 .write_to_file(path.as_path())
             {
                 println!("{}", err);
+            } else {
+                self.instances[instance_index].is_changed = false;
             }
         } else {
             self.menu_save_as_dialogue(instance_index);
@@ -477,6 +518,7 @@ impl WaddyGui {
             } else {
                 // Change path to the current WAD file if we use Save As
                 self.instances[instance_index].path = Some(path);
+                self.instances[instance_index].is_changed = false;
             }
         }
     }
