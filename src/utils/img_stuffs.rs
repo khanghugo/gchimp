@@ -1,12 +1,14 @@
 use std::{
     collections::HashMap,
     fs::OpenOptions,
-    io::{BufWriter, Cursor, Write},
+    io::{BufReader, BufWriter, Cursor, Write},
     path::{Path, PathBuf},
 };
 
 use eyre::eyre;
-use image::{imageops, GenericImageView, RgbImage, RgbaImage};
+use image::{
+    codecs::bmp::BmpDecoder, imageops, GenericImageView, ImageDecoder, RgbImage, RgbaImage,
+};
 use quantette::{ColorSpace, ImagePipeline, QuantizeMethod};
 use rayon::prelude::*;
 
@@ -331,11 +333,61 @@ pub fn eight_bpp_transparent_img(
     (new_img, new_palette)
 }
 
+// the idea is that if the input file is a bitmap, just don't do anything :)
+fn _generate_mipmaps_indexed_bmp(
+    img_path: impl AsRef<Path> + Into<PathBuf>,
+) -> eyre::Result<([Vec<u8>; 4], Vec<[u8; 3]>, (u32, u32))> {
+    let img_file = OpenOptions::new().read(true).open(img_path.as_ref())?;
+
+    let decoder = BmpDecoder::new(BufReader::new(img_file))?;
+
+    let (width, height) = decoder.dimensions();
+    let palette = decoder.get_palette();
+
+    if palette.is_none() {
+        return Err(eyre!("This is not an indexed bitmap."));
+    }
+
+    let palette = palette.unwrap().to_owned();
+
+    let buf_len = width * height * 3;
+    let mut mip0 = vec![0u8; buf_len as usize];
+
+    decoder.read_image(&mut mip0)?;
+
+    let mip0 = mip0
+        .chunks(3)
+        .map(|pixel| {
+            palette
+                .iter()
+                .position(|curr_pal| curr_pal == &[pixel[0], pixel[1], pixel[2]])
+                .unwrap() as u8
+        })
+        .collect::<Vec<u8>>();
+    let mip1 = vec![0u8; width as usize * height as usize / 4];
+    let mip2 = vec![0u8; width as usize * height as usize / 4 / 4];
+    let mip3 = vec![0u8; width as usize * height as usize / 4 / 4 / 4];
+
+    Ok(([mip0, mip1, mip2, mip3], palette, (width, height)))
+}
+
 // TODO: better mipmaps generation because this is very SHIT
 #[allow(clippy::type_complexity)]
 pub fn generate_mipmaps(
     img_path: impl AsRef<Path> + Into<PathBuf>,
 ) -> eyre::Result<([Vec<u8>; 4], Vec<[u8; 3]>, (u32, u32))> {
+    // if it is bitmap, then for now don't generate any bitmap
+    // dont even do any thing really.
+    // just return the original image and mipmaps are dummy
+    // unless the bitmap is not indexed, then process normally
+    if img_path.as_ref().extension().unwrap() == "bmp" {
+        let res = _generate_mipmaps_indexed_bmp(img_path.as_ref());
+
+        if let Ok(res) = res {
+            return Ok(res);
+        }
+    };
+
     let img = image::open(img_path.as_ref())?.into_rgba8();
     let mip0 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
 
