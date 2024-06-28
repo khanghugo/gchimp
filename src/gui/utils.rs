@@ -1,4 +1,6 @@
-use eframe::egui::{self, Align2, Color32, Context, Id, Image, LayerId, Order, TextStyle};
+use eframe::egui::{
+    self, Align2, Color32, Context, Id, Image, LayerId, Order, TextStyle, TextureHandle,
+};
 
 /// Preview hovering files:
 pub fn preview_file_being_dropped(ctx: &egui::Context) {
@@ -64,7 +66,8 @@ pub fn display_image_viewport(
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.add(image);
 
-                if ctx.input(|i| i.viewport().close_requested()) {
+                if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
+                {
                     return true;
                 };
 
@@ -76,6 +79,7 @@ pub fn display_image_viewport(
     should_stop.inner
 }
 
+#[allow(dead_code)]
 pub fn display_image_viewport_from_uri(
     ctx: &Context,
     uri: &str,
@@ -90,7 +94,33 @@ pub fn display_image_viewport_from_uri(
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.add(egui::Image::from_uri(uri));
 
-                if ctx.input(|i| i.viewport().close_requested()) {
+                if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
+                {
+                    return true;
+                };
+
+                false
+            })
+        },
+    );
+
+    should_draw.inner
+}
+
+pub fn display_image_viewport_from_texture(ctx: &Context, texture: &TextureHandle) -> bool {
+    let should_draw = ctx.show_viewport_immediate(
+        egui::ViewportId::from_hash_of(texture.name()),
+        egui::ViewportBuilder::default()
+            .with_title(texture.name())
+            .with_inner_size(
+                texture.size_vec2() + egui::Vec2 { x: 16., y: 16. }, // border :()
+            ),
+        |ctx, _class| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.add(egui::Image::new(texture));
+
+                if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
+                {
                     return true;
                 };
 
@@ -113,7 +143,8 @@ pub fn display_text_in_viewport(ctx: &Context, s: impl Into<String>) -> bool {
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.label(s.into());
 
-                if ctx.input(|i| i.viewport().close_requested()) {
+                if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
+                {
                     return true;
                 };
 
@@ -123,4 +154,42 @@ pub fn display_text_in_viewport(ctx: &Context, s: impl Into<String>) -> bool {
     );
 
     should_draw.inner
+}
+
+#[derive(Clone)]
+pub struct WadImage {
+    texture: egui::TextureHandle,
+}
+
+impl WadImage {
+    pub fn new(handle: &egui::TextureHandle) -> Self {
+        Self {
+            texture: handle.clone(),
+        }
+    }
+
+    pub fn from_wad_image(
+        ui: &mut egui::Ui,
+        name: impl AsRef<str> + Into<String>,
+        image: &[u8],
+        palette: &[[u8; 3]],
+        dimensions: (u32, u32),
+    ) -> Self {
+        let image = image
+            .iter()
+            .flat_map(|color_index| palette[*color_index as usize])
+            .collect::<Vec<u8>>();
+        // Load the texture only once.
+        let handle = ui.ctx().load_texture(
+            name,
+            egui::ColorImage::from_rgb([dimensions.0 as usize, dimensions.1 as usize], &image),
+            Default::default(),
+        );
+
+        Self { texture: handle }
+    }
+
+    pub fn texture(&self) -> &egui::TextureHandle {
+        &self.texture
+    }
 }
