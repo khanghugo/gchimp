@@ -413,7 +413,7 @@ impl fmt::Display for QcCommand {
         write!(f, " ")?;
 
         match self {
-            QcCommand::ModelName(x) => write!(f, "{}", x),
+            QcCommand::ModelName(x) => write!(f, "\"{}\"", x),
             QcCommand::Body(Body {
                 name,
                 mesh,
@@ -431,9 +431,9 @@ impl fmt::Display for QcCommand {
                     "".to_string()
                 }
             ),
-            QcCommand::Cd(x) => write!(f, "{}", x),
-            QcCommand::CdTexture(x) => write!(f, "{}", x),
-            QcCommand::CdMaterials(x) => write!(f, "{}", x),
+            QcCommand::Cd(x) => write!(f, "\"{}\"", x),
+            QcCommand::CdTexture(x) => write!(f, "\"{}\"", x),
+            QcCommand::CdMaterials(x) => write!(f, "\"{}\"", x),
             QcCommand::ClipToTextures => Ok(()),
             QcCommand::Scale(x) => write!(f, "{}", x),
             QcCommand::TextureRenderMode { texture, render } => {
@@ -537,7 +537,7 @@ pub enum CollisionModelOption {
 /// The Qc data.
 ///
 /// To access the data, follow this.
-/// ```no_run
+/// ```no-run
 /// for command in qc.commands {
 ///     match command {
 ///         QcCommand::ModelName(modelname) => (),
