@@ -1,25 +1,19 @@
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{self, Context, Modifiers, RichText, ScrollArea, Sense, Ui};
+use wad::FileEntry;
 
 use crate::{
     gui::{
-        utils::{display_image_viewport_from_uri, preview_file_being_dropped},
+        utils::{display_image_viewport_from_texture, preview_file_being_dropped, WadImage},
         TabProgram,
     },
     modules::waddy::Waddy,
-    utils::img_stuffs::any_format_to_png,
 };
 
 pub struct WaddyGui {
     instances: Vec<WaddyInstance>,
-    extra_image_viewports: Vec<ExtraImageViewports>,
-}
-
-#[derive(Clone)]
-struct ExtraImageViewports {
-    uri: String,
-    name: String,
+    extra_image_viewports: Vec<WadImage>,
 }
 
 struct WaddyInstance {
@@ -31,8 +25,7 @@ struct WaddyInstance {
 }
 
 struct LoadedImage {
-    uri: String,
-    image: egui::Image<'static>,
+    image: WadImage,
 }
 
 struct TextureTile {
@@ -62,6 +55,7 @@ impl TextureTile {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for WaddyGui {
     fn default() -> Self {
         Self {
@@ -89,18 +83,19 @@ impl WaddyGui {
         let mut texture_tile_to_delete: Option<usize> = None;
 
         // FIXME: reduce ram usage by at least 4 times
-        egui::Grid::new(format!("tile{}", texture_tile.index))
+        egui::Grid::new(format!("tile{}{}", texture_tile.index, texture_tile.name))
             .num_columns(1)
             .max_col_width(IMAGE_TILE_SIZE)
             .spacing([0., 0.])
             .show(ui, |ui| {
+                let texture = texture_tile.image.image.texture();
+                let dimensions = texture.size_vec2() / 512. * IMAGE_TILE_SIZE;
+
                 let clickable_image = ui.add_sized(
                     [IMAGE_TILE_SIZE, IMAGE_TILE_SIZE],
-                    egui::ImageButton::new(egui::Image::new(
-                        texture_tile.image.image.source().clone(),
-                    ))
-                    .frame(false)
-                    .selected(false),
+                    egui::ImageButton::new(egui::Image::new((texture.id(), dimensions)))
+                        .frame(false)
+                        .selected(false),
                 );
 
                 let mut context_menu_clicked = false;
@@ -113,21 +108,27 @@ impl WaddyGui {
                                 .selectable(false)
                                 .sense(Sense::click()),
                         )
+                        .on_hover_text("Click to copy name")
                         .clicked()
                     {
                         ui.output_mut(|o| o.copied_text = texture_tile.name.to_string());
                         ui.close_menu();
                     }
 
+                    ui.separator();
+
+                    if ui.button("View").clicked() {
+                        self.extra_image_viewports
+                            .push(WadImage::new(texture_tile.image.image.texture()));
+                        ui.close_menu();
+                    }
+
+                    ui.separator();
+
                     if ui.button("Rename").clicked() {
                         texture_tile.in_rename = true;
                         context_menu_clicked = true;
                         texture_tile.prev_name.clone_from(&texture_tile.name);
-                        ui.close_menu();
-                    }
-
-                    if ui.button("Delete").clicked() {
-                        texture_tile_to_delete = Some(texture_tile_index);
                         ui.close_menu();
                     }
 
@@ -148,13 +149,19 @@ impl WaddyGui {
 
                         ui.close_menu();
                     }
+
+                    ui.separator();
+
+                    if ui.button("Delete").clicked() {
+                        texture_tile_to_delete = Some(texture_tile_index);
+                        ui.close_menu();
+                    }
                 });
 
+                // double click wound bring a new viewport
                 if clickable_image.double_clicked() {
-                    self.extra_image_viewports.push(ExtraImageViewports {
-                        uri: texture_tile.image.uri.clone(),
-                        name: texture_tile.name.clone(),
-                    });
+                    self.extra_image_viewports
+                        .push(WadImage::new(texture_tile.image.image.texture()));
                 };
 
                 ui.end_row();
@@ -219,9 +226,9 @@ impl WaddyGui {
         self.extra_image_viewports = self
             .extra_image_viewports
             .iter()
-            .filter(|uri| !display_image_viewport_from_uri(ctx, &uri.uri, &uri.name))
+            .filter(|wad_img| !display_image_viewport_from_texture(ctx, wad_img.texture()))
             .cloned()
-            .collect::<Vec<ExtraImageViewports>>()
+            .collect::<Vec<WadImage>>()
     }
 
     fn texture_grid(&mut self, ui: &mut Ui, instance_index: usize) {
@@ -313,55 +320,73 @@ impl WaddyGui {
         preview_file_being_dropped(ctx);
 
         // Collect dropped files:
-        ctx.input(|i| {
-            for item in &i.raw.dropped_files {
-                if let Some(path) = &item.path {
-                    if path.is_dir() {
-                        return;
-                    }
+        let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
 
-                    if let Some(ext) = path.extension() {
-                        if ext == "wad" {
-                            if let Err(err) = self.start_waddy_instance(Some(path)) {
-                                // TODO TOAST
-                                println!("{}", err);
-                            }
-                        } else if SUPPORTED_TEXTURE_FORMATS.contains(&ext.to_str().unwrap()) {
-                            if let Err(err) = self.instances[instance_index].waddy.add_texture(path)
+        for item in &dropped_files {
+            if let Some(path) = &item.path {
+                if path.is_dir() {
+                    continue;
+                }
+
+                if let Some(ext) = path.extension() {
+                    // if new wad file is dropped, we open that wad file instead
+                    if ext == "wad" {
+                        if let Err(err) = self.start_waddy_instance(ui, Some(path)) {
+                            // TODO TOAST
+                            println!("{}", err);
+                        }
+                    // if an image file is dropped, we will add that to the current wad file
+                    } else if SUPPORTED_TEXTURE_FORMATS.contains(&ext.to_str().unwrap()) {
+                        if let Err(err) = self.instances[instance_index].waddy.add_texture(path) {
+                            println!("{}", err);
+                        } else {
+                            // after adding a new texture, we have to update the gui to include that new file
+                            let new_entry = self.instances[instance_index]
+                                .waddy
+                                .wad()
+                                .entries
+                                .last()
+                                .unwrap();
+
+                            let texture_name = new_entry.directory_entry.texture_name.get_string();
+                            let dimensions =
+                                if let FileEntry::MipTex(miptex) = &new_entry.file_entry {
+                                    (miptex.width, miptex.height)
+                                } else {
+                                    unreachable!()
+                                };
+                            let wad_image = if let FileEntry::MipTex(miptex) = &new_entry.file_entry
                             {
-                                println!("{}", err);
-                            } else if let Ok((bytes, dimensions)) = any_format_to_png(path) {
-                                let uri = format!(
-                                    "bytes://{}-{}-{}",
+                                WadImage::from_wad_image(
+                                    ui,
+                                    texture_name.clone(),
+                                    miptex.mip_images[0].data.get_bytes(),
+                                    miptex.palette.get_bytes(),
+                                    dimensions,
+                                )
+                            } else {
+                                unreachable!()
+                            };
+
+                            self.instances[instance_index]
+                                .texture_tiles
+                                .push(TextureTile::new(
                                     instance_index,
-                                    self.instances[instance_index].texture_tiles.len(),
-                                    path.file_stem().unwrap().to_str().unwrap()
-                                );
-                                let loaded_image = load_image_from_bytes(&bytes, uri);
+                                    texture_name,
+                                    LoadedImage { image: wad_image },
+                                    dimensions,
+                                ));
 
-                                let texture_name = &path.file_stem().unwrap().to_str().unwrap();
-                                let texture_name = &texture_name[..texture_name.len().min(15)];
-
-                                self.instances[instance_index].texture_tiles.push(
-                                    TextureTile::new(
-                                        instance_index,
-                                        texture_name,
-                                        loaded_image,
-                                        dimensions,
-                                    ),
-                                );
-
-                                self.instances[instance_index].is_changed = true;
-                            }
+                            self.instances[instance_index].is_changed = true;
                         }
                     }
                 }
             }
-        });
+        }
     }
 
     // FIXME: it is ram guzzler
-    fn start_waddy_instance(&mut self, path: Option<&Path>) -> eyre::Result<()> {
+    fn start_waddy_instance(&mut self, ui: &mut Ui, path: Option<&Path>) -> eyre::Result<()> {
         let waddy = if let Some(path) = path {
             Waddy::from_file(path)?
         } else {
@@ -369,23 +394,32 @@ impl WaddyGui {
         };
 
         let texture_tiles = waddy
-            .dump_textures_to_png_bytes()?
-            .into_iter()
-            .map(|(index, texture_bytes)| {
-                let uri = format!(
-                    "bytes://{}-{}-{}",
-                    self.instances.len(),
-                    index,
-                    waddy.wad().entries[index].texture_name()
-                );
-                let loaded_image = load_image_from_bytes(&texture_bytes, uri);
+            .wad()
+            .entries
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| {
+                if let FileEntry::MipTex(miptex) = &entry.file_entry {
+                    let loaded_image = WadImage::from_wad_image(
+                        ui,
+                        entry.directory_entry.texture_name.get_string(),
+                        miptex.mip_images[0].data.get_bytes(),
+                        miptex.palette.get_bytes(),
+                        (miptex.width, miptex.height),
+                    );
 
-                TextureTile::new(
-                    index,
-                    waddy.wad().entries[index].texture_name(),
-                    loaded_image,
-                    waddy.wad().entries[index].file_entry.dimensions(),
-                )
+                    return Some(TextureTile::new(
+                        index,
+                        waddy.wad().entries[index].texture_name(),
+                        LoadedImage {
+                            image: loaded_image,
+                        },
+                        waddy.wad().entries[index].file_entry.dimensions(),
+                    ));
+                    // None
+                }
+
+                None
             })
             .collect::<Vec<TextureTile>>();
 
@@ -404,11 +438,11 @@ impl WaddyGui {
         Ok(())
     }
 
-    fn menu_open(&mut self) -> bool {
+    fn menu_open(&mut self, ui: &mut Ui) -> bool {
         if let Some(path) = rfd::FileDialog::new().pick_file() {
             if path.extension().unwrap().to_str().unwrap() == "wad" {
                 // todo toast
-                if let Err(err) = self.start_waddy_instance(Some(path.as_path())) {
+                if let Err(err) = self.start_waddy_instance(ui, Some(path.as_path())) {
                     println!("{}", err);
                 } else {
                     return true;
@@ -424,13 +458,13 @@ impl WaddyGui {
 
         ui.menu_button("Menu", |ui| {
             if ui.button("New").clicked() {
-                let _ = self.start_waddy_instance(None);
+                let _ = self.start_waddy_instance(ui, None);
 
                 ui.close_menu();
             }
 
             if ui.button("Open").clicked() {
-                should_close = self.menu_open();
+                should_close = self.menu_open(ui);
 
                 ui.close_menu();
             }
@@ -538,13 +572,13 @@ impl TabProgram for WaddyGui {
             ui.separator();
             ui.menu_button("Menu", |ui| {
                 if ui.button("New").clicked() {
-                    let _ = self.start_waddy_instance(None);
+                    let _ = self.start_waddy_instance(ui, None);
 
                     ui.close_menu();
                 }
 
                 if ui.button("Open").clicked() {
-                    self.menu_open();
+                    self.menu_open(ui);
 
                     ui.close_menu();
                 }
@@ -558,24 +592,24 @@ impl TabProgram for WaddyGui {
             preview_file_being_dropped(ctx);
 
             // Collect dropped files:
-            ctx.input(|i| {
-                for item in &i.raw.dropped_files {
-                    if let Some(path) = &item.path {
-                        if path.is_dir() {
-                            return;
-                        }
+            let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
 
-                        if let Some(ext) = path.extension() {
-                            if ext == "wad" {
-                                if let Err(err) = self.start_waddy_instance(Some(path)) {
-                                    // TODO TOAST
-                                    println!("{}", err);
-                                }
+            for item in &dropped_files {
+                if let Some(path) = &item.path {
+                    if path.is_dir() {
+                        continue;
+                    }
+
+                    if let Some(ext) = path.extension() {
+                        if ext == "wad" {
+                            if let Err(err) = self.start_waddy_instance(ui, Some(path)) {
+                                // TODO TOAST
+                                println!("{}", err);
                             }
                         }
                     }
                 }
-            });
+            }
         }
 
         // Make it non drag-able
@@ -585,13 +619,4 @@ impl TabProgram for WaddyGui {
 
 fn custom_font(s: impl Into<String>) -> RichText {
     egui::RichText::new(s).size(11.).small_raised().strong()
-}
-
-fn load_image_from_bytes(bytes: &[u8], uri: impl AsRef<str>) -> LoadedImage {
-    let image = egui::Image::from_bytes(uri.as_ref().to_owned(), bytes.to_owned());
-
-    LoadedImage {
-        uri: uri.as_ref().to_string(),
-        image,
-    }
 }
