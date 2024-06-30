@@ -314,14 +314,16 @@ impl S2GBuilder {
 
             // TODO make good
             #[cfg(target_os = "windows")]
-            run_crowbar(input_file, &self.settings.crowbar);
+            let handle = run_crowbar(input_file, &self.settings.crowbar);
 
             #[cfg(target_os = "linux")]
-            run_crowbar(
+            let handle = run_crowbar(
                 input_file,
                 &self.settings.crowbar,
                 self.settings.wineprefix.as_ref().unwrap(),
             );
+
+            let _ = handle.join();
 
             Ok(())
         });
@@ -697,19 +699,19 @@ impl S2GBuilder {
 
                     self.log_err(err_str);
 
-                    return Err(eyre!(err_str));
+                    Err(eyre!(err_str))
                 }
             }
         });
 
-        let res = res.filter_map(|a| a.err()).map(|a| a.to_string()).reduce(
-            || String::new(),
-            |mut acc, e| {
-                acc += &e;
-                acc += "\n";
-                acc
-            },
-        );
+        let res =
+            res.filter_map(|a| a.err())
+                .map(|a| a.to_string())
+                .reduce(String::new, |mut acc, e| {
+                    acc += &e;
+                    acc += "\n";
+                    acc
+                });
 
         if !res.is_empty() && !self.options.force {
             return Err(eyre!(res));
