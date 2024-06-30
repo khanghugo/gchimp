@@ -33,9 +33,31 @@ pub struct BrushPlane {
     pub v_scale: f64,
 }
 
+impl TryFrom<&str> for BrushPlane {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match parse_brush_plane(value) {
+            Ok((_, res)) => Ok(res),
+            Err(err) => Err(err.to_string().leak()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Brush {
     pub planes: Vec<BrushPlane>,
+}
+
+impl TryFrom<&str> for Brush {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match parse_brush(value) {
+            Ok((_, res)) => Ok(res),
+            Err(err) => Err(err.to_string().leak()),
+        }
+    }
 }
 
 // #[derive(Debug, Clone, PartialEq)]
@@ -46,6 +68,17 @@ pub struct Entity {
     // All entities have attributes.
     pub attributes: Attributes,
     pub brushes: Option<Vec<Brush>>,
+}
+
+impl TryFrom<&str> for Entity {
+    type Error = &'static str;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match parse_entity(value) {
+            Ok((_, res)) => Ok(res),
+            Err(err) => Err(err.to_string().leak()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
