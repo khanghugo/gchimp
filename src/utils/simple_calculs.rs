@@ -1,12 +1,28 @@
-use std::ops::{self, Div, Mul};
+use std::ops::{self, Div, Mul, Neg};
 
 use glam::DVec3;
+
+use eyre::eyre;
+
+use gcd::Gcd;
+
+static EPSILON: f64 = 0.000001;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point3D {
     x: f64,
     y: f64,
     z: f64,
+}
+
+impl Default for Point3D {
+    fn default() -> Self {
+        Self {
+            x: 0.,
+            y: 0.,
+            z: 0.,
+        }
+    }
 }
 
 impl ops::Add for Point3D {
@@ -57,6 +73,20 @@ impl Div<f64> for Point3D {
     }
 }
 
+impl Neg for Point3D {
+    type Output = Point3D;
+
+    fn neg(self) -> Self::Output {
+        Self {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+        }
+    }
+}
+
+static MAX_DISTANCE: f64 = 4294967296.;
+
 impl Point3D {
     pub fn dot(&self, rhs: Self) -> f64 {
         self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
@@ -78,6 +108,25 @@ impl Point3D {
 
     pub fn as_array(&self) -> [f64; 3] {
         [self.x, self.y, self.z]
+    }
+
+    /// Returns true if one of the component has value exceeding [`MAX_DISTANCE`]
+    pub fn is_too_big(&self) -> bool {
+        self.x.abs() > MAX_DISTANCE || self.y.abs() > MAX_DISTANCE || self.z.abs() > MAX_DISTANCE
+    }
+
+    pub fn normalize(&self) -> Self {
+        let delta = self.x.powf(2.) + self.y.powf(2.) + self.z.powf(2.);
+        let delta = delta.sqrt();
+
+        *self / delta
+    }
+
+    pub fn simplify(&self) -> Self {
+        let gcd1 = (self.x.round().abs() as usize).gcd(self.y.round().abs() as usize);
+        let gcd2 = gcd1.gcd(self.z.round().abs() as usize);
+
+        *self / gcd2 as f64
     }
 }
 
@@ -101,11 +150,15 @@ impl From<DVec3> for Point3D {
     }
 }
 
-// impl Into<Point3D> for DVec3 {
-//     fn into(self) -> Point3D {
-//         Point3D { x: self.x, y: self.y, z: self.z }
-//     }
-// }
+impl From<Point3D> for DVec3 {
+    fn from(value: Point3D) -> Self {
+        Self {
+            x: value.x,
+            y: value.y,
+            z: value.z,
+        }
+    }
+}
 
 // | a b |
 // | c d |
@@ -122,17 +175,17 @@ impl Matrix2x2<f64> {
         self.a * self.d - self.b * self.c
     }
 
-    pub fn solve_cramer(&self, r: [f64; 2]) -> Option<[f64; 2]> {
+    pub fn solve_cramer(&self, r: [f64; 2]) -> eyre::Result<[f64; 2]> {
         let denominator = self.determinant();
 
         if denominator == 0. || denominator == -0. {
-            return None;
+            return Err(eyre!("Determinant is 0."));
         }
 
         let x_nom = Matrix2x2::from([r[0], self.b, r[1], self.d]).determinant();
         let y_nom = Matrix2x2::from([self.a, r[0], self.c, r[1]]).determinant();
 
-        return Some([x_nom / denominator, y_nom / denominator]);
+        Ok([x_nom / denominator, y_nom / denominator])
     }
 }
 
@@ -236,7 +289,8 @@ pub struct Line3D {
 }
 
 impl Line3D {
-    pub fn intersect_with_line(&self, rhs: Self) -> Option<Point3D> {
+    pub fn intersect_with_line(&self, rhs: Self) -> eyre::Result<Point3D> {
+        // TODO do the same stupid shit i did with intersecting plane because this looks like it will have edge cases
         let m = Matrix2x2::from([
             self.direction.x,
             -rhs.direction.x,
@@ -253,15 +307,21 @@ impl Line3D {
         ];
 
         if r3[0] * x + r3[1] * y != r3[2] {
-            return None;
+            return Err(eyre!("Fail to test intersecting point of two lines."));
         }
 
-        Some(self.source + self.direction * x)
+        Ok(self.source + self.direction * x)
     }
 
-    pub fn intersect_with_plane(&self, rhs: Plane3D) -> Option<Point3D> {
-        rhs.intersect_with_line(self.clone())
+    pub fn intersect_with_plane(&self, rhs: Plane3D) -> eyre::Result<Point3D> {
+        rhs.intersect_with_line(*self)
     }
+}
+
+pub enum SideOfPoint {
+    In,
+    Out,
+    On,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -296,11 +356,11 @@ impl Plane3D {
         }
     }
 
-    pub fn intersect_with_plane(&self, rhs: Self) -> Option<Line3D> {
+    pub fn intersect_with_plane(&self, rhs: Self) -> eyre::Result<Line3D> {
         let normal = self.normal().cross(rhs.normal());
 
         if normal.is_zero() {
-            return None;
+            return Err(eyre!("Normal vector is zero."));
         }
 
         // TODO: i need to be a math major, maybe there is a way better than this
@@ -309,8 +369,8 @@ impl Plane3D {
 
         // test x = 0
         let m = Matrix2x2::from([self.y, self.z, rhs.y, rhs.z]);
-        if let Some([start_y, start_z]) = m.solve_cramer([self.w, rhs.w]) {
-            return Some(Line3D {
+        if let Ok([start_y, start_z]) = m.solve_cramer([self.w, rhs.w]) {
+            return Ok(Line3D {
                 source: Point3D {
                     x: 0.,
                     y: start_y,
@@ -322,8 +382,8 @@ impl Plane3D {
 
         // test y = 0
         let m = Matrix2x2::from([self.x, self.z, rhs.x, rhs.z]);
-        if let Some([start_x, start_z]) = m.solve_cramer([self.w, rhs.w]) {
-            return Some(Line3D {
+        if let Ok([start_x, start_z]) = m.solve_cramer([self.w, rhs.w]) {
+            return Ok(Line3D {
                 source: Point3D {
                     x: start_x,
                     y: 0.,
@@ -335,8 +395,8 @@ impl Plane3D {
 
         // test z = 0
         let m = Matrix2x2::from([self.x, self.y, rhs.x, rhs.y]);
-        if let Some([start_x, start_y]) = m.solve_cramer([self.w, rhs.w]) {
-            return Some(Line3D {
+        if let Ok([start_x, start_y]) = m.solve_cramer([self.w, rhs.w]) {
+            return Ok(Line3D {
                 source: Point3D {
                     x: start_x,
                     y: start_y,
@@ -346,68 +406,262 @@ impl Plane3D {
             });
         }
 
-        None
+        Err(eyre!("No intersection between two planes."))
     }
 
-    pub fn intersect_with_two_planes(&self, plane1: Self, plane2: Self) -> Option<Point3D> {
+    pub fn intersect_with_two_planes(&self, plane1: Self, plane2: Self) -> eyre::Result<Point3D> {
         let line = self.intersect_with_plane(plane1)?;
 
         line.intersect_with_plane(plane2)
     }
 
-    pub fn intersect_with_line(self, rhs: Line3D) -> Option<Point3D> {
+    pub fn intersect_with_line(&self, rhs: Line3D) -> eyre::Result<Point3D> {
         let t_part = self.normal().dot(rhs.direction);
 
         if t_part == 0. || t_part == -0. {
-            return None;
+            return Err(eyre!(
+                "Cannot find intersection between a plane and a line."
+            ));
         }
 
         let z_part = self.normal().dot(rhs.source);
         let t = (self.w - z_part) / t_part;
 
-        Some(rhs.source + rhs.direction * t)
+        Ok(rhs.source + rhs.direction * t)
+    }
+
+    pub fn simplify(&self) -> Self {
+        let gcd1 = (self.x.round().abs() as usize).gcd(self.y.round().abs() as usize);
+        let gcd2 = gcd1.gcd(self.z.round().abs() as usize);
+        let gcd3 = gcd2.gcd(self.w.round().abs() as usize);
+
+        Self {
+            x: self.x / gcd3 as f64,
+            y: self.y / gcd3 as f64,
+            z: self.z / gcd3 as f64,
+            w: self.w / gcd3 as f64,
+        }
+    }
+
+    pub fn with_distance(&self, d: f64) -> Self {
+        Self {
+            x: self.x,
+            y: self.y,
+            z: self.z,
+            w: d,
+        }
+    }
+
+    pub fn side_of_point(&self, point: Point3D) -> SideOfPoint {
+        let distance_check = self.normal().dot(point) - self.w;
+
+        if distance_check < -EPSILON {
+            SideOfPoint::Out
+        } else if distance_check > EPSILON {
+            SideOfPoint::In
+        } else {
+            SideOfPoint::On
+        }
     }
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct Polygon {
-    vertices: Vec<Point3D>,
-}
+pub struct Polygon3D(Vec<Point3D>);
 
-impl Polygon {
+impl Polygon3D {
+    /// Will check for duplication before adding.
     pub fn add_vertex(&mut self, v: Point3D) -> &mut Self {
-        self.vertices.push(v);
+        if !self.0.contains(&v) {
+            self.0.push(v);
+        }
+
         self
     }
 
     pub fn vertices(&self) -> &Vec<Point3D> {
-        &self.vertices
+        &self.0
+    }
+
+    pub fn centroid(&self) -> eyre::Result<Point3D> {
+        if self.0.is_empty() {
+            return Err(eyre!("Polygon has no vertices."));
+        }
+
+        Ok(self.0.iter().fold(Point3D::default(), |acc, e| acc + *e) / self.0.len() as f64)
+    }
+
+    // Returns the normal from a plane created by first 3 points in the polygon.
+    pub fn normal(&self) -> eyre::Result<Point3D> {
+        if self.0.len() < 3 {
+            return Err(eyre!("Polygon has less than 3 vertices to be a plane."));
+        }
+
+        Ok(Plane3D::from_three_points(self.0[0], self.0[1], self.0[2]).normal())
+    }
+
+    // https://github.com/pwitvoet/mess/blob/master/MESS/Mapping/Brush.cs#L38
+    /// Returns an [`Polygon`] with vertices sorted clockwise.
+    pub fn with_sorted_vertices(&self) -> eyre::Result<Self> {
+        let centroid = self.centroid()?;
+
+        // Since it is a face, now we interpret it as if we are on a 2D plane.
+        let forward = self.0[0] - centroid;
+        // Right thumb rule
+        let right = forward.cross(self.normal()?);
+
+        let mut what = self
+            .0
+            .iter()
+            .map(|vertex| {
+                let vector = *vertex - centroid;
+                let x = vector.dot(right);
+                let y = vector.dot(forward);
+
+                y.atan2(x)
+            })
+            .zip(&self.0)
+            .collect::<Vec<(f64, &Point3D)>>();
+
+        what.sort_by(|(angle_a, _), (angle_b, _)| angle_a.total_cmp(angle_b));
+
+        Ok(what
+            .into_iter()
+            .map(|(_, vertex)| vertex.to_owned())
+            .collect::<Vec<Point3D>>()
+            .into())
+    }
+
+    /// Fan triangulation from a list of sorted vertices
+    pub fn triangulate(&self, reverse: bool) -> eyre::Result<Vec<Triangle3D>> {
+        if self.0.len() < 3 {
+            return Err(eyre!("Polygon has less than 3 vertices."));
+        }
+
+        let triangulation_count = self.0.len() - 3 + 1;
+        let sorted_vertices = self.with_sorted_vertices()?;
+
+        Ok((0..triangulation_count)
+            .map(|cur_tri| {
+                if reverse {
+                    [
+                        sorted_vertices.vertices()[0],
+                        sorted_vertices.vertices()[cur_tri + 2],
+                        sorted_vertices.vertices()[cur_tri + 1],
+                    ]
+                    .into()
+                } else {
+                    [
+                        sorted_vertices.vertices()[0],
+                        sorted_vertices.vertices()[cur_tri + 1],
+                        sorted_vertices.vertices()[cur_tri + 2],
+                    ]
+                    .into()
+                }
+            })
+            .collect())
+    }
+
+    pub fn to_plane3d(&self) -> Plane3D {
+        self.clone().into()
+    }
+}
+
+impl From<Vec<Point3D>> for Polygon3D {
+    fn from(value: Vec<Point3D>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Polygon3D> for Plane3D {
+    fn from(value: Polygon3D) -> Self {
+        Plane3D::from_three_points(
+            value.vertices()[0],
+            value.vertices()[1],
+            value.vertices()[2],
+        )
+    }
+}
+
+pub struct Triangle3D(Polygon3D);
+
+impl Triangle3D {
+    pub fn get_triangle(&self) -> &Vec<Point3D> {
+        return self.0.vertices();
+    }
+
+    pub fn normal(&self) -> Point3D {
+        self.0.normal().unwrap()
+    }
+
+    pub fn with_sorted_vertices(&self) -> Self {
+        let what = self.0.with_sorted_vertices();
+        let huh = what.unwrap();
+
+        Self(huh)
+    }
+}
+
+impl TryFrom<Polygon3D> for Triangle3D {
+    type Error = &'static str;
+
+    fn try_from(value: Polygon3D) -> Result<Self, Self::Error> {
+        if value.vertices().len() != 3 {
+            Err("Polygon does not have exactly 3 vertices.")
+        } else {
+            Ok(Triangle3D(value))
+        }
+    }
+}
+
+impl From<[Point3D; 3]> for Triangle3D {
+    fn from(value: [Point3D; 3]) -> Self {
+        Self(Polygon3D(value.to_vec()))
     }
 }
 
 #[derive(Debug, Default)]
-pub struct ConvexPolytope {
-    polygons: Vec<Polygon>,
-}
+pub struct ConvexPolytope(Vec<Polygon3D>);
 
 impl ConvexPolytope {
     pub fn with_face_count(count: usize) -> Self {
-        Self {
-            polygons: vec![Polygon::default(); count],
-        }
+        Self(vec![Polygon3D::default(); count])
     }
 
-    pub fn add_polygon(&mut self, p: Polygon) -> &mut Self {
-        self.polygons.push(p);
+    pub fn add_polygon(&mut self, p: Polygon3D) -> &mut Self {
+        self.0.push(p);
         self
     }
 
-    pub fn polygons(&self) -> &Vec<Polygon> {
-        &self.polygons
+    pub fn polygons(&self) -> &Vec<Polygon3D> {
+        &self.0
     }
 
-    pub fn polygons_mut(&mut self) -> &mut Vec<Polygon> {
-        &mut self.polygons
+    pub fn polygons_mut(&mut self) -> &mut Vec<Polygon3D> {
+        &mut self.0
+    }
+}
+
+pub struct Solid3D(Vec<Plane3D>);
+
+impl Solid3D {
+    pub fn contains_point(&self, point: Point3D) -> bool {
+        self.0.iter().fold(true, |acc, e| {
+            matches!(e.side_of_point(point), SideOfPoint::In | SideOfPoint::On) && acc
+        })
+    }
+
+    pub fn face_count(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn faces(&self) -> &Vec<Plane3D> {
+        &self.0
+    }
+}
+
+impl From<Vec<Plane3D>> for Solid3D {
+    fn from(value: Vec<Plane3D>) -> Self {
+        Self(value)
     }
 }
 
@@ -489,8 +743,8 @@ mod test {
         };
 
         assert_eq!(
-            l1.intersect_with_line(l2),
-            Some(Point3D::from([2., 3., 4.]))
+            l1.intersect_with_line(l2).unwrap(),
+            Point3D::from([2., 3., 4.])
         )
     }
 
@@ -536,4 +790,33 @@ mod test {
             Point3D::from([-16., -16., -16.])
         );
     }
+
+    #[test]
+    fn triangulate_polygon() {
+        let a: Polygon3D = vec![
+            [1., 1., 0.].into(),
+            [-1., -1., 0.].into(),
+            [-1., 1., 0.].into(),
+            [1., -1., 0.].into(),
+        ]
+        .into();
+
+        let huh = a.triangulate(false).unwrap();
+
+        assert_eq!(huh.len(), 2);
+        assert_eq!(huh[0].get_triangle()[0], huh[1].get_triangle()[0]);
+        assert_eq!(huh[0].get_triangle()[2], huh[1].get_triangle()[1]);
+        assert_ne!(huh[0].get_triangle()[1], huh[1].get_triangle()[2]);
+    }
+
+    // #[test]
+    // fn another_from_three_points() {
+    //     let plane = Plane3D::from_three_points(
+    //         [-16., -16., -16.].into(),
+    //         [16., 16., -16.].into(),
+    //         [16., -16., 16.].into(),
+    //     );
+
+    //     println!("{:?}", plane);
+    // }
 }
