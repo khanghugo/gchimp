@@ -334,6 +334,7 @@ pub fn eight_bpp_transparent_img(
 }
 
 // the idea is that if the input file is a bitmap, just don't do anything :)
+#[allow(clippy::type_complexity)]
 fn _generate_mipmaps_indexed_bmp(
     img_path: impl AsRef<Path> + Into<PathBuf>,
 ) -> eyre::Result<([Vec<u8>; 4], Vec<[u8; 3]>, (u32, u32))> {
