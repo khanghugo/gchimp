@@ -9,3 +9,5 @@ pub static MAX_GOLDSRC_MODEL_TEXTURE_COUNT: u32 = 64;
 
 pub static PALETTE_PAD_COLOR: [u8; 3] = [0, 0, 0];
 pub static PALETTE_TRANSPARENT_COLOR: [u8; 3] = [0, 255, 0];
+
+pub static NO_RENDER_TEXTURE: &[&str] = &["NULL", "HINT", "AAATRIGGER", "SKIP", "sky"];
