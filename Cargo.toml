@@ -31,6 +31,7 @@ env_logger = "0.11.3"
 egui_tiles = "0.8.0"
 rfd = "0.14.1"
 egui_extras = {version = "*", features = ["all_loaders"]}
+gcd = "2.3.0"
 
 [workspace]
 members = [".", "map", "smd", "qc" , "wad"]
