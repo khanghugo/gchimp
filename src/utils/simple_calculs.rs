@@ -6,7 +6,7 @@ use eyre::eyre;
 
 use gcd::Gcd;
 
-static EPSILON: f64 = 0.000001;
+static EPSILON: f64 = 0.0001;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point3D {
@@ -178,7 +178,7 @@ impl Matrix2x2<f64> {
     pub fn solve_cramer(&self, r: [f64; 2]) -> eyre::Result<[f64; 2]> {
         let denominator = self.determinant();
 
-        if denominator == 0. || denominator == -0. {
+        if denominator <= EPSILON && denominator >= -EPSILON {
             return Err(eyre!("Determinant is 0."));
         }
 
@@ -418,7 +418,7 @@ impl Plane3D {
     pub fn intersect_with_line(&self, rhs: Line3D) -> eyre::Result<Point3D> {
         let t_part = self.normal().dot(rhs.direction);
 
-        if t_part == 0. || t_part == -0. {
+        if t_part <= EPSILON && t_part >= -EPSILON {
             return Err(eyre!(
                 "Cannot find intersection between a plane and a line."
             ));
@@ -462,6 +462,18 @@ impl Plane3D {
         } else {
             SideOfPoint::On
         }
+    }
+
+    pub fn get_equation(&self) -> String {
+        format!(
+            "{}x {} {}y {} {}z = {}",
+            self.x,
+            if self.y.is_sign_negative() { "-" } else { "+" },
+            self.y.abs(),
+            if self.z.is_sign_negative() { "-" } else { "+" },
+            self.z.abs(),
+            self.w
+        )
     }
 }
 
@@ -641,6 +653,7 @@ impl ConvexPolytope {
     }
 }
 
+#[derive(Debug)]
 pub struct Solid3D(Vec<Plane3D>);
 
 impl Solid3D {
@@ -809,14 +822,14 @@ mod test {
         assert_ne!(huh[0].get_triangle()[1], huh[1].get_triangle()[2]);
     }
 
-    // #[test]
-    // fn another_from_three_points() {
-    //     let plane = Plane3D::from_three_points(
-    //         [-16., -16., -16.].into(),
-    //         [16., 16., -16.].into(),
-    //         [16., -16., 16.].into(),
-    //     );
+    #[test]
+    fn another_from_three_points() {
+        let plane = Plane3D::from_three_points(
+            [87.42562584220406, 61.81925288250034, 115.30958489062226].into(),
+            [87.42562584220406, 62.52635966368689, 114.60247810943571].into(),
+            [88.2916512459885, 61.46569949190706, 114.956031500029].into(),
+        );
 
-    //     println!("{:?}", plane);
-    // }
+        println!("{}", plane.get_equation());
+    }
 }
