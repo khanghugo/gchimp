@@ -705,6 +705,15 @@ impl Qc {
 
         self.add(command)
     }
+
+    pub fn add_origin(&mut self, x: f64, y: f64, z: f64, rotation: Option<f64>) -> &mut Self {
+        let command = QcCommand::Origin(Origin {
+            origin: DVec3::from_array([x, y, z]),
+            rotation,
+        });
+
+        self.add(command)
+    }
 }
 
 fn _number(i: &str) -> IResult<i32> {
