@@ -31,3 +31,24 @@ pub fn relative_to_less_relative(root: &Path, relative: &Path) -> PathBuf {
 pub fn fix_backslash(i: &str) -> String {
     i.replace("\\", "/")
 }
+
+#[macro_export]
+macro_rules! err {
+    ($e: ident) => {{
+        use eyre::eyre;
+
+        Err(eyre!($e))
+    }};
+
+    ($format_string: literal) => {{
+        use eyre::eyre;
+
+        Err(eyre!($format_string))
+    }};
+
+    ($format_string: literal, $($format_arg: tt)*) => {{
+        use eyre::eyre;
+
+        Err(eyre!($format_string, arg $($path_format_arg)*))
+    }};
+}
