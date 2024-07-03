@@ -78,9 +78,9 @@ pub struct Smd {
     pub nodes: Vec<Node>,
     pub skeleton: Vec<Skeleton>,
     // triangles is optional because sequence file does not have triangles apparently.
-    pub triangles: Option<Vec<Triangle>>,
+    pub triangles: Vec<Triangle>,
     /// Optional for Source
-    pub vertex_anim: Option<Vec<VertexAnim>>,
+    pub vertex_anim: Vec<VertexAnim>,
 }
 
 macro_rules! write_dvec {
@@ -104,8 +104,8 @@ impl Smd {
             version: 1,
             nodes: vec![],
             skeleton: vec![],
-            triangles: None,
-            vertex_anim: None,
+            triangles: vec![],
+            vertex_anim: vec![],
         }
     }
 
@@ -136,8 +136,8 @@ impl Smd {
                     rot: [0., 0., 0.].into(),
                 }],
             }],
-            triangles: None,
-            vertex_anim: None,
+            triangles: vec![],
+            vertex_anim: vec![],
         }
     }
 
@@ -189,10 +189,10 @@ impl Smd {
         file.write_all("end\n".as_bytes())?;
 
         // triangles
-        if let Some(triangles) = &self.triangles {
+        if !self.triangles.is_empty() {
             file.write_all("triangles\n".as_bytes())?;
 
-            for triangle in triangles {
+            for triangle in &self.triangles {
                 file.write_all(format!("{}\n", triangle.material).as_bytes())?;
 
                 for vertex in &triangle.vertices {
@@ -214,10 +214,10 @@ impl Smd {
             file.write_all("end\n".as_bytes())?;
         }
 
-        if let Some(vertex_anim) = &self.vertex_anim {
+        if !self.vertex_anim.is_empty() {
             // skeleton
             file.write_all("vertexanim\n".as_bytes())?;
-            for single in vertex_anim {
+            for single in &self.vertex_anim {
                 file.write_all(format!("time {}\n", single.time).as_bytes())?;
 
                 for vertex in &single.vertices {
@@ -236,13 +236,19 @@ impl Smd {
     }
 
     pub fn add_triangle(&mut self, tri: Triangle) -> &mut Self {
-        if let Some(triangles) = &mut self.triangles {
-            triangles.push(tri);
-        } else {
-            self.triangles = Some(vec![tri]);
-        }
+        self.triangles.push(tri);
 
         self
+    }
+
+    pub fn without_triangles(&self) -> Self {
+        Self {
+            version: self.version,
+            nodes: self.nodes.clone(),
+            skeleton: self.skeleton.clone(),
+            triangles: vec![],
+            vertex_anim: self.vertex_anim.clone(),
+        }
     }
 }
 
@@ -451,8 +457,8 @@ fn parse_smd(i: &str) -> IResult<Smd> {
             version,
             nodes,
             skeleton,
-            triangles,
-            vertex_anim,
+            triangles: triangles.unwrap_or(vec![]),
+            vertex_anim: vertex_anim.unwrap_or(vec![]),
         },
     )(i)
 }
@@ -683,8 +689,7 @@ end
         assert_eq!(smd.version, 1);
         assert_eq!(smd.nodes.len(), 1);
         assert_eq!(smd.skeleton.len(), 1);
-        assert!(smd.triangles.is_some());
-        assert_eq!(smd.triangles.unwrap().len(), 1);
+        assert_eq!(smd.triangles.len(), 1);
     }
 
     #[test]
