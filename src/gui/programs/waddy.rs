@@ -284,7 +284,7 @@ impl WaddyGui {
                 ui.add(
                     egui::Label::new(wad_file_name)
                         .sense(Sense::hover())
-                        .truncate(true),
+                        .truncate(),
                 )
                 .on_hover_text(format!(
                     "{} textures",

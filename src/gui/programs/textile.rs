@@ -112,7 +112,7 @@ Space seperated",
                 ui.checkbox(&mut self.options.is_tiling, "Tiling");
                 ui.add_enabled(
                     self.options.is_tiling,
-                    egui::DragValue::new(&mut self.options.tiling_scalar).clamp_range(0.0..=100.0),
+                    egui::DragValue::new(&mut self.options.tiling_scalar).range(0.0..=100.0),
                 )
                 .on_hover_text("The dimensions of a texture will multiply by this number.");
 
@@ -120,7 +120,7 @@ Space seperated",
                 ui.add_enabled(
                     self.options.is_transparent,
                     egui::DragValue::new(&mut self.options.transparent_threshold)
-                        .clamp_range(0.0..=1.0)
+                        .range(0.0..=1.0)
                         .speed(0.01),
                 )
                 .on_hover_text(
