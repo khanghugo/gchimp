@@ -503,18 +503,16 @@ impl S2GBuilder {
                 for (index, smd) in goldsrc_smds.iter().enumerate() {
                     // check for every texture
                     // TODO: make it efficent but this might be on smd side to use map for each texture to avoid doing thousands plus comparisons
-                    if let Some(triangles) = &smd.triangles {
-                        // have to iterate everything to make sure that we have every missing textures ever
-                        triangles.iter().for_each(|tri| {
-                            if !textures_in_folder.contains(&tri.material)
-                                && !missing_textures.contains(&tri.material)
-                            {
-                                missing_textures.insert(tri.material.to_string());
-                            } else {
-                                qc_textures.insert(tri.material.to_string());
-                            }
-                        })
-                    }
+                    // have to iterate everything to make sure that we have every missing textures ever
+                    smd.triangles.iter().for_each(|tri| {
+                        if !textures_in_folder.contains(&tri.material)
+                            && !missing_textures.contains(&tri.material)
+                        {
+                            missing_textures.insert(tri.material.to_string());
+                        } else {
+                            qc_textures.insert(tri.material.to_string());
+                        }
+                    });
 
                     // if there is missing texture then just don't do anything next
                     // also do this same thing for the qc loop.
