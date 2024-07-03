@@ -267,7 +267,7 @@ impl SkyModBuilder {
 
         // write .smd, plural
         let texture_count = self.options.texture_per_face * 6;
-        let model_count = texture_count / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
+        let model_count = texture_count / MAX_GOLDSRC_MODEL_TEXTURE_COUNT as u32 + 1;
 
         let mut new_smds = vec![Smd::new_basic(); model_count as usize];
 
@@ -289,7 +289,7 @@ impl SkyModBuilder {
                         texture_index * self.options.texture_per_face + _y * texture_per_side + _x;
 
                     let new_smd_index =
-                        (curr_texture_overall_count / MAX_GOLDSRC_MODEL_TEXTURE_COUNT) as usize;
+                        curr_texture_overall_count as usize / MAX_GOLDSRC_MODEL_TEXTURE_COUNT;
 
                     let texture_world_min_x = skybox_coord - texture_world_size * _x as f64;
                     let texture_world_min_y = skybox_coord - texture_world_size * _y as f64;
@@ -433,9 +433,8 @@ impl SkyModBuilder {
                                 * self.options.texture_per_face
                                 + _y * texture_per_side
                                 + _x;
-                            let new_qc_index = (curr_texture_overall_count
-                                / MAX_GOLDSRC_MODEL_TEXTURE_COUNT)
-                                as usize;
+                            let new_qc_index = curr_texture_overall_count as usize
+                                / MAX_GOLDSRC_MODEL_TEXTURE_COUNT;
 
                             if new_qc_index != model_index as usize {
                                 continue;
