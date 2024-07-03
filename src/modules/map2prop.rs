@@ -13,9 +13,7 @@ use rayon::prelude::*;
 use crate::utils::{
     map_stuffs::{map_to_triangulated_smd_3_points, textures_used_in_map},
     run_bin::run_studiomdl,
-    smd_stuffs::{
-        add_bitmap_extension_to_texture, find_centroid, move_by,
-    },
+    smd_stuffs::{add_bitmap_extension_to_texture, find_centroid, move_by},
     wad_stuffs::{export_texture, SimpleWad},
 };
 
@@ -333,6 +331,7 @@ impl Map2Prop {
         let handle = run_studiomdl(
             output_path.with_extension("qc").as_path(),
             self.options.studiomdl.as_ref().unwrap(),
+            #[cfg(target_os = "linux")]
             self.options.wineprefix.as_ref().unwrap(),
         );
 
