@@ -1,4 +1,6 @@
-use smd::Smd;
+use glam::DVec3;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use smd::{Smd, Triangle};
 
 use super::constants::MAX_SMD_TRIANGLE;
 
@@ -58,4 +60,59 @@ pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
     });
 
     res
+}
+
+pub fn find_centroid(smd: &Smd) -> Option<DVec3> {
+    if smd.triangles.is_none() {
+        return None;
+    }
+
+    find_centroid_from_triangles(smd.triangles.as_ref().unwrap().as_slice())
+}
+
+pub fn find_centroid_from_triangles(triangles: &[Triangle]) -> Option<DVec3> {
+    if triangles.is_empty() {
+        return None;
+    }
+
+    Some(
+        triangles
+            .par_iter()
+            .map(|triangle| {
+                triangle
+                    .vertices
+                    .iter()
+                    .fold(DVec3::default(), |acc, e| acc + e.pos)
+            })
+            .reduce(DVec3::default, |acc, e| acc + e)
+            / triangles.len() as f64
+            / 3.,
+    )
+}
+
+/// Mutates the original smd
+pub fn move_by(smd: &mut Smd, offset: DVec3) {
+    if smd.triangles.is_none() {
+        return;
+    }
+
+    if let Some(triangles) = &mut smd.triangles {
+        triangles.iter_mut().for_each(|triangle| {
+            triangle.vertices.iter_mut().for_each(|vertex| {
+                vertex.pos += offset;
+            })
+        });
+    }
+}
+
+pub fn add_bitmap_extension_to_texture(smd: &mut Smd) {
+    if smd.triangles.is_none() {
+        return;
+    }
+
+    if let Some(triangles) = &mut smd.triangles {
+        triangles
+            .iter_mut()
+            .for_each(|triangle| triangle.material += ".bmp");
+    }
 }
