@@ -6,7 +6,7 @@ use eyre::eyre;
 
 use gcd::Gcd;
 
-static EPSILON: f64 = 0.0001;
+use super::constants::EPSILON;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point3D {
@@ -128,6 +128,10 @@ impl Point3D {
 
         *self / gcd2 as f64
     }
+
+    pub fn to_dvec3(&self) -> DVec3 {
+        self.into()
+    }
 }
 
 impl From<[f64; 3]> for Point3D {
@@ -150,13 +154,19 @@ impl From<DVec3> for Point3D {
     }
 }
 
-impl From<Point3D> for DVec3 {
-    fn from(value: Point3D) -> Self {
+impl From<&Point3D> for DVec3 {
+    fn from(value: &Point3D) -> Self {
         Self {
             x: value.x,
             y: value.y,
             z: value.z,
         }
+    }
+}
+
+impl From<Point3D> for DVec3 {
+    fn from(value: Point3D) -> Self {
+        (&value).into()
     }
 }
 
@@ -650,6 +660,22 @@ impl ConvexPolytope {
 
     pub fn polygons_mut(&mut self) -> &mut Vec<Polygon3D> {
         &mut self.0
+    }
+
+    pub fn centroid(&self) -> eyre::Result<Point3D> {
+        if self.0.is_empty() {
+            return Err(eyre!("Polytope has zero faces."));
+        }
+
+        if self.0.len() < 4 {
+            return Err(eyre!("Polytope has less than 4 faces."));
+        }
+
+        Ok(self
+            .0
+            .iter()
+            .fold(Point3D::default(), |acc, e| acc + e.centroid().unwrap())
+            / self.0.len() as f64)
     }
 }
 
