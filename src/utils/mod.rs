@@ -6,3 +6,4 @@ pub mod qc_stuffs;
 pub mod run_bin;
 pub mod simple_calculs;
 pub mod smd_stuffs;
+pub mod wad_stuffs;
