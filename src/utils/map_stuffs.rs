@@ -1,59 +1,30 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use glam::{DVec2, DVec3, Vec4Swizzles};
 use map::{Brush, BrushPlane, Entity, Map};
 use smd::{Triangle, Vertex};
-use wad::{FileEntry, Wad};
 
 use crate::utils::simple_calculs::Solid3D;
 
-use super::simple_calculs::{ConvexPolytope, Plane3D, Triangle3D};
+use super::{
+    simple_calculs::{ConvexPolytope, Plane3D, Triangle3D},
+    wad_stuffs::SimpleWad,
+};
 
 use eyre::eyre;
 
 use rayon::prelude::*;
 
-#[derive(Clone, Default)]
-pub struct SimpleWadInfo(HashMap<String, (u32, u32)>);
-
-impl From<&[Wad]> for SimpleWadInfo {
-    fn from(value: &[Wad]) -> Self {
-        let mut res = Self::default();
-
-        value.iter().for_each(|wad| {
-            wad.entries.iter().for_each(|entry| {
-                if let FileEntry::MipTex(miptex) = &entry.file_entry {
-                    res.0.insert(
-                        entry.directory_entry.texture_name.get_string(),
-                        (miptex.width, miptex.height),
-                    );
-                }
-            });
-        });
-
-        res
-    }
-}
-
-impl SimpleWadInfo {
-    pub fn from_wads(value: &[Wad]) -> Self {
-        value.into()
-    }
-
-    pub fn get(&self, k: &str) -> Option<&(u32, u32)> {
-        self.0.get(k)
-    }
-}
-
+/// Remember to check if texture exists.
 pub fn map_to_triangulated_smd_3_points(
     map: &Map,
-    wads: &SimpleWadInfo,
+    wads: &SimpleWad,
 ) -> eyre::Result<Vec<Triangle>> {
     let res = map
         .entities
         .par_iter()
-        .filter(|entity| entity.brushes.is_some())
-        .map(|entity| entity_to_triangulated_smd_3_points(entity, &wads))
+        .filter(|entity| entity.brushes.is_some()) // for entities with brush only
+        .map(|entity| entity_to_triangulated_smd_3_points(entity, wads))
         .collect::<Vec<eyre::Result<Vec<Triangle>>>>();
 
     let err = res
@@ -72,9 +43,10 @@ pub fn map_to_triangulated_smd_3_points(
         .collect())
 }
 
+/// Remember to check if texture exists.
 pub fn entity_to_triangulated_smd_3_points(
     entity: &Entity,
-    wads: &SimpleWadInfo,
+    wads: &SimpleWad,
 ) -> eyre::Result<Vec<Triangle>> {
     if entity.brushes.is_none() {
         return Err(eyre!("This entity does not contain any brushes."));
@@ -108,7 +80,7 @@ pub fn entity_to_triangulated_smd_3_points(
 // https://github.com/pwitvoet/mess/blob/master/MESS/Mapping/Brush.cs#L38
 fn brush_to_triangulated_smd_3_points(
     brush: &Brush,
-    wads: &SimpleWadInfo,
+    wads: &SimpleWad,
 ) -> eyre::Result<Vec<Triangle>> {
     let solid: Solid3D = brush
         .planes
@@ -147,23 +119,32 @@ fn brush_to_triangulated_smd_3_points(
         }
     }
 
+    // it is convex so no worry that the center is outside the brush
+    let polytope_centroid = polytope.centroid()?;
+
     let triangulatable = polytope
         .polygons()
         .iter()
-        .zip(&brush.planes)
-        .map(|(polygon, brush_plane)| {
-            // So, normal vector will point down on the texture, aka where you are looking at, I think.
-            // So for a vector pointing down for a face. You go the "opposite way". The first face you see would be
-            // the face having texture.
-            let norm = brush_plane.u.xyz().cross(brush_plane.v.xyz());
+        .map(|polygon| {
+            // ~~So, normal vector will point down on the texture, aka where you are looking at, I think.~~
+            // ~~So for a vector pointing down for a face. You go the "opposite way". The first face you see would be~~
+            // ~~the face having texture.~~
+            //
+            // Apparently, do not trust that the cross would produce the normal.
+            // The information is pretty much there and it might be wrong.
+            // The correct way to do this is to derive the direction of the normal ourselves with the center of brush.
+            // let norm = brush_plane.u.xyz().cross(brush_plane.v.xyz());
+            // let texture_direction = polygon
+            //     .normal()
+            //     .unwrap()
+            //     .normalize()
+            //     .dot(norm.normalize().into());
+            //
+            // Luckily, the normal is only important when we need reverse the triangle or not.
+            let direction = polygon.centroid().unwrap() - polytope_centroid;
+            let texture_direction = direction.dot(polygon.normal().unwrap().normalize());
 
-            if polygon
-                .normal()
-                .unwrap()
-                .normalize()
-                .dot(norm.normalize().into())
-                >= 0.
-            {
+            if texture_direction.is_sign_negative() {
                 polygon.triangulate(true)
             } else {
                 polygon.triangulate(false)
@@ -194,13 +175,15 @@ fn brush_to_triangulated_smd_3_points(
             face_3d
                 .into_iter()
                 .map(|triangle_3d| {
-                    // flip the normal vector because this one is actually pointing outward from the texture.
-                    // map normal vector points toward the texture.
-                    let norm = brush_plane.u.xyz().cross(brush_plane.v.xyz()) * -1.;
+                    // ~flip the normal vector because this one is actually pointing outward from the texture.~
+                    // ~map normal vector points toward the texture.~
+                    // Don't trust the UV coordinate to give the correct normal
+                    // let norm = brush_plane.u.xyz().cross(brush_plane.v.xyz()) * -1.;
+                    let norm = triangle_3d.normal().to_dvec3();
 
                     // make sure to check the texture exists before running the function
                     // seems very inefficient to do check here instead
-                    let tex_dimensions = wads.get(&brush_plane.texture_name).unwrap();
+                    let tex_dimensions = wads.get(&brush_plane.texture_name).unwrap().dimensions();
 
                     let p1: DVec3 = triangle_3d.get_triangle()[0].into();
                     let p2: DVec3 = triangle_3d.get_triangle()[1].into();
@@ -208,9 +191,9 @@ fn brush_to_triangulated_smd_3_points(
 
                     let parent = 0;
 
-                    let v1_uv = convert_uv_origin(p1, brush_plane, *tex_dimensions);
-                    let v2_uv = convert_uv_origin(p2, brush_plane, *tex_dimensions);
-                    let v3_uv = convert_uv_origin(p3, brush_plane, *tex_dimensions);
+                    let v1_uv = convert_uv_origin(p1, brush_plane, tex_dimensions);
+                    let v2_uv = convert_uv_origin(p2, brush_plane, tex_dimensions);
+                    let v3_uv = convert_uv_origin(p3, brush_plane, tex_dimensions);
 
                     Triangle {
                         material: brush_plane.texture_name.to_owned(),
@@ -273,6 +256,22 @@ fn convert_uv_origin(
     res * DVec2::new(1., -1.) // flip the v coordinate because .map points toward the texture
 }
 
+pub fn textures_used_in_map(map: &Map) -> HashSet<String> {
+    map.entities
+        .iter()
+        .fold(HashSet::<String>::new(), |mut acc, entity| {
+            if let Some(brushes) = &entity.brushes {
+                for brush in brushes.iter() {
+                    for plane in brush.planes.iter() {
+                        acc.insert(plane.texture_name.clone());
+                    }
+                }
+            }
+
+            acc
+        })
+}
+
 #[cfg(test)]
 mod test {
     use smd::Smd;
@@ -294,10 +293,10 @@ mod test {
         Brush::try_from(default_cube_str).unwrap()
     }
 
-    fn devtex() -> SimpleWadInfo {
-        let mut res = SimpleWadInfo::default();
+    fn devtex() -> SimpleWad {
+        let mut res = SimpleWad::default();
 
-        res.0.insert("devcrate64".to_owned(), (64, 64));
+        res.insert("devcrate64".to_owned(), 0, (64, 64));
 
         res
     }
@@ -322,16 +321,15 @@ mod test {
     #[test]
     fn roll_cube() {
         let slanted_block = "\
-( -16 -22.62741699796952 -45.254833995939045 ) ( -16 -21.920310216782973 -44.5477272147525 ) ( -16 -23.334523779156065 -44.5477272147525 ) __TB_empty [ 0 -0.7071067811865475 -0.7071067811865477 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 45 1 1
-( -64 0 -22.62741699796952 ) ( -64 -0.7071067811865461 -21.920310216782973 ) ( -63 0 -22.62741699796952 ) __TB_empty [ 1 0 0 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 0 1 1
-( 64 45.25483399593904 67.88225099390857 ) ( 64 45.961940777125584 68.58935777509511 ) ( 65 45.25483399593904 67.88225099390857 ) the_end_stuck [ 1 0 0 80 ] [ 0 -0.7071067811865475 -0.7071067811865477 16 ] 0 1 1
-( -64 -22.62741699796952 -45.254833995939045 ) ( -63 -22.62741699796952 -45.254833995939045 ) ( -64 -21.920310216782973 -44.5477272147525 ) jeniceq [ -1 0 0 112 ] [ 0 -0.7071067811865475 -0.7071067811865477 160 ] 0 1 1
-( 64 0 22.62741699796952 ) ( 65 0 22.62741699796952 ) ( 64 -0.7071067811865497 23.33452377915607 ) __TB_empty [ -1 0 0 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 0 1 1
-( 16 45.25483399593904 67.88225099390857 ) ( 16 44.547727214752484 68.58935777509511 ) ( 16 45.961940777125584 68.58935777509511 ) __TB_empty [ 0 0.7071067811865475 0.7071067811865477 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 315 1 1
+( -16 -22.62741699796952 -45.254833995939045 ) ( -16 -21.920310216782973 -44.5477272147525 ) ( -16 -23.334523779156065 -44.5477272147525 ) devcrate64 [ 0 -0.7071067811865475 -0.7071067811865477 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 45 1 1
+( -64 0 -22.62741699796952 ) ( -64 -0.7071067811865461 -21.920310216782973 ) ( -63 0 -22.62741699796952 ) devcrate64 [ 1 0 0 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 0 1 1
+( 64 45.25483399593904 67.88225099390857 ) ( 64 45.961940777125584 68.58935777509511 ) ( 65 45.25483399593904 67.88225099390857 ) devcrate64 [ 1 0 0 80 ] [ 0 -0.7071067811865475 -0.7071067811865477 16 ] 0 1 1
+( -64 -22.62741699796952 -45.254833995939045 ) ( -63 -22.62741699796952 -45.254833995939045 ) ( -64 -21.920310216782973 -44.5477272147525 ) devcrate64 [ -1 0 0 112 ] [ 0 -0.7071067811865475 -0.7071067811865477 160 ] 0 1 1
+( 64 0 22.62741699796952 ) ( 65 0 22.62741699796952 ) ( 64 -0.7071067811865497 23.33452377915607 ) devcrate64 [ -1 0 0 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 0 1 1
+( 16 45.25483399593904 67.88225099390857 ) ( 16 44.547727214752484 68.58935777509511 ) ( 16 45.961940777125584 68.58935777509511 ) devcrate64 [ 0 0.7071067811865475 0.7071067811865477 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 315 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles =
-            brush_to_triangulated_smd_3_points(&cube, &SimpleWadInfo::default()).unwrap();
+        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -348,16 +346,15 @@ mod test {
     #[test]
     fn yaw_cube() {
         let slanted_block = "\
-( 22.627416997969526 -45.25483399593904 -16 ) ( 21.92031021678298 -44.54772721475249 -16 ) ( 22.627416997969526 -45.25483399593904 -15 ) __TB_empty [ 0.7071067811865476 -0.7071067811865475 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( 33.94112549695428 56.568542494923804 16 ) ( 34.648232278140824 57.27564927611035 16 ) ( 33.94112549695428 56.568542494923804 17 ) __TB_empty [ -0.7071067811865475 -0.7071067811865477 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -11.313708498984752 -79.19595949289332 -16 ) ( -10.606601717798206 -78.48885271170678 -16 ) ( -12.020815280171298 -78.48885271170678 -16 ) jeniceq [ -0.7071067811865475 -0.7071067811865477 0 112 ] [ 0.7071067811865476 -0.7071067811865475 0 160 ] 45 1 1
-( -11.313708498984766 101.82337649086284 16 ) ( -12.020815280171313 102.5304832720494 16 ) ( -10.60660171779822 102.5304832720494 16 ) the_end_stuck [ 0.7071067811865475 0.7071067811865477 0 80 ] [ 0.7071067811865476 -0.7071067811865475 0 16 ] 315 1 1
-( -33.94112549695428 -56.568542494923804 -16 ) ( -33.94112549695428 -56.568542494923804 -15 ) ( -33.23401871576773 -55.86143571373726 -16 ) __TB_empty [ 0.7071067811865475 0.7071067811865477 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -45.254833995939045 67.88225099390856 16 ) ( -45.254833995939045 67.88225099390856 17 ) ( -45.96194077712559 68.58935777509511 16 ) __TB_empty [ -0.7071067811865476 0.7071067811865475 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( 22.627416997969526 -45.25483399593904 -16 ) ( 21.92031021678298 -44.54772721475249 -16 ) ( 22.627416997969526 -45.25483399593904 -15 ) devcrate64 [ 0.7071067811865476 -0.7071067811865475 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( 33.94112549695428 56.568542494923804 16 ) ( 34.648232278140824 57.27564927611035 16 ) ( 33.94112549695428 56.568542494923804 17 ) devcrate64 [ -0.7071067811865475 -0.7071067811865477 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( -11.313708498984752 -79.19595949289332 -16 ) ( -10.606601717798206 -78.48885271170678 -16 ) ( -12.020815280171298 -78.48885271170678 -16 ) devcrate64 [ -0.7071067811865475 -0.7071067811865477 0 112 ] [ 0.7071067811865476 -0.7071067811865475 0 160 ] 45 1 1
+( -11.313708498984766 101.82337649086284 16 ) ( -12.020815280171313 102.5304832720494 16 ) ( -10.60660171779822 102.5304832720494 16 ) devcrate64 [ 0.7071067811865475 0.7071067811865477 0 80 ] [ 0.7071067811865476 -0.7071067811865475 0 16 ] 315 1 1
+( -33.94112549695428 -56.568542494923804 -16 ) ( -33.94112549695428 -56.568542494923804 -15 ) ( -33.23401871576773 -55.86143571373726 -16 ) devcrate64 [ 0.7071067811865475 0.7071067811865477 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( -45.254833995939045 67.88225099390856 16 ) ( -45.254833995939045 67.88225099390856 17 ) ( -45.96194077712559 68.58935777509511 16 ) devcrate64 [ -0.7071067811865476 0.7071067811865475 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles =
-            brush_to_triangulated_smd_3_points(&cube, &SimpleWadInfo::default()).unwrap();
+        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -374,16 +371,15 @@ mod test {
     #[test]
     fn roll_prism() {
         let slanted_block = "\
-( -56.5685424949238 -48 33.941125496954285 ) ( -55.86143571373725 -48 33.23401871576774 ) ( -56.5685424949238 -47 33.941125496954285 ) NULL [ -0.7071067811865475 0 0.7071067811865477 112 ] [ 0 -1 0 160 ] 0 1 1
-( -45.25483399593904 -48 22.627416997969526 ) ( -45.25483399593904 -47 22.627416997969526 ) ( -44.54772721475249 -48 23.334523779156072 ) NULL [ 0 -1 0 0 ] [ -0.7071067811865476 0 -0.7071067811865475 0 ] 0 1 1
-( -56.5685424949238 -16 33.941125496954285 ) ( -55.86143571373725 -16 34.64823227814083 ) ( -55.86143571373725 -16 33.23401871576774 ) NULL [ 0.7071067811865475 0 -0.7071067811865477 0 ] [ -0.7071067811865476 0 -0.7071067811865475 0 ] 45 1 1
-( 56.5685424949238 16 -33.941125496954285 ) ( 57.27564927611034 16 -34.64823227814083 ) ( 57.27564927611034 16 -33.23401871576774 ) NULL [ -0.7071067811865475 0 0.7071067811865477 0 ] [ -0.7071067811865476 0 -0.7071067811865475 0 ] 315 1 1
-( 45.25483399593904 80 -22.627416997969526 ) ( 45.96194077712559 80 -21.92031021678298 ) ( 45.25483399593904 81 -22.627416997969526 ) NULL [ 0 1 0 0 ] [ -0.7071067811865476 0 -0.7071067811865475 0 ] 0 1 1
-( 56.5685424949238 80 -33.941125496954285 ) ( 56.5685424949238 81 -33.941125496954285 ) ( 57.27564927611034 80 -34.64823227814083 ) NULL [ 0.7071067811865475 0 -0.7071067811865477 80 ] [ 0 -1 0 16 ] 0 1 1
+( -56.5685424949238 -48 33.941125496954285 ) ( -55.86143571373725 -48 33.23401871576774 ) ( -56.5685424949238 -47 33.941125496954285 ) devcrate64 [ -0.7071067811865475 0 0.7071067811865477 112 ] [ 0 -1 0 160 ] 0 1 1
+( -45.25483399593904 -48 22.627416997969526 ) ( -45.25483399593904 -47 22.627416997969526 ) ( -44.54772721475249 -48 23.334523779156072 ) devcrate64 [ 0 -1 0 0 ] [ -0.7071067811865476 0 -0.7071067811865475 0 ] 0 1 1
+( -56.5685424949238 -16 33.941125496954285 ) ( -55.86143571373725 -16 34.64823227814083 ) ( -55.86143571373725 -16 33.23401871576774 ) devcrate64 [ 0.7071067811865475 0 -0.7071067811865477 0 ] [ -0.7071067811865476 0 -0.7071067811865475 0 ] 45 1 1
+( 56.5685424949238 16 -33.941125496954285 ) ( 57.27564927611034 16 -34.64823227814083 ) ( 57.27564927611034 16 -33.23401871576774 ) devcrate64 [ -0.7071067811865475 0 0.7071067811865477 0 ] [ -0.7071067811865476 0 -0.7071067811865475 0 ] 315 1 1
+( 45.25483399593904 80 -22.627416997969526 ) ( 45.96194077712559 80 -21.92031021678298 ) ( 45.25483399593904 81 -22.627416997969526 ) devcrate64 [ 0 1 0 0 ] [ -0.7071067811865476 0 -0.7071067811865475 0 ] 0 1 1
+( 56.5685424949238 80 -33.941125496954285 ) ( 56.5685424949238 81 -33.941125496954285 ) ( 57.27564927611034 80 -34.64823227814083 ) devcrate64 [ 0.7071067811865475 0 -0.7071067811865477 80 ] [ 0 -1 0 16 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles =
-            brush_to_triangulated_smd_3_points(&cube, &SimpleWadInfo::default()).unwrap();
+        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -400,15 +396,14 @@ mod test {
     #[test]
     fn square_pyramid() {
         let slanted_block = "\
-( -16 16 -16 ) ( 0 0 16 ) ( -16 -16 -16 ) NULL [ 2.220446049250313e-16 0 -1 80 ] [ 0 -1 0 16 ] 0 1 1
-( 0 0 16 ) ( 16 -16 -16 ) ( -16 -16 -16 ) NULL [ 1 0 0 80 ] [ 0 -2.220446049250313e-16 1 16 ] 0 1 1
-( 16 -16 -16 ) ( 16 16 -16 ) ( -16 16 -16 ) NULL [ -1 0 0 112 ] [ 0 -1 0 160 ] 0 1 1
-( -16 16 -16 ) ( 16 16 -16 ) ( 0 0 16 ) NULL [ 1 0 0 80 ] [ 0 -2.220446049250313e-16 -1 -16 ] 0 1 1
-( 0 0 16 ) ( 16 16 -16 ) ( 16 -16 -16 ) NULL [ 2.220446049250313e-16 0 1 112 ] [ 0 -1 0 16 ] 0 1 1
+( -16 16 -16 ) ( 0 0 16 ) ( -16 -16 -16 ) devcrate64 [ 2.220446049250313e-16 0 -1 80 ] [ 0 -1 0 16 ] 0 1 1
+( 0 0 16 ) ( 16 -16 -16 ) ( -16 -16 -16 ) devcrate64 [ 1 0 0 80 ] [ 0 -2.220446049250313e-16 1 16 ] 0 1 1
+( 16 -16 -16 ) ( 16 16 -16 ) ( -16 16 -16 ) devcrate64 [ -1 0 0 112 ] [ 0 -1 0 160 ] 0 1 1
+( -16 16 -16 ) ( 16 16 -16 ) ( 0 0 16 ) devcrate64 [ 1 0 0 80 ] [ 0 -2.220446049250313e-16 -1 -16 ] 0 1 1
+( 0 0 16 ) ( 16 16 -16 ) ( 16 -16 -16 ) devcrate64 [ 2.220446049250313e-16 0 1 112 ] [ 0 -1 0 16 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles =
-            brush_to_triangulated_smd_3_points(&cube, &SimpleWadInfo::default()).unwrap();
+        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
 
         assert_eq!(triangles.len(), 4 + 2);
 
@@ -425,19 +420,18 @@ mod test {
     #[test]
     fn house_shape() {
         let slanted_block = "\
-( -16 16 16 ) ( -16 -16 16 ) ( -16 -16 -16 ) NULL [ 0 -1 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( -16 16 16 ) ( 0 0 32 ) ( -16 -16 16 ) NULL [ 1 0 0 16 ] [ 0 -1 0 16 ] 0 1 1
-( -16 -16 16 ) ( 16 -16 16 ) ( 16 -16 -16 ) NULL [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( 0 0 32 ) ( 16 -16 16 ) ( -16 -16 16 ) NULL [ 1 0 0 16 ] [ 0 -1 0 16 ] 0 1 1
-( 16 -16 -16 ) ( 16 16 -16 ) ( -16 16 -16 ) NULL [ -1 0 0 112 ] [ 0 -1 0 160 ] 0 1 1
-( -16 16 16 ) ( 16 16 16 ) ( 0 0 32 ) NULL [ 1 0 0 80 ] [ 0 -1 0 16 ] 0 1 1
-( 16 16 -16 ) ( 16 16 16 ) ( -16 16 16 ) NULL [ -1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
-( 0 0 32 ) ( 16 16 16 ) ( 16 -16 16 ) NULL [ 1 0 0 16 ] [ 0 -1 0 16 ] 0 1 1
-( 16 -16 16 ) ( 16 16 16 ) ( 16 16 -16 ) NULL [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( -16 16 16 ) ( -16 -16 16 ) ( -16 -16 -16 ) devcrate64 [ 0 -1 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( -16 16 16 ) ( 0 0 32 ) ( -16 -16 16 ) devcrate64 [ 1 0 0 16 ] [ 0 -1 0 16 ] 0 1 1
+( -16 -16 16 ) ( 16 -16 16 ) ( 16 -16 -16 ) devcrate64 [ 1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( 0 0 32 ) ( 16 -16 16 ) ( -16 -16 16 ) devcrate64 [ 1 0 0 16 ] [ 0 -1 0 16 ] 0 1 1
+( 16 -16 -16 ) ( 16 16 -16 ) ( -16 16 -16 ) devcrate64 [ -1 0 0 112 ] [ 0 -1 0 160 ] 0 1 1
+( -16 16 16 ) ( 16 16 16 ) ( 0 0 32 ) devcrate64 [ 1 0 0 80 ] [ 0 -1 0 16 ] 0 1 1
+( 16 16 -16 ) ( 16 16 16 ) ( -16 16 16 ) devcrate64 [ -1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( 0 0 32 ) ( 16 16 16 ) ( 16 -16 16 ) devcrate64 [ 1 0 0 16 ] [ 0 -1 0 16 ] 0 1 1
+( 16 -16 16 ) ( 16 16 16 ) ( 16 16 -16 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles =
-            brush_to_triangulated_smd_3_points(&cube, &SimpleWadInfo::default()).unwrap();
+        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
 
         assert_eq!(triangles.len(), 14);
 
@@ -460,8 +454,7 @@ mod test {
 ( 16 -16 16 ) ( 16 16 -16 ) ( 16 -16 -16 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles =
-            brush_to_triangulated_smd_3_points(&cube, &SimpleWadInfo::default()).unwrap();
+        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
 
         assert_eq!(triangles.len(), 4);
 
@@ -495,6 +488,30 @@ mod test {
 
         new_smd
             .write("/home/khang/gchimp/examples/map2prop/cube.smd")
+            .unwrap();
+    }
+
+    #[test]
+    // testing the float precision
+    fn rotated_block() {
+        let slanted_block = "\
+( -95.42562584220407 -71.61721185363308 162.89245613824502 ) ( -95.42562584220407 -70.91010507244653 162.18534935705847 ) ( -94.92562584220407 -71.00483941793729 163.5048285739408 ) devcrate64 [ 0 -0.7071067811865474 0.7071067811865477 -37.82338 ] [ -0.5000000000000001 -0.6123724356957947 -0.6123724356957945 -39.818367 ] 320.5322 1 1
+( -87.42562584220407 -61.81925288250036 172.69041510937774 ) ( -86.55960043841964 -62.172806273093634 172.33686171878446 ) ( -87.42562584220407 -61.11214610131381 171.98330832819119 ) devcrate64 [ -0.8660254037844387 0.3535533905932739 0.35355339059327373 13.08831 ] [ 0 -0.7071067811865474 0.7071067811865477 -37.82338 ] 336.59818 1 1
+( -95.42562584220407 -71.61721185363308 162.89245613824502 ) ( -94.92562584220407 -71.00483941793729 163.5048285739408 ) ( -94.55960043841964 -71.97076524422636 162.53890274765178 ) devcrate64 [ 0.9999999999999998 1.0302873457157524e-08 1.0302873457157524e-08 -13.08831 ] [ 1.4570463349738993e-08 -0.7071067811865474 -0.7071067811865471 -39.818367 ] 0 1 1
+( 31.42562584220407 -6.766459915428641 46.72387209269332 ) ( 32.291651245988504 -7.120013306021917 46.37031870210004 ) ( 31.92562584220407 -6.154087479732851 47.33624452838911 ) devcrate64 [ -0.8660254037844387 0.3535533905932739 0.35355339059327373 13.08831 ] [ -0.5000000000000001 -0.6123724356957947 -0.6123724356957945 -39.818367 ] 330 1 1
+( 87.42562584220406 61.81925288250034 115.30958489062226 ) ( 87.42562584220406 62.52635966368689 114.60247810943571 ) ( 88.2916512459885 61.46569949190706 114.956031500029 ) devcrate64 [ 0.8660254037844387 -0.3535533905932739 -0.35355339059327373 -13.08831 ] [ 0 -0.7071067811865474 0.7071067811865477 -37.82338 ] 23.401838 1 1
+( 31.42562584220407 -6.766459915428641 46.72387209269332 ) ( 31.92562584220407 -6.154087479732851 47.33624452838911 ) ( 31.42562584220407 -6.059353134242087 46.016765311506774 ) devcrate64 [ 0 0.7071067811865474 -0.7071067811865477 37.82338 ] [ -0.5000000000000001 -0.6123724356957947 -0.6123724356957945 -39.818367 ] 39.467796 1 1
+";
+        let cube = Brush::try_from(slanted_block).unwrap();
+        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+
+        let mut new_smd = Smd::new_basic();
+        triangles.into_iter().for_each(|tri| {
+            new_smd.add_triangle(tri);
+        });
+
+        new_smd
+            .write("/home/khang/gchimp/examples/map2prop/rotated_block.smd")
             .unwrap();
     }
 }
