@@ -11,3 +11,5 @@ pub static PALETTE_PAD_COLOR: [u8; 3] = [0, 0, 0];
 pub static PALETTE_TRANSPARENT_COLOR: [u8; 3] = [0, 255, 0];
 
 pub static NO_RENDER_TEXTURE: &[&str] = &["NULL", "HINT", "AAATRIGGER", "SKIP", "sky"];
+
+pub static EPSILON: f64 = 0.000001;
