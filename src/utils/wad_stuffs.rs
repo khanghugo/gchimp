@@ -34,22 +34,19 @@ impl From<&[&Wad]> for SimpleWad {
     fn from(value: &[&Wad]) -> Self {
         let mut res = Self::default();
 
-        value
-            .into_iter()
-            .enumerate()
-            .for_each(|(wad_file_index, wad)| {
-                wad.entries.iter().for_each(|entry| {
-                    if let FileEntry::MipTex(miptex) = &entry.file_entry {
-                        res.0.insert(
-                            entry.directory_entry.texture_name.get_string(),
-                            SimpleWadEntry {
-                                wad_file_index,
-                                dimensions: (miptex.width, miptex.height),
-                            },
-                        );
-                    }
-                });
+        value.iter().enumerate().for_each(|(wad_file_index, wad)| {
+            wad.entries.iter().for_each(|entry| {
+                if let FileEntry::MipTex(miptex) = &entry.file_entry {
+                    res.0.insert(
+                        entry.directory_entry.texture_name.get_string(),
+                        SimpleWadEntry {
+                            wad_file_index,
+                            dimensions: (miptex.width, miptex.height),
+                        },
+                    );
+                }
             });
+        });
 
         res
     }
@@ -57,7 +54,7 @@ impl From<&[&Wad]> for SimpleWad {
 
 impl From<&[Wad]> for SimpleWad {
     fn from(value: &[Wad]) -> Self {
-        value.iter().map(|what| what).collect::<Vec<&Wad>>().into()
+        value.iter().collect::<Vec<&Wad>>().into()
     }
 }
 

@@ -63,9 +63,7 @@ pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
 }
 
 pub fn find_centroid(smd: &Smd) -> Option<DVec3> {
-    if smd.triangles.is_none() {
-        return None;
-    }
+    smd.triangles.as_ref()?;
 
     find_centroid_from_triangles(smd.triangles.as_ref().unwrap().as_slice())
 }
