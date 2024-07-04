@@ -239,10 +239,10 @@ fn convert_uv_origin(
     brush_plane: &BrushPlane,
     (tex_width, tex_height): (u32, u32),
 ) -> DVec2 {
-    let res = (DVec2::new(p.dot(brush_plane.u.xyz()), p.dot(brush_plane.v.xyz()))
-        + DVec2::new(brush_plane.u.w, brush_plane.v.w)) // offset
+    let res = DVec2::new(p.dot(brush_plane.u.xyz()), p.dot(brush_plane.v.xyz()))
         / DVec2::new(tex_width as f64, tex_height as f64) // "modulo"
-        * DVec2::new(brush_plane.u_scale, brush_plane.v_scale) // scale
+        / DVec2::new(brush_plane.u_scale, brush_plane.v_scale) // scale
+        + DVec2::new(brush_plane.u.w, brush_plane.v.w) / DVec2::new(tex_width as f64, tex_height as f64) // offset
         ;
 
     // no need to handle rotation because apparently UV vector helps with that
