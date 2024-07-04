@@ -1,6 +1,4 @@
-use std::{
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use glam::DVec3;
 
@@ -508,6 +506,32 @@ mod test {
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
             .map_file("/home/khang/gchimp/examples/map2prop/arte_spin/arte_spin.map")
+            .work()
+            .unwrap();
+    }
+
+    #[test]
+    fn sphere() {
+        let mut binding = Map2Prop::default();
+        binding
+            .auto_pickup_wad(true)
+            .move_to_origin(false)
+            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
+            .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
+            .map_file("/home/khang/gchimp/examples/map2prop/sphere.map")
+            .work()
+            .unwrap();
+    }
+
+    #[test]
+    fn sphere2() {
+        let mut binding = Map2Prop::default();
+        binding
+            .auto_pickup_wad(true)
+            .move_to_origin(false)
+            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
+            .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
+            .map_file("/home/khang/gchimp/examples/map2prop/sphere2.map")
             .work()
             .unwrap();
     }
