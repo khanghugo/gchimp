@@ -46,9 +46,9 @@ macro_rules! err {
         Err(eyre!($format_string))
     }};
 
-    ($format_string: literal, $($format_arg: tt)*) => {{
+    ($($arg:tt)*) => {{
         use eyre::eyre;
 
-        Err(eyre!($format_string, arg $($path_format_arg)*))
+        Err(eyre!($($arg)*))
     }};
 }
