@@ -8,6 +8,8 @@ use gcd::Gcd;
 
 use super::constants::EPSILON;
 
+use crate::err;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point3D {
     x: f64,
@@ -101,9 +103,9 @@ impl Point3D {
     }
 
     pub fn is_zero(&self) -> bool {
-        (self.x == 0.0 || self.x == -0.0)
-            && (self.y == 0.0 || self.y == -0.0)
-            && (self.z == 0.0 || self.z == -0.0)
+        (self.x <= EPSILON && self.x >= -EPSILON)
+            && (self.y <= EPSILON && self.y >= -EPSILON)
+            && (self.z <= EPSILON && self.z >= -EPSILON)
     }
 
     pub fn as_array(&self) -> [f64; 3] {
@@ -316,7 +318,9 @@ impl Line3D {
             -self.source.z + rhs.source.z,
         ];
 
-        if r3[0] * x + r3[1] * y != r3[2] {
+        let lhs = r3[0] * x + r3[1] * y;
+
+        if lhs >= r3[2] + EPSILON || lhs <= r3[2] - EPSILON {
             return Err(eyre!("Fail to test intersecting point of two lines."));
         }
 
@@ -325,6 +329,13 @@ impl Line3D {
 
     pub fn intersect_with_plane(&self, rhs: Plane3D) -> eyre::Result<Point3D> {
         rhs.intersect_with_line(*self)
+    }
+
+    pub fn from_two_points(from: Point3D, to: Point3D) -> Self {
+        Self {
+            source: from,
+            direction: to - from,
+        }
     }
 }
 
@@ -419,10 +430,27 @@ impl Plane3D {
         Err(eyre!("No intersection between two planes."))
     }
 
-    pub fn intersect_with_two_planes(&self, plane1: Self, plane2: Self) -> eyre::Result<Point3D> {
-        let line = self.intersect_with_plane(plane1)?;
+    pub fn intersect_with_two_planes(&self, plane2: Self, plane3: Self) -> eyre::Result<Point3D> {
+        let line = self.intersect_with_plane(plane2)?;
 
-        line.intersect_with_plane(plane2)
+        line.intersect_with_plane(plane3)
+    }
+
+    pub fn intersect_with_two_planes_fast(
+        &self,
+        plane2: Self,
+        plane3: Self,
+    ) -> eyre::Result<Point3D> {
+        let denom = self.normal().dot(plane2.normal().cross(plane3.normal()));
+
+        if denom <= EPSILON && denom >= -EPSILON {
+            return err!("No intersection between three planes.");
+        }
+
+        Ok((plane2.normal().cross(plane3.normal()) * -self.distance()
+            + plane3.normal().cross(self.normal()) * -plane2.distance()
+            + self.normal().cross(plane2.normal()) * -plane3.distance())
+            / denom)
     }
 
     pub fn intersect_with_line(&self, rhs: Line3D) -> eyre::Result<Point3D> {
@@ -493,11 +521,30 @@ pub struct Polygon3D(Vec<Point3D>);
 impl Polygon3D {
     /// Will check for duplication before adding.
     pub fn add_vertex(&mut self, v: Point3D) -> &mut Self {
-        if !self.0.contains(&v) {
+        if !self.check_if_vertex_is_illegal(&v) {
             self.0.push(v);
         }
 
         self
+    }
+
+    /// Will check for duplication before adding.
+    pub fn insert_vertex(&mut self, idx: usize, v: Point3D) -> &mut Self {
+        if !self.check_if_vertex_is_illegal(&v) {
+            self.0.insert(idx, v);
+        }
+
+        self
+    }
+
+    /// Returns true if vertex is illegal
+    pub fn check_if_vertex_is_illegal(&self, v: &Point3D) -> bool {
+        self.0.iter().any(|vertex| {
+            vertex == v
+                || ((v.x <= vertex.x + EPSILON && v.x >= vertex.x - EPSILON)
+                    && (v.y <= vertex.y + EPSILON && v.y >= vertex.y - EPSILON)
+                    && (v.z <= vertex.z + EPSILON && v.z >= vertex.z - EPSILON))
+        })
     }
 
     pub fn vertices(&self) -> &Vec<Point3D> {
@@ -553,6 +600,12 @@ impl Polygon3D {
             .into())
     }
 
+    pub fn sort_vertices(&mut self) -> eyre::Result<()> {
+        self.0 = self.with_sorted_vertices()?.0;
+
+        Ok(())
+    }
+
     /// Fan triangulation from a list of sorted vertices
     pub fn triangulate(&self, reverse: bool) -> eyre::Result<Vec<Triangle3D>> {
         if self.0.len() < 3 {
@@ -585,6 +638,27 @@ impl Polygon3D {
 
     pub fn to_plane3d(&self) -> Plane3D {
         self.clone().into()
+    }
+
+    /// Returns neighbors of a vertex in the order of `[left, right]`
+    /// assuming that vertices are sorted.
+    ///
+    /// Also returns the index of the current point because that is handy.
+    pub fn get_vertex_neighbors(&self, point: &Point3D) -> Option<(usize, [Point3D; 2])> {
+        // "neighbors", plural
+        if self.0.len() < 3 {
+            return None;
+        }
+
+        let index = self.0.iter().position(|x| x == point)?;
+
+        if index == 0 {
+            return Some((index, [self.0[1], self.0[self.0.len() - 1]]));
+        } else if index == self.0.len() - 1 {
+            return Some((index, [self.0[0], self.0[index - 1]]));
+        }
+
+        Some((index, [self.0[index + 1], self.0[index - 1]]))
     }
 }
 
@@ -649,6 +723,156 @@ impl ConvexPolytope {
         Self(vec![Polygon3D::default(); count])
     }
 
+    pub fn cube(size: f64) -> Self {
+        // too lazy to do something
+        Self(vec![
+            Polygon3D(vec![
+                Point3D {
+                    x: size,
+                    y: size,
+                    z: size,
+                },
+                Point3D {
+                    x: size,
+                    y: size,
+                    z: -size,
+                },
+                Point3D {
+                    x: size,
+                    y: -size,
+                    z: size,
+                },
+                Point3D {
+                    x: size,
+                    y: -size,
+                    z: -size,
+                },
+            ])
+            .with_sorted_vertices()
+            .unwrap(),
+            Polygon3D(vec![
+                Point3D {
+                    x: size,
+                    y: size,
+                    z: size,
+                },
+                Point3D {
+                    x: size,
+                    y: size,
+                    z: -size,
+                },
+                Point3D {
+                    x: -size,
+                    y: size,
+                    z: size,
+                },
+                Point3D {
+                    x: -size,
+                    y: size,
+                    z: -size,
+                },
+            ])
+            .with_sorted_vertices()
+            .unwrap(),
+            Polygon3D(vec![
+                Point3D {
+                    x: size,
+                    y: size,
+                    z: size,
+                },
+                Point3D {
+                    x: size,
+                    y: -size,
+                    z: size,
+                },
+                Point3D {
+                    x: -size,
+                    y: size,
+                    z: size,
+                },
+                Point3D {
+                    x: -size,
+                    y: -size,
+                    z: size,
+                },
+            ])
+            .with_sorted_vertices()
+            .unwrap(),
+            Polygon3D(vec![
+                Point3D {
+                    x: size,
+                    y: size,
+                    z: -size,
+                },
+                Point3D {
+                    x: size,
+                    y: -size,
+                    z: -size,
+                },
+                Point3D {
+                    x: -size,
+                    y: size,
+                    z: -size,
+                },
+                Point3D {
+                    x: -size,
+                    y: -size,
+                    z: -size,
+                },
+            ])
+            .with_sorted_vertices()
+            .unwrap(),
+            Polygon3D(vec![
+                Point3D {
+                    x: size,
+                    y: -size,
+                    z: size,
+                },
+                Point3D {
+                    x: size,
+                    y: -size,
+                    z: -size,
+                },
+                Point3D {
+                    x: -size,
+                    y: -size,
+                    z: size,
+                },
+                Point3D {
+                    x: -size,
+                    y: -size,
+                    z: -size,
+                },
+            ])
+            .with_sorted_vertices()
+            .unwrap(),
+            Polygon3D(vec![
+                Point3D {
+                    x: -size,
+                    y: size,
+                    z: size,
+                },
+                Point3D {
+                    x: -size,
+                    y: size,
+                    z: -size,
+                },
+                Point3D {
+                    x: -size,
+                    y: -size,
+                    z: size,
+                },
+                Point3D {
+                    x: -size,
+                    y: -size,
+                    z: -size,
+                },
+            ])
+            .with_sorted_vertices()
+            .unwrap(),
+        ])
+    }
+
     pub fn add_polygon(&mut self, p: Polygon3D) -> &mut Self {
         self.0.push(p);
         self
@@ -676,6 +900,129 @@ impl ConvexPolytope {
             .iter()
             .fold(Point3D::default(), |acc, e| acc + e.centroid().unwrap())
             / self.0.len() as f64)
+    }
+
+    /// Cuts a convex hull
+    /// "Removed parts" lie on the opposite direction of the plane normal.
+    pub fn cut(&mut self, plane: &Plane3D) {
+        // assumption: vertices are sorted
+        // facts:
+        // a cut might remove some faces
+        // a cut will always produce a new face
+        let mut new_face = Polygon3D::default();
+        let mut to_delete: Vec<usize> = vec![];
+
+        self.0
+            .iter_mut()
+            .enumerate()
+            .for_each(|(polygon_index, polygon)| {
+                let (not_removed, removed_vertices): (Vec<(usize, Point3D)>, _) = polygon
+                    .vertices()
+                    .iter()
+                    .cloned()
+                    .enumerate()
+                    .partition(|(_, vertex)| {
+                        matches!(
+                            plane.side_of_point(*vertex),
+                            SideOfPoint::In | SideOfPoint::On
+                        )
+                    });
+                // lemma: since we are doing convex polygon, only the firstmost and fartmost vertices are connected
+                // to the other cut
+                // therefore, we only need to check for newly created vertices/edges from two cuts involving those two vertices
+                // so, we will have two cases to handle, one vertex is cut and more than one vertex is cut
+
+                // no affected vertices
+                if removed_vertices.is_empty() {
+                    return;
+                }
+
+                // the entire polygon is removed
+                if removed_vertices.len() == polygon.0.len() {
+                    to_delete.push(polygon_index);
+                    return;
+                }
+
+                let not_removed: Polygon3D = not_removed
+                    .into_iter()
+                    .map(|(_, v)| v)
+                    .collect::<Vec<Point3D>>()
+                    .into();
+
+                let left_vertex = removed_vertices.iter().find(|(_, vertex)| {
+                    not_removed
+                        .vertices()
+                        .contains(&polygon.get_vertex_neighbors(vertex).unwrap().1[0])
+                });
+
+                let left_vertex = left_vertex.unwrap().1;
+
+                // cutting 1 vertex
+                if removed_vertices.len() == 1 {
+                    // this means we only cut 1 vertex
+                    let (idx, neighbors) = polygon.get_vertex_neighbors(&left_vertex).unwrap();
+                    let line_left = Line3D::from_two_points(neighbors[0], left_vertex);
+                    let line_right = Line3D::from_two_points(neighbors[1], left_vertex);
+
+                    let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
+                    let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
+
+                    polygon.0.remove(idx);
+
+                    polygon.insert_vertex(idx, new_left_vertex);
+                    polygon.insert_vertex(idx, new_right_vertex);
+
+                    // polygon.add_vertex(new_left_vertex);
+                    // polygon.add_vertex(new_right_vertex);
+                    // polygon.sort_vertices().unwrap();
+
+                    new_face.add_vertex(new_left_vertex);
+                    new_face.add_vertex(new_right_vertex);
+                } else {
+                    let (_, left_neighbors) = polygon.get_vertex_neighbors(&left_vertex).unwrap();
+                    let line_left = Line3D::from_two_points(left_neighbors[0], left_vertex);
+                    let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
+
+                    let right_vertex = removed_vertices
+                        .iter()
+                        .find(|(_, vertex)| {
+                            not_removed
+                                .vertices()
+                                .contains(&polygon.get_vertex_neighbors(vertex).unwrap().1[1])
+                        })
+                        .unwrap()
+                        .1;
+
+                    let (_, right_neighbors) = polygon.get_vertex_neighbors(&right_vertex).unwrap();
+                    let line_right = Line3D::from_two_points(right_neighbors[1], right_vertex);
+                    let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
+
+                    removed_vertices.iter().rev().for_each(|(idx, _)| {
+                        polygon.0.remove(*idx);
+                    });
+
+                    let left_neighbor_left_idx = removed_vertices[0].0;
+
+                    polygon.insert_vertex(left_neighbor_left_idx, new_left_vertex);
+                    polygon.insert_vertex(left_neighbor_left_idx, new_right_vertex);
+
+                    // polygon.add_vertex(new_left_vertex);
+                    // polygon.add_vertex(new_right_vertex);
+                    // polygon.sort_vertices().unwrap();
+
+                    new_face.add_vertex(new_left_vertex);
+                    new_face.add_vertex(new_right_vertex);
+                }
+            });
+
+        to_delete.into_iter().rev().for_each(|what| {
+            self.0.remove(what);
+        });
+
+        if !new_face.0.is_empty() {
+            // println!("new face is {:?}", new_face.with_sorted_vertices().unwrap());
+            self.0.push(new_face.with_sorted_vertices().unwrap());
+        }
     }
 }
 

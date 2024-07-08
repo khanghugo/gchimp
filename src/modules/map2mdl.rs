@@ -13,7 +13,7 @@ use crate::{
     err,
     utils::{
         constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE, ORIGIN_TEXTURE},
-        map_stuffs::{map_to_triangulated_smd_3_points, textures_used_in_map},
+        map_stuffs::{map_to_triangulated_smd, textures_used_in_map},
         run_bin::run_studiomdl,
         smd_stuffs::{
             add_bitmap_extension_to_texture, find_centroid, find_centroid_from_triangles,
@@ -278,7 +278,7 @@ impl Map2Prop {
         let smd_triangles_res = if !self.options.marked_entity.is_empty() {
             todo!()
         } else if let Some(map) = &map_file {
-            map_to_triangulated_smd_3_points(map, &simple_wads)
+            map_to_triangulated_smd(map, &simple_wads, false)
         } else {
             unreachable!()
         };

@@ -15,16 +15,19 @@ use eyre::eyre;
 
 use rayon::prelude::*;
 
+static SUBTRACTIVE_CUBE_SIZE: f64 = 128000.;
+
 /// Remember to check if texture exists.
-pub fn map_to_triangulated_smd_3_points(
+pub fn map_to_triangulated_smd(
     map: &Map,
     wads: &SimpleWad,
+    three_planes: bool,
 ) -> eyre::Result<Vec<Triangle>> {
     let res = map
         .entities
         .par_iter()
         .filter(|entity| entity.brushes.is_some()) // for entities with brush only
-        .map(|entity| entity_to_triangulated_smd_3_points(entity, wads))
+        .map(|entity| entity_to_triangulated_smd_3_points(entity, wads, three_planes))
         .collect::<Vec<eyre::Result<Vec<Triangle>>>>();
 
     let err = res
@@ -47,6 +50,7 @@ pub fn map_to_triangulated_smd_3_points(
 pub fn entity_to_triangulated_smd_3_points(
     entity: &Entity,
     wads: &SimpleWad,
+    three_planes: bool,
 ) -> eyre::Result<Vec<Triangle>> {
     if entity.brushes.is_none() {
         return Err(eyre!("This entity does not contain any brushes."));
@@ -57,7 +61,7 @@ pub fn entity_to_triangulated_smd_3_points(
         .as_ref()
         .unwrap()
         .par_iter()
-        .map(|brush| brush_to_triangulated_smd_3_points(brush, wads))
+        .map(|brush| brush_to_triangulated_smd(brush, wads, three_planes))
         .collect::<Vec<eyre::Result<Vec<Triangle>>>>();
 
     let err = res
@@ -76,11 +80,10 @@ pub fn entity_to_triangulated_smd_3_points(
         .collect())
 }
 
-// https://3707026871-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2F-LtVT8pJjInrrHVCovzy%2Fuploads%2FEukkFYJLwfafFXUMpsI2%2FMAPFiles_2001_StefanHajnoczi.pdf?alt=media&token=51471685-bf69-42ae-a015-a474c0b95165
-// https://github.com/pwitvoet/mess/blob/master/MESS/Mapping/Brush.cs#L38
-fn brush_to_triangulated_smd_3_points(
+fn brush_to_triangulated_smd(
     brush: &Brush,
     wads: &SimpleWad,
+    three_planes: bool,
 ) -> eyre::Result<Vec<Triangle>> {
     let solid: Solid3D = brush
         .planes
@@ -95,29 +98,46 @@ fn brush_to_triangulated_smd_3_points(
         .collect::<Vec<Plane3D>>()
         .into();
 
-    let plane_count = solid.face_count();
+    // TODO maybe phase out three_planes
+    let polytope = if three_planes {
+        // https://3707026871-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2F-LtVT8pJjInrrHVCovzy%2Fuploads%2FEukkFYJLwfafFXUMpsI2%2FMAPFiles_2001_StefanHajnoczi.pdf?alt=media&token=51471685-bf69-42ae-a015-a474c0b95165
+        // https://github.com/pwitvoet/mess/blob/master/MESS/Mapping/Brush.cs#L38
+        let plane_count = solid.face_count();
 
-    let mut polytope = ConvexPolytope::with_face_count(plane_count);
-    for i in 0..plane_count {
-        for j in (i + 1)..plane_count {
-            for k in (j + 1)..plane_count {
-                let new_vertex =
-                    solid.faces()[i].intersect_with_two_planes(solid.faces()[j], solid.faces()[k]);
+        let mut polytope = ConvexPolytope::with_face_count(plane_count);
 
-                if new_vertex.is_err() || new_vertex.as_ref().unwrap().is_too_big() {
-                    continue;
-                }
+        for i in 0..plane_count {
+            for j in (i + 1)..plane_count {
+                for k in (j + 1)..plane_count {
+                    let new_vertex = solid.faces()[i]
+                        .intersect_with_two_planes_fast(solid.faces()[j], solid.faces()[k]);
 
-                let new_vertex = new_vertex.unwrap();
+                    if new_vertex.is_err() || new_vertex.as_ref().unwrap().is_too_big() {
+                        continue;
+                    }
 
-                if solid.contains_point(new_vertex) {
-                    polytope.polygons_mut()[i].add_vertex(new_vertex);
-                    polytope.polygons_mut()[j].add_vertex(new_vertex);
-                    polytope.polygons_mut()[k].add_vertex(new_vertex);
+                    let new_vertex = new_vertex.unwrap();
+
+                    if solid.contains_point(new_vertex) {
+                        polytope.polygons_mut()[i].add_vertex(new_vertex);
+                        polytope.polygons_mut()[j].add_vertex(new_vertex);
+                        polytope.polygons_mut()[k].add_vertex(new_vertex);
+                    }
                 }
             }
         }
-    }
+
+        polytope
+    } else {
+        // i am very proud that i came up with this shit myself
+        let mut polytope = ConvexPolytope::cube(SUBTRACTIVE_CUBE_SIZE);
+
+        solid.faces().iter().for_each(|plane| {
+            polytope.cut(plane);
+        });
+
+        polytope
+    };
 
     // it is convex so no worry that the center is outside the brush
     let polytope_centroid = polytope.centroid()?;
@@ -229,11 +249,6 @@ fn brush_to_triangulated_smd_3_points(
     Ok(smd_triangles)
 }
 
-// subtractive geometry method for crazy speed up
-pub fn brush_to_triangulated_smd_subtractive(brush: Brush) -> eyre::Result<Vec<Triangle>> {
-    todo!()
-}
-
 fn convert_uv_origin(
     p: DVec3,
     brush_plane: &BrushPlane,
@@ -297,6 +312,8 @@ mod test {
         let mut res = SimpleWad::default();
 
         res.insert("devcrate64".to_owned(), 0, (64, 64));
+        res.insert("devcross".to_owned(), 0, (128, 128));
+        res.insert("devwallgray".to_owned(), 0, (128, 128));
 
         res
     }
@@ -304,7 +321,7 @@ mod test {
     #[test]
     fn normal_cube() {
         let cube = default_cube();
-        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -329,7 +346,7 @@ mod test {
 ( 16 45.25483399593904 67.88225099390857 ) ( 16 44.547727214752484 68.58935777509511 ) ( 16 45.961940777125584 68.58935777509511 ) devcrate64 [ 0 0.7071067811865475 0.7071067811865477 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 315 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -354,7 +371,7 @@ mod test {
 ( -45.254833995939045 67.88225099390856 16 ) ( -45.254833995939045 67.88225099390856 17 ) ( -45.96194077712559 68.58935777509511 16 ) devcrate64 [ -0.7071067811865476 0.7071067811865475 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -379,7 +396,7 @@ mod test {
 ( 56.5685424949238 80 -33.941125496954285 ) ( 56.5685424949238 81 -33.941125496954285 ) ( 57.27564927611034 80 -34.64823227814083 ) devcrate64 [ 0.7071067811865475 0 -0.7071067811865477 80 ] [ 0 -1 0 16 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -403,7 +420,7 @@ mod test {
 ( 0 0 16 ) ( 16 16 -16 ) ( 16 -16 -16 ) devcrate64 [ 2.220446049250313e-16 0 1 112 ] [ 0 -1 0 16 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
 
         assert_eq!(triangles.len(), 4 + 2);
 
@@ -431,7 +448,7 @@ mod test {
 ( 16 -16 16 ) ( 16 16 16 ) ( 16 16 -16 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
 
         assert_eq!(triangles.len(), 14);
 
@@ -454,7 +471,7 @@ mod test {
 ( 16 -16 16 ) ( 16 16 -16 ) ( 16 -16 -16 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
 
         assert_eq!(triangles.len(), 4);
 
@@ -479,7 +496,7 @@ mod test {
 ( 128 128 32 ) ( 128 128 33 ) ( 128 129 32 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
 
         let mut new_smd = Smd::new_basic();
         triangles.into_iter().for_each(|tri| {
@@ -503,7 +520,7 @@ mod test {
 ( 31.42562584220407 -6.766459915428641 46.72387209269332 ) ( 31.92562584220407 -6.154087479732851 47.33624452838911 ) ( 31.42562584220407 -6.059353134242087 46.016765311506774 ) devcrate64 [ 0 0.7071067811865474 -0.7071067811865477 37.82338 ] [ -0.5000000000000001 -0.6123724356957947 -0.6123724356957945 -39.818367 ] 39.467796 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd_3_points(&cube, &devtex()).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
 
         let mut new_smd = Smd::new_basic();
         triangles.into_iter().for_each(|tri| {
@@ -512,6 +529,76 @@ mod test {
 
         new_smd
             .write("/home/khang/gchimp/examples/map2prop/rotated_block.smd")
+            .unwrap();
+    }
+
+    #[test]
+    fn normal_cube_new() {
+        let cube = default_cube();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+
+        assert_eq!(triangles.len(), 12);
+
+        let mut new_smd = Smd::new_basic();
+        triangles.into_iter().for_each(|tri| {
+            new_smd.add_triangle(tri);
+        });
+
+        new_smd
+            .write("/home/khang/gchimp/examples/map2prop/cube.smd")
+            .unwrap();
+    }
+
+    #[test]
+    fn block_rotated_texture_new() {
+        let slanted_block = "\
+( 0 0 0 ) ( 0 1 0 ) ( 0 0 1 ) devcrate64 [ 0 -1 0 0 ] [ -0 -0 -1 0 ] 0 1 1
+( 0 0 0 ) ( 0 0 1 ) ( 1 0 0 ) devcrate64 [ 1 0 -0 0 ] [ 0 -0 -1 0 ] 0 1 1
+( 0 0 0 ) ( 1 0 0 ) ( 0 1 0 ) devcrate64 [ -1 0 0 0 ] [ -0 -1 -0 0 ] 0 1 1
+( 128 128 64 ) ( 128 129 64 ) ( 129 128 64 ) devcrate64 [ 0.9659258244035115 -0.25881905213951417 0 0 ] [ -0.25881905213951417 -0.9659258244035115 0 0 ] 15 1 1
+( 128 128 32 ) ( 129 128 32 ) ( 128 128 33 ) devcrate64 [ -1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( 128 128 32 ) ( 128 128 33 ) ( 128 129 32 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
+";
+        let cube = Brush::try_from(slanted_block).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+
+        let mut new_smd = Smd::new_basic();
+        triangles.into_iter().for_each(|tri| {
+            new_smd.add_triangle(tri);
+        });
+
+        new_smd
+            .write("/home/khang/gchimp/examples/map2prop/cube.smd")
+            .unwrap();
+    }
+
+    #[test]
+    fn sphere1() {
+        let map = Map::from_file("/home/khang/gchimp/examples/map2prop/sphere.map").unwrap();
+        let triangles = map_to_triangulated_smd(&map, &devtex(), false).unwrap();
+
+        let mut new_smd = Smd::new_basic();
+        triangles.into_iter().for_each(|tri| {
+            new_smd.add_triangle(tri);
+        });
+
+        new_smd
+            .write("/home/khang/gchimp/examples/map2prop/sphere1.smd")
+            .unwrap();
+    }
+
+    #[test]
+    fn sphere2() {
+        let map = Map::from_file("/home/khang/gchimp/examples/map2prop/sphere2.map").unwrap();
+        let triangles = map_to_triangulated_smd(&map, &devtex(), false).unwrap();
+
+        let mut new_smd = Smd::new_basic();
+        triangles.into_iter().for_each(|tri| {
+            new_smd.add_triangle(tri);
+        });
+
+        new_smd
+            .write("/home/khang/gchimp/examples/map2prop/sphere2.smd")
             .unwrap();
     }
 }
