@@ -1,12 +1,13 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, path::PathBuf};
 
 use glam::{DVec2, DVec3, Vec4Swizzles};
 use map::{Brush, BrushPlane, Entity, Map};
 use smd::{Triangle, Vertex};
 
-use crate::utils::simple_calculs::Solid3D;
+use crate::{err, utils::simple_calculs::Solid3D};
 
 use super::{
+    constants::GCHIMP_INFO_ENTITY,
     simple_calculs::{ConvexPolytope, Plane3D, Triangle3D},
     wad_stuffs::SimpleWad,
 };
@@ -27,7 +28,7 @@ pub fn map_to_triangulated_smd(
         .entities
         .par_iter()
         .filter(|entity| entity.brushes.is_some()) // for entities with brush only
-        .map(|entity| entity_to_triangulated_smd_3_points(entity, wads, three_planes))
+        .map(|entity| entity_to_triangulated_smd(entity, wads, three_planes))
         .collect::<Vec<eyre::Result<Vec<Triangle>>>>();
 
     let err = res
@@ -47,7 +48,7 @@ pub fn map_to_triangulated_smd(
 }
 
 /// Remember to check if texture exists.
-pub fn entity_to_triangulated_smd_3_points(
+pub fn entity_to_triangulated_smd(
     entity: &Entity,
     wads: &SimpleWad,
     three_planes: bool,
@@ -285,6 +286,49 @@ pub fn textures_used_in_map(map: &Map) -> HashSet<String> {
 
             acc
         })
+}
+
+/// Returns the index of [`GCHIMP_INFO_ENTITY`]
+pub fn check_gchimp_info_entity(map: &Map) -> eyre::Result<usize> {
+    let entity_index = map.entities.iter().position(|entity| {
+        entity
+            .attributes
+            .get("classname")
+            .is_some_and(|classname| classname == GCHIMP_INFO_ENTITY)
+    });
+
+    if entity_index.is_none() {
+        return err!("Cannot find {}", GCHIMP_INFO_ENTITY);
+    }
+
+    let entity_index = entity_index.unwrap();
+    let entity = &map.entities[entity_index];
+
+    // check entity field
+    if let Some(hl_path) = entity.attributes.get("hl_path") {
+        let game_path = PathBuf::from(hl_path);
+
+        if !game_path.exists() {
+            return err!("Path to Half-Life does not exist: {}", hl_path);
+        }
+
+        if let Some(gamedir) = entity.attributes.get("gamedir") {
+            let mod_path = game_path.join(gamedir);
+
+            if !mod_path.exists() {
+                return err!(
+                    "Path to game mod does not exist: {}",
+                    mod_path.to_str().unwrap()
+                );
+            }
+        } else {
+            return err!("No game mod provided");
+        }
+    } else {
+        return err!("No path to Half-Life provided");
+    }
+
+    Ok(entity_index)
 }
 
 #[cfg(test)]

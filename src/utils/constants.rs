@@ -11,6 +11,7 @@ pub static PALETTE_PAD_COLOR: [u8; 3] = [0, 0, 0];
 pub static PALETTE_TRANSPARENT_COLOR: [u8; 3] = [0, 255, 0];
 
 pub static ORIGIN_TEXTURE: &str = "ORIGIN";
+pub static CLIP_TEXTURE: &str = "CLIP";
 pub static NO_RENDER_TEXTURE: &[&str] = &[
     "NULL",
     "HINT",
@@ -18,7 +19,10 @@ pub static NO_RENDER_TEXTURE: &[&str] = &[
     "SKIP",
     "sky",
     ORIGIN_TEXTURE,
-    "CLIP",
+    CLIP_TEXTURE,
 ];
 
 pub static EPSILON: f64 = 0.000001;
+
+pub static GCHIMP_INFO_ENTITY: &str = "gchimp_info";
+pub static GCHIMP_MAP_EXTENSION: &str = "gchimp.map";
