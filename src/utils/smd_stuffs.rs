@@ -115,7 +115,7 @@ pub fn add_bitmap_extension_to_texture(smd: &mut Smd) {
         .for_each(|triangle| triangle.material += ".bmp");
 }
 
-pub fn with_selected_textures(smd: &Smd, textures: &[String]) -> eyre::Result<Smd> {
+pub fn with_selected_textures(smd: &Smd, textures: &[&String]) -> eyre::Result<Smd> {
     if smd.triangles.is_empty() {
         return err!("Smd has no triangles.");
     }
@@ -124,7 +124,7 @@ pub fn with_selected_textures(smd: &Smd, textures: &[String]) -> eyre::Result<Sm
 
     smd.triangles
         .iter()
-        .filter(|triangle| textures.contains(&triangle.material))
+        .filter(|triangle| textures.contains(&&triangle.material))
         .for_each(|triangle| {
             new_smd.add_triangle(triangle.clone());
         });
