@@ -61,7 +61,7 @@ impl TryFrom<&str> for Brush {
 }
 
 // #[derive(Debug, Clone, PartialEq)]
-type Attributes = HashMap<String, String>;
+pub type Attributes = HashMap<String, String>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Entity {
