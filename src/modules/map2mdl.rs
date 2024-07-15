@@ -32,7 +32,7 @@ use crate::{
 pub static GCHIMP_MAP2MDL_ENTITY_NAME: &str = "gchimp_map2mdl";
 
 #[derive(Debug)]
-pub struct Map2PropOptions {
+pub struct Map2MdlOptions {
     /// If input entity has "wad" key then we get texture from there.
     auto_pickup_wad: bool,
     /// Exports necessary texture for model compilation.
@@ -46,13 +46,13 @@ pub struct Map2PropOptions {
     studiomdl: Option<PathBuf>,
     #[cfg(target_os = "linux")]
     wineprefix: Option<String>,
-    /// Only converts [`GCHIMP_MAP2PROP_ENTITY_NAME`] entity
+    /// Only converts [`GCHIMP_MAP2MDL_ENTITY_NAME`] entity
     ///
     /// Not only this will creates a new model but potentially a new .map file
     marked_entity: bool,
 }
 
-impl Default for Map2PropOptions {
+impl Default for Map2MdlOptions {
     fn default() -> Self {
         Self {
             auto_pickup_wad: true,
@@ -68,13 +68,13 @@ impl Default for Map2PropOptions {
 }
 
 #[derive(Default, Debug)]
-pub struct Map2Prop {
-    options: Map2PropOptions,
+pub struct Map2Mdl {
+    options: Map2MdlOptions,
     map: Option<PathBuf>,
     wads: Vec<PathBuf>,
 }
 
-impl Map2Prop {
+impl Map2Mdl {
     pub fn auto_pickup_wad(&mut self, v: bool) -> &mut Self {
         self.options.auto_pickup_wad = v;
         self
@@ -673,7 +673,7 @@ mod test {
 
     #[test]
     fn run() {
-        let mut binding = Map2Prop::default();
+        let mut binding = Map2Mdl::default();
         binding
             .auto_pickup_wad(true)
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
@@ -685,7 +685,7 @@ mod test {
 
     #[test]
     fn run2() {
-        let mut binding = Map2Prop::default();
+        let mut binding = Map2Mdl::default();
         binding
             .auto_pickup_wad(true)
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
@@ -697,7 +697,7 @@ mod test {
 
     #[test]
     fn arte_twist() {
-        let mut binding = Map2Prop::default();
+        let mut binding = Map2Mdl::default();
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
@@ -710,7 +710,7 @@ mod test {
 
     #[test]
     fn sphere() {
-        let mut binding = Map2Prop::default();
+        let mut binding = Map2Mdl::default();
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
@@ -723,7 +723,7 @@ mod test {
 
     #[test]
     fn sphere2() {
-        let mut binding = Map2Prop::default();
+        let mut binding = Map2Mdl::default();
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
@@ -736,7 +736,7 @@ mod test {
 
     #[test]
     fn marked_1() {
-        let mut binding = Map2Prop::default();
+        let mut binding = Map2Mdl::default();
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
