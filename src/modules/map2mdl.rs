@@ -757,7 +757,7 @@ impl Map2Mdl {
                     });
 
                 // lastly^2 write the map file
-                map.write(self.map.as_ref().unwrap().with_file_name("fuck.map"))?;
+                map.write(self.map.as_ref().unwrap())?;
             } else {
                 // just convert the whole map, very simple
                 let smd_triangles = map_to_triangulated_smd(map, &simple_wads, false)?;
