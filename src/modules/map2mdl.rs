@@ -14,16 +14,17 @@ use crate::{
     err,
     utils::{
         constants::{
-            CLIP_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE, ORIGIN_TEXTURE,
+            CLIP_TEXTURE, GCHIMP_INFO_ENTITY, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE,
+            ORIGIN_TEXTURE,
         },
         map_stuffs::{
-            check_gchimp_info_entity, entity_to_triangulated_smd, map_to_triangulated_smd,
-            textures_used_in_map,
+            brush_from_mins_maxs, check_gchimp_info_entity, entity_to_triangulated_smd,
+            map_to_triangulated_smd, textures_used_in_map,
         },
         run_bin::run_studiomdl,
         smd_stuffs::{
             add_bitmap_extension_to_texture, find_centroid, find_centroid_from_triangles,
-            maybe_split_smd, move_by, with_selected_textures,
+            find_mins_maxs, maybe_split_smd, move_by, with_selected_textures,
         },
         wad_stuffs::{export_texture, SimpleWad},
     },
@@ -395,6 +396,23 @@ impl Map2Mdl {
             if self.options.marked_entity {
                 // check if the the info entity is there
                 let gchimp_info_entity = &map.entities[check_gchimp_info_entity(map)?];
+
+                if gchimp_info_entity
+                    .attributes
+                    .get("options")
+                    .unwrap()
+                    .parse::<usize>()
+                    .unwrap()
+                    & 1
+                    == 0
+                {
+                    println!(
+                        "map2mdl is not enabled as specified in {}",
+                        GCHIMP_INFO_ENTITY
+                    );
+                    return Ok(());
+                }
+
                 let output_base_path =
                     PathBuf::from(gchimp_info_entity.attributes.get("hl_path").unwrap())
                         .join(gchimp_info_entity.attributes.get("gamedir").unwrap());
@@ -555,7 +573,7 @@ impl Map2Mdl {
                             .replace(".mdl", "0.mdl");
                         let model_angles = "0 0 0".to_string();
 
-                        let mut models_to_insert: Vec<Entity> = vec![];
+                        let mut entities_to_insert: Vec<Entity> = vec![];
 
                         // if we have more than 1 models from the conversion, we will add more just like this
                         (1..(model_count)).for_each(|model_index| {
@@ -572,32 +590,13 @@ impl Map2Mdl {
                                 brushes: None,
                             };
 
-                            models_to_insert.push(new_entity);
+                            entities_to_insert.push(new_entity);
                         });
 
-                        // both of these have the same repeated steps
-                        if clip_type == 0 || clip_type == 2 {
-                            // easy way, just remove the brush then change entity
-                            entity.brushes = None;
-                            entity
-                                .attributes
-                                .insert("classname".to_owned(), model_classname);
-                            entity.attributes.insert("origin".to_owned(), model_origin);
-                            entity.attributes.insert("angles".to_owned(), model_angles);
-                            entity
-                                .attributes
-                                .insert("model".to_owned(), model_modelname0);
+                        if clip_type == 1 {
+                            let mut clip_brush_entity = entity.clone();
 
-                            // now specific to clip_type = 2
-                            // we need to insert a brush later
-                            if clip_type == 2 {
-                                todo!()
-                            }
-                        } else if clip_type == 1 {
-                            // change the texture name to CLIP
-                            // convert entity to func_detail
-                            // then insert the model entity right after the brush
-                            if let Some(brushes) = &mut entity.brushes {
+                            if let Some(brushes) = &mut clip_brush_entity.brushes {
                                 brushes.iter_mut().for_each(|brush| {
                                     brush.planes.iter_mut().for_each(|plane| {
                                         plane.texture_name = CLIP_TEXTURE.to_string();
@@ -605,29 +604,53 @@ impl Map2Mdl {
                                 })
                             }
 
-                            entity
+                            clip_brush_entity
+                            .attributes.clear();
+
+                            clip_brush_entity
                                 .attributes
                                 .insert("classname".to_string(), "func_detail".to_string());
 
-                            let new_entity = Entity {
-                                attributes: Attributes::from([
-                                    ("classname".to_string(), model_classname.to_string()),
-                                    ("origin".to_owned(), model_origin),
-                                    ("angles".to_owned(), model_angles),
-                                    ("model".to_owned(), model_modelname0),
-                                ]),
-                                brushes: None,
+                            // remove origin because brush entity
+                            // otherwise the editor would confuse
+                            // maybe need to remove more in the future if there's problems
+                            clip_brush_entity.attributes.remove("origin");
+
+                            entities_to_insert.push(clip_brush_entity);
+                        }
+
+                        // for all cliptype, the original brush would turn into the model entity
+                        // doing this will make the model entity inherit original passed in values
+                        entity.brushes = None;
+                        entity
+                            .attributes
+                            .insert("classname".to_owned(), model_classname);
+                        entity.attributes.insert("origin".to_owned(), model_origin);
+                        entity.attributes.insert("angles".to_owned(), model_angles);
+                        entity
+                            .attributes
+                            .insert("model".to_owned(), model_modelname0);
+
+                        // now specific to clip_type = 2
+                        // we need to insert a brush later
+                        if clip_type == 2 {
+                            let [mins, maxs] = find_mins_maxs(smd_triangles);
+                            let new_brush = brush_from_mins_maxs(&mins, &maxs, "CLIP");
+                            let new_brush_entity = Entity {
+                                attributes: Attributes::from([(
+                                    "classname".to_string(),
+                                    "func_detail".to_owned(),
+                                )]),
+                                brushes: vec![new_brush].into(),
                             };
 
-                            models_to_insert.push(new_entity);
-                        } else {
-                            unreachable!()
-                        };
+                            entities_to_insert.push(new_brush_entity);
+                        }
 
-                        if models_to_insert.is_empty() {
+                        if entities_to_insert.is_empty() {
                             None
                         } else {
-                            Some((*entity_index, models_to_insert))
+                            Some((*entity_index, entities_to_insert))
                         }
                     })
                     .collect::<Vec<(usize, Vec<Entity>)>>();
@@ -644,7 +667,7 @@ impl Map2Mdl {
                     });
 
                 // lastly^2 write the map file
-                map.write(self.map.as_ref().unwrap())?;
+                map.write(self.map.as_ref().unwrap().with_file_name("fuck.map"))?;
             } else {
                 // just convert the whole map, very simple
                 let smd_triangles = map_to_triangulated_smd(map, &simple_wads, false)?;
