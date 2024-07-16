@@ -2,4 +2,4 @@ studiomdl = "./dist/studiomdl.exe"
 crowbar = "./dist/CrowbarCommandLineDecomp.exe"
 no_vtf = "./dist/no_vtf/no_vtf"
 
-wineprefix = "/home/khang/.local/share/wineprefixes/wine32/"
+# wineprefix = "/home/khang/.local/share/wineprefixes/wine32/"
