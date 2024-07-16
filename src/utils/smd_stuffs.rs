@@ -131,3 +131,39 @@ pub fn with_selected_textures(smd: &Smd, textures: &[&String]) -> eyre::Result<S
 
     Ok(new_smd)
 }
+
+pub fn find_mins_maxs(triangles: &[Triangle]) -> [[f64; 3]; 2] {
+    let minx = triangles.iter().fold(f64::MAX, |acc, e| {
+        acc.min(e.vertices[0].pos.x)
+            .min(e.vertices[1].pos.x)
+            .min(e.vertices[2].pos.x)
+    });
+    let miny = triangles.iter().fold(f64::MAX, |acc, e| {
+        acc.min(e.vertices[0].pos.y)
+            .min(e.vertices[1].pos.y)
+            .min(e.vertices[2].pos.y)
+    });
+    let minz = triangles.iter().fold(f64::MAX, |acc, e| {
+        acc.min(e.vertices[0].pos.z)
+            .min(e.vertices[1].pos.z)
+            .min(e.vertices[2].pos.z)
+    });
+
+    let maxx = triangles.iter().fold(f64::MIN, |acc, e| {
+        acc.max(e.vertices[0].pos.x)
+            .max(e.vertices[1].pos.x)
+            .max(e.vertices[2].pos.x)
+    });
+    let maxy = triangles.iter().fold(f64::MIN, |acc, e| {
+        acc.max(e.vertices[0].pos.y)
+            .max(e.vertices[1].pos.y)
+            .max(e.vertices[2].pos.y)
+    });
+    let maxz = triangles.iter().fold(f64::MIN, |acc, e| {
+        acc.max(e.vertices[0].pos.z)
+            .max(e.vertices[1].pos.z)
+            .max(e.vertices[2].pos.z)
+    });
+
+    [[minx, miny, minz], [maxx, maxy, maxz]]
+}
