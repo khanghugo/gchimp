@@ -29,7 +29,7 @@ pub struct TexTileOptions {
     pub transparent_threshold: f32,
     /// Prepends "{" if transparent
     ///
-    /// Appends "_<scalar>" if tiling
+    /// Appends "`_<scalar>`" if tiling
     pub change_name: bool,
 }
 
@@ -171,7 +171,7 @@ impl TexTileBuilder {
 
     /// Prepends "{" if transparent
     ///
-    /// Appends "_<scalar>" if tiling
+    /// Appends "`_<scalar>`" if tiling
     pub fn change_name(&mut self, a: bool) -> &mut Self {
         self.options.change_name = a;
         self
