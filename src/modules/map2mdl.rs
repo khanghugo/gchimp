@@ -157,7 +157,7 @@ impl Map2Mdl {
             .collect::<Vec<Triangle>>();
 
         smd_triangles
-            .into_iter()
+            .iter()
             .filter(|tri| {
                 if self.options.ignore_nodraw {
                     !NO_RENDER_TEXTURE.contains(&tri.material.as_str())
@@ -314,12 +314,10 @@ impl Map2Mdl {
         }
 
         // very convoluted error propagating
-        let map_file = self.map.as_ref().map(|path| Map::from_file(path));
+        let map_file = self.map.as_ref().map(Map::from_file);
 
-        if let Some(map_file) = &map_file {
-            if let Err(err) = map_file {
-                return err!("Cannot parse map file: {}", err);
-            }
+        if let Some(Err(err)) = &map_file {
+            return err!("Cannot parse map file: {}", err);
         }
 
         let mut map_file = if let Some(map_file) = map_file {
@@ -334,10 +332,8 @@ impl Map2Mdl {
             .as_ref()
             .map(|entity| Map::from_text(entity).map(|res| res.entities[0].clone()));
 
-        if let Some(entity_entity) = &entity_entity {
-            if let Err(err) = entity_entity {
-                return err!("Cannot parse entity: {}", err);
-            }
+        if let Some(Err(err)) = &entity_entity {
+            return err!("Cannot parse entity: {}", err);
         }
 
         let entity_entity = if let Some(entity_entity) = entity_entity {
