@@ -101,7 +101,7 @@ impl Map {
         }
     }
 
-    pub fn from(text: &str) -> eyre::Result<Self> {
+    pub fn from_text(text: &str) -> eyre::Result<Self> {
         match parse_map(text) {
             Ok((_, res)) => Ok(res),
             Err(err) => Err(eyre!("Cannot parse text: {}", err.to_string())),
@@ -111,7 +111,7 @@ impl Map {
     pub fn from_file(path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<Self> {
         let text = std::fs::read_to_string(path)?;
 
-        Self::from(&text)
+        Self::from_text(&text)
     }
 
     pub fn write(&self, path: impl AsRef<Path> + Into<PathBuf>) -> io::Result<()> {
