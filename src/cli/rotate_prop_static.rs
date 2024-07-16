@@ -9,12 +9,12 @@ impl Cli for RotatePropStatic {
     }
 
     // In, Out, New name
-    fn cli(&self) {
+    fn cli(&self) -> CliRes {
         let args: Vec<String> = std::env::args().skip(2).collect();
 
         if args.len() < 2 {
             self.cli_help();
-            return;
+            return CliRes::Err;
         }
 
         let mut map = Map::from_file(&args[0]).unwrap();
@@ -22,6 +22,8 @@ impl Cli for RotatePropStatic {
         rotate_prop_static(&mut map, if args.len() > 2 { Some(&args[2]) } else { None });
 
         map.write(&args[1]).unwrap();
+
+        CliRes::Ok
     }
 
     fn cli_help(&self) {

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::modules::custom_script::custom_script;
 
-use super::Cli;
+use super::{Cli, CliRes};
 
 pub struct CustomScript;
 impl Cli for CustomScript {
@@ -10,13 +10,13 @@ impl Cli for CustomScript {
         "custom_script"
     }
 
-    fn cli(&self) {
+    fn cli(&self) -> CliRes {
         let args: Vec<String> = std::env::args().skip(2).collect();
 
         if args.is_empty() {
             println!("No .rhai file included.");
             self.cli_help();
-            return;
+            return CliRes::Err;
         }
 
         if args[0] == "--help" {
@@ -42,12 +42,14 @@ new_smd(file_name) -> x.write(file_name)
 "
             );
 
-            return;
+            return CliRes::Err;
         }
 
         let path = Path::new(&args[0]);
 
         custom_script(path);
+
+        CliRes::Ok
     }
 
     fn cli_help(&self) {

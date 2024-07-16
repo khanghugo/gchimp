@@ -9,22 +9,28 @@ mod rotate_prop_static;
 mod s2g;
 mod texture_scale;
 
+pub enum CliRes {
+    NoCli,
+    Ok,
+    Err,
+}
+
 pub trait Cli {
     fn name(&self) -> &'static str;
     /// Each module has to handle the arguments by itself.
-    fn cli(&self);
+    fn cli(&self) -> CliRes;
     fn cli_help(&self);
 }
 
 /// Runs command-line options
 ///
 /// Returns a boolean to indicate whether any CLI actions taken.
-pub fn cli() -> bool {
+pub fn cli() -> CliRes {
     let mut args = std::env::args();
 
     // No arguments
     if args.len() <= 1 {
-        return false;
+        return CliRes::NoCli;
     }
 
     // Add new modules here.
@@ -56,13 +62,12 @@ Available modules:"
 
     for module in modules {
         if command == module.name() {
-            module.cli();
-            return true;
+            return module.cli();
         }
     }
 
     // In case nothing fits then prints this again.
     help();
 
-    true
+    CliRes::Err
 }

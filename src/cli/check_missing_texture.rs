@@ -6,7 +6,7 @@ use wad::Wad;
 
 use crate::modules::check_missing_texture::check_missing_texture;
 
-use super::Cli;
+use super::{Cli, CliRes};
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
@@ -37,7 +37,7 @@ impl Cli for CheckMissingTexture {
         "missing_texture"
     }
 
-    fn cli(&self) {
+    fn cli(&self) -> CliRes {
         let a = CheckMissingTextureCli::parse();
         let Commands::MissingTexture { map, wads } = a.command;
 
@@ -51,12 +51,15 @@ impl Cli for CheckMissingTexture {
 
         if missings.is_empty() {
             println!("There is no missing textures. Good job");
+            CliRes::Ok
         } else {
             println!("Missing textures are:");
 
             for missing in missings.iter() {
                 println!("{missing}");
             }
+
+            CliRes::Err
         }
     }
 

@@ -9,12 +9,12 @@ impl Cli for TextureScale {
     }
 
     // In, Out, Scale
-    fn cli(&self) {
+    fn cli(&self) -> CliRes {
         let args: Vec<String> = std::env::args().skip(2).collect();
 
         if args.len() < 3 {
             self.cli_help();
-            return;
+            return CliRes::Err;
         }
 
         let scalar = args[2].parse::<f64>();
@@ -22,14 +22,20 @@ impl Cli for TextureScale {
         if scalar.is_err() {
             println!("Cannot parse scalar.");
             self.cli_help();
-            return;
+            return CliRes::Err;
         }
 
         let mut map = Map::from_file(&args[0]).unwrap();
 
         texture_scale(&mut map, scalar.unwrap());
 
-        map.write(&args[1]).unwrap();
+        match map.write(&args[1]) {
+            Ok(_) => CliRes::Ok,
+            Err(err) => {
+                println!("{}", err);
+                CliRes::Err
+            }
+        }
     }
 
     fn cli_help(&self) {

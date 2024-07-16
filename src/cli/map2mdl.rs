@@ -14,18 +14,19 @@ impl Cli for Map2MdlCli {
     }
 
     // .map file
-    fn cli(&self) {
+    fn cli(&self) -> CliRes {
         let args: Vec<String> = std::env::args().skip(2).collect();
 
         if args.len() != 1 {
             self.cli_help();
-            return;
+            return CliRes::Err;
         }
 
         let config = parse_config();
 
         if config.is_err() {
             println!("Error parsing config.toml");
+            return CliRes::Err;
         }
 
         let Config {
@@ -39,7 +40,7 @@ impl Cli for Map2MdlCli {
         #[cfg(target_os = "linux")]
         if config_wineprefix.is_none() {
             println!("No WINECONFIG provided.");
-            return;
+            return CliRes::Err;
         }
 
         let mut binding = Map2Mdl::default();
@@ -56,7 +57,10 @@ impl Cli for Map2MdlCli {
 
         if let Err(err) = binding.work() {
             println!("{}", err);
+            return CliRes::Err;
         }
+
+        CliRes::Ok
     }
 
     fn cli_help(&self) {

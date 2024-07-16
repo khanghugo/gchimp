@@ -56,7 +56,7 @@ impl Cli for S2G {
         "s2g"
     }
 
-    fn cli(&self) {
+    fn cli(&self) -> CliRes {
         let cli = S2GCliStruct::parse();
 
         let Commands::S2G {
@@ -77,6 +77,7 @@ impl Cli for S2G {
 
         if config.is_err() {
             println!("Error parsing config.toml");
+            return CliRes::Err;
         }
 
         let Config {
@@ -108,7 +109,10 @@ impl Cli for S2G {
 
         if let Err(err) = s2g.work() {
             println!("{:?}", err);
+            return CliRes::Err;
         };
+
+        CliRes::Ok
     }
 
     fn cli_help(&self) {

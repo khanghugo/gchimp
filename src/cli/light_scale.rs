@@ -2,7 +2,7 @@ use map::Map;
 
 use crate::modules::light_scale::light_scale;
 
-use super::Cli;
+use super::{Cli, CliRes};
 
 pub struct LightScale;
 impl Cli for LightScale {
@@ -11,12 +11,12 @@ impl Cli for LightScale {
     }
 
     // In, Out, Scale
-    fn cli(&self) {
+    fn cli(&self) -> CliRes {
         let args: Vec<String> = std::env::args().skip(2).collect();
 
         if args.len() < 6 {
             self.cli_help();
-            return;
+            return CliRes::Err;
         }
 
         let scalars: Vec<f64> = args
@@ -37,6 +37,8 @@ impl Cli for LightScale {
         light_scale(&mut map, (scalars[0], scalars[1], scalars[2], scalars[3]));
 
         map.write(&args[1]).unwrap();
+
+        CliRes::Ok
     }
 
     fn cli_help(&self) {

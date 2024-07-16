@@ -2,7 +2,7 @@ use map::Map;
 
 use crate::modules::check_illegal_brush::check_illegal_brush;
 
-use super::Cli;
+use super::{Cli, CliRes};
 
 pub struct CheckIllegalBrush;
 impl Cli for CheckIllegalBrush {
@@ -11,17 +11,19 @@ impl Cli for CheckIllegalBrush {
     }
 
     // .map file
-    fn cli(&self) {
+    fn cli(&self) -> CliRes {
         let args: Vec<String> = std::env::args().skip(2).collect();
 
         if args.len() != 1 {
             self.cli_help();
-            return;
+            return CliRes::Err;
         }
 
         let map = Map::from_file(&args[0]).unwrap();
 
         check_illegal_brush(&map);
+
+        CliRes::Ok
     }
 
     fn cli_help(&self) {
