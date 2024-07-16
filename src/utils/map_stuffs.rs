@@ -288,6 +288,20 @@ pub fn textures_used_in_map(map: &Map) -> HashSet<String> {
         })
 }
 
+pub fn textures_used_in_entity(entity: &Entity) -> HashSet<String> {
+    let mut acc = HashSet::<String>::new();
+
+    if let Some(brushes) = &entity.brushes {
+        for brush in brushes.iter() {
+            for plane in brush.planes.iter() {
+                acc.insert(plane.texture_name.clone());
+            }
+        }
+    }
+
+    acc
+}
+
 /// Returns the index of [`GCHIMP_INFO_ENTITY`]
 pub fn check_gchimp_info_entity(map: &Map) -> eyre::Result<usize> {
     let entity_index = map.entities.iter().position(|entity| {
