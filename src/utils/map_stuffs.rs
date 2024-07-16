@@ -312,7 +312,7 @@ pub fn check_gchimp_info_entity(map: &Map) -> eyre::Result<usize> {
     });
 
     if entity_index.is_none() {
-        return err!("Cannot find {}", GCHIMP_INFO_ENTITY);
+        return err!("gchimp_info: Cannot find {}", GCHIMP_INFO_ENTITY);
     }
 
     let entity_index = entity_index.unwrap();
@@ -323,7 +323,7 @@ pub fn check_gchimp_info_entity(map: &Map) -> eyre::Result<usize> {
         let game_path = PathBuf::from(hl_path);
 
         if !game_path.exists() {
-            return err!("Path to Half-Life does not exist: {}", hl_path);
+            return err!("gchimp_info: Path to Half-Life does not exist: {}", hl_path);
         }
 
         if let Some(gamedir) = entity.attributes.get("gamedir") {
@@ -331,24 +331,27 @@ pub fn check_gchimp_info_entity(map: &Map) -> eyre::Result<usize> {
 
             if !mod_path.exists() {
                 return err!(
-                    "Path to game mod does not exist: {}",
+                    "gchimp_info: Path to game mod does not exist: {}",
                     mod_path.to_str().unwrap()
                 );
             }
         } else {
-            return err!("No game mod provided");
+            return err!("gchimp_info: No game mod provided");
         }
     } else {
-        return err!("No path to Half-Life provided");
+        return err!("gchimp_info: No path to Half-Life provided");
     }
 
     // check options
     if let Some(options) = entity.attributes.get("options") {
         if let Err(err) = options.parse::<usize>() {
-            return err!("Value for \"options\" is not a number: {}", err);
+            return err!(
+                "gchimp_info: Value for \"options\" is not a number: {}",
+                err
+            );
         }
     } else {
-        return err!("Cannot find \"options\" key");
+        return err!("gchimp_info: Cannot find \"options\" key");
     };
 
     Ok(entity_index)
