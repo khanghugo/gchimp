@@ -35,22 +35,22 @@ pub static GCHIMP_MAP2MDL_ENTITY_NAME: &str = "gchimp_map2mdl";
 #[derive(Debug)]
 pub struct Map2MdlOptions {
     /// If input entity has "wad" key then we get texture from there.
-    auto_pickup_wad: bool,
+    pub auto_pickup_wad: bool,
     /// Exports necessary texture for model compilation.
-    export_texture: bool,
+    pub export_texture: bool,
     /// The entity is moved to the origin so it's overall boxed shape is balanced.
     ///
     /// ORIGIN brush will only work if this is enabled.
-    move_to_origin: bool,
+    pub move_to_origin: bool,
     /// Ignores "no draw" textures like sky or NULL
-    ignore_nodraw: bool,
+    pub ignore_nodraw: bool,
     studiomdl: Option<PathBuf>,
     #[cfg(target_os = "linux")]
     wineprefix: Option<String>,
     /// Only converts [`GCHIMP_MAP2MDL_ENTITY_NAME`] entity
     ///
     /// Not only this will creates a new model but potentially a new .map file
-    marked_entity: bool,
+    pub marked_entity: bool,
 }
 
 impl Default for Map2MdlOptions {
@@ -95,6 +95,11 @@ impl Map2Mdl {
 
     pub fn move_to_origin(&mut self, v: bool) -> &mut Self {
         self.options.move_to_origin = v;
+        self
+    }
+
+    pub fn ignore_nodraw(&mut self, v: bool) -> &mut Self {
+        self.options.ignore_nodraw = v;
         self
     }
 
