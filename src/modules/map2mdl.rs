@@ -19,7 +19,7 @@ use crate::{
         },
         map_stuffs::{
             brush_from_mins_maxs, check_gchimp_info_entity, entity_to_triangulated_smd,
-            map_to_triangulated_smd, textures_used_in_map,
+            map_to_triangulated_smd, textures_used_in_entity, textures_used_in_map,
         },
         run_bin::run_studiomdl,
         smd_stuffs::{
@@ -71,7 +71,14 @@ impl Default for Map2MdlOptions {
 #[derive(Default, Debug)]
 pub struct Map2Mdl {
     options: Map2MdlOptions,
+    /// Converts a .map file
+    ///
+    /// Can be used with marked_entity option to convert specifically [`GCHIMP_MAP2MDL_ENTITY_NAME`]
     map: Option<PathBuf>,
+    /// Converts a provided entity text
+    ///
+    /// Entity should be a worldbrush, meaning it is part of entity 0
+    entity: Option<String>,
     wads: Vec<PathBuf>,
 }
 
@@ -107,8 +114,19 @@ impl Map2Mdl {
         self
     }
 
-    pub fn map_file(&mut self, v: &str) -> &mut Self {
+    /// Converts a .map file
+    ///
+    /// Can be used with marked_entity option to convert specifically [`GCHIMP_MAP2MDL_ENTITY_NAME`]
+    pub fn map(&mut self, v: &str) -> &mut Self {
         self.map = PathBuf::from(v).into();
+        self
+    }
+
+    /// Converts a provided entity text
+    ///
+    /// Entity should be a worldbrush, meaning it is part of entity 0
+    pub fn entity(&mut self, v: &str) -> &mut Self {
+        self.entity = v.to_owned().into();
         self
     }
 
@@ -122,9 +140,10 @@ impl Map2Mdl {
         smd_triangles: &[Triangle],
         textures_used: &HashSet<String>,
         // output path would be where the model ends up with
+        // output path should be the .mdl file
         output_path: &Path,
         // resource path is where qc smd and textures file are stored
-        // usually it should be with the .map file
+        // usually it should be the .map file
         resource_path: &Path,
         move_to_origin: bool,
     ) -> eyre::Result<usize> {
@@ -281,6 +300,10 @@ impl Map2Mdl {
     }
 
     pub fn work(&mut self) -> eyre::Result<()> {
+        if self.map.is_none() && self.entity.is_none() {
+            return err!("No input provided.");
+        }
+
         if self.options.studiomdl.is_none() {
             return err!("No studiomdl.exe supplied.");
         }
@@ -290,23 +313,77 @@ impl Map2Mdl {
             return err!("No WINEPREFIX supplied.");
         }
 
-        // TODO convert from pasted entity instead of whole map
-        let mut map_file = if let Some(path) = &self.map {
-            Map::from_file(path).ok()
+        // very convoluted error propagating
+        let map_file = self.map.as_ref().map(|path| Map::from_file(path));
+
+        if let Some(map_file) = &map_file {
+            if let Err(err) = map_file {
+                return err!("Cannot parse map file: {}", err);
+            }
+        }
+
+        let mut map_file = if let Some(map_file) = map_file {
+            map_file.ok()
         } else {
             None
         };
 
+        // repeating the convoluted error propagating
+        let entity_entity = self
+            .entity
+            .as_ref()
+            .map(|entity| Map::from_text(entity).map(|res| res.entities[0].clone()));
+
+        if let Some(entity_entity) = &entity_entity {
+            if let Err(err) = entity_entity {
+                return err!("Cannot parse entity: {}", err);
+            }
+        }
+
+        let entity_entity = if let Some(entity_entity) = entity_entity {
+            entity_entity.ok()
+        } else {
+            None
+        };
+
+        // more checking even though this is very redundant
+        if map_file.is_none() && entity_entity.is_none() {
+            if self.map.is_some() {
+                return err!("Cannot parse map file.");
+            }
+
+            if self.entity.is_some() {
+                return err!("Cannot parse entity text.");
+            }
+        }
+
+        if let Some(entity) = &entity_entity {
+            if !entity.attributes.contains_key("wad") {
+                return err!("Provided entity does not contain \"wad\" key. Make sure entity is a worldbrush.");
+            }
+        }
+
+        // now we talking about something different
+        let valid_autopickup_wad_for_map = map_file.is_some()
+            && map_file.as_ref().unwrap().entities[0] // always entity 0
+                .attributes
+                .get("wad")
+                .is_some_and(|paths| !paths.is_empty());
+
+        let valid_autopickup_wad_for_entity = entity_entity.is_some()
+            && entity_entity
+                .as_ref()
+                .unwrap()
+                .attributes
+                .get("wad") // worldbrush only becuase it is entity 0
+                .is_some_and(|paths| !paths.is_empty());
+
         // now we are collecting wad files
         let valid_autopickup_wad = self.options.auto_pickup_wad
-            && (map_file.is_none()
-                || map_file.as_ref().unwrap().entities[0] // always entity 0
-                    .attributes
-                    .get("wad")
-                    .is_some_and(|paths| !paths.is_empty()));
+            && (valid_autopickup_wad_for_map || valid_autopickup_wad_for_entity);
 
         if self.wads.is_empty() && (!valid_autopickup_wad) {
-            return err!("No WAD files or MAP supplied.");
+            return err!("Cannot pick up any WAD files.");
         }
 
         let wads_res = if !self.wads.is_empty() {
@@ -315,8 +392,15 @@ impl Map2Mdl {
                 .map(Wad::from_file)
                 .collect::<Vec<eyre::Result<Wad>>>()
         } else if valid_autopickup_wad {
-            map_file.as_ref().unwrap().entities[0]
-                .attributes
+            let hashset = if let Some(entity_entity) = &entity_entity {
+                &entity_entity.attributes
+            } else if let Some(map_file) = &map_file {
+                &map_file.entities[0].attributes
+            } else {
+                unreachable!()
+            };
+
+            hashset
                 .get("wad")
                 .unwrap()
                 .split_terminator(";")
@@ -346,8 +430,10 @@ impl Map2Mdl {
         // check for missing textures
         let textures_used = if let Some(map) = &map_file {
             textures_used_in_map(map)
+        } else if let Some(entity) = &entity_entity {
+            textures_used_in_entity(entity)
         } else {
-            todo!()
+            unreachable!()
         };
 
         let textures_missing = textures_used
@@ -377,10 +463,19 @@ impl Map2Mdl {
                     }
                 })
                 .map(|tex| {
+                    // textures will be exported inside studiomdl folder if convert entity
+                    let out_path_file = if let Some(map) = &self.map {
+                        map
+                    } else if let Some(studiomdl) = &self.options.studiomdl {
+                        studiomdl
+                    } else {
+                        unreachable!()
+                    };
+
                     export_texture(
                         wads[simple_wads.get(tex).unwrap().wad_file_index()],
                         tex,
-                        self.map.as_ref().unwrap().with_file_name(tex),
+                        out_path_file.with_file_name(tex),
                     )
                 })
                 .find_any(|res| res.is_err())
@@ -604,8 +699,7 @@ impl Map2Mdl {
                                 })
                             }
 
-                            clip_brush_entity
-                            .attributes.clear();
+                            clip_brush_entity.attributes.clear();
 
                             clip_brush_entity
                                 .attributes
@@ -672,16 +766,33 @@ impl Map2Mdl {
                 // just convert the whole map, very simple
                 let smd_triangles = map_to_triangulated_smd(map, &simple_wads, false)?;
 
-                let output_path = self.map.as_ref().unwrap().to_path_buf();
+                let output_path = self.map.as_ref().unwrap();
 
                 self.convert_from_triangles(
                     &smd_triangles,
                     &textures_used,
-                    output_path.as_path(),
-                    output_path.as_path(),
+                    output_path,
+                    output_path,
                     self.options.move_to_origin,
                 )?;
             }
+        } else if let Some(entity) = &entity_entity {
+            let smd_triangles = entity_to_triangulated_smd(entity, &simple_wads, false)?;
+
+            let output_path = self
+                .options
+                .studiomdl
+                .as_ref()
+                .unwrap()
+                .with_file_name("map2mdl.mdl");
+
+            self.convert_from_triangles(
+                &smd_triangles,
+                &textures_used,
+                output_path.as_path(),
+                output_path.as_path(),
+                self.options.move_to_origin,
+            )?;
         } else {
             unreachable!()
         };
@@ -701,7 +812,7 @@ mod test {
             .auto_pickup_wad(true)
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map_file("/home/khang/gchimp/examples/map2prop/map.map")
+            .map("/home/khang/gchimp/examples/map2prop/map.map")
             .work()
             .unwrap();
     }
@@ -713,7 +824,7 @@ mod test {
             .auto_pickup_wad(true)
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map_file("/home/khang/gchimp/examples/map2prop/map2.map")
+            .map("/home/khang/gchimp/examples/map2prop/map2.map")
             .work()
             .unwrap();
     }
@@ -726,7 +837,7 @@ mod test {
             .move_to_origin(false)
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map_file("/home/khang/gchimp/examples/map2prop/arte_spin/arte_spin.map")
+            .map("/home/khang/gchimp/examples/map2prop/arte_spin/arte_spin.map")
             .work()
             .unwrap();
     }
@@ -739,7 +850,7 @@ mod test {
             .move_to_origin(false)
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map_file("/home/khang/gchimp/examples/map2prop/sphere.map")
+            .map("/home/khang/gchimp/examples/map2prop/sphere.map")
             .work()
             .unwrap();
     }
@@ -752,7 +863,7 @@ mod test {
             .move_to_origin(false)
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map_file("/home/khang/gchimp/examples/map2prop/sphere2.map")
+            .map("/home/khang/gchimp/examples/map2prop/sphere2.map")
             .work()
             .unwrap();
     }
@@ -765,8 +876,66 @@ mod test {
             .move_to_origin(false)
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map_file("/home/khang/gchimp/examples/map2prop/marked/marked.map")
+            .map("/home/khang/gchimp/examples/map2prop/marked/marked.map")
             .marked_entity(true)
+            .work()
+            .unwrap();
+    }
+
+    #[test]
+    fn entity() {
+        let mut binding = Map2Mdl::default();
+        binding
+            .auto_pickup_wad(true)
+            .move_to_origin(false)
+            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
+            .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
+            .entity("\
+// entity 0
+{
+\"mapversion\" \"220\"
+\"wad\" \"/home/khang/map_compiler/sdhlt.wad;/home/khang/map_compiler/devtextures.wad\"
+\"classname\" \"worldspawn\"
+\"_tb_mod\" \"cstrike;cstrike_downloads\"
+\"_tb_def\" \"external:/home/khang/map_compiler/combined.fgd\"
+// brush 0
+{
+( -64 0 80 ) ( -64 -64 128 ) ( -64 -64 64 ) devcrate64 [ 0 -1 0 0 ] [ 0 0 -1 16 ] 0 1 1
+( -64 -64 128 ) ( 64 -64 128 ) ( 64 -64 64 ) devcrate64 [ 1 0 0 0 ] [ 0 0 -1 16 ] 0 1 1
+( 64 -64 64 ) ( 64 0 64 ) ( -64 0 64 ) devcrate64 [ -1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1
+( -64 0 80 ) ( 64 0 80 ) ( 64 -64 128 ) devcrate64 [ 1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1
+( 64 0 64 ) ( 64 0 80 ) ( -64 0 80 ) devcrate64 [ -1 0 0 0 ] [ 0 0 -1 16 ] 0 1 1
+( 64 -64 128 ) ( 64 0 80 ) ( 64 0 64 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 16 ] 0 1 1
+}
+// brush 1
+{
+( -64 64 128 ) ( -64 0 80 ) ( -64 0 64 ) devcrate64 [ 0 -1 0 0 ] [ 0 0 -1 16 ] 0 1 1
+( -64 0 80 ) ( 64 0 80 ) ( 64 0 64 ) devcrate64 [ -1 0 0 0 ] [ 0 0 -1 16 ] 0 1 1
+( -64 64 128 ) ( 64 64 128 ) ( 64 0 80 ) devcrate64 [ 1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1
+( 64 0 64 ) ( 64 64 64 ) ( -64 64 64 ) devcrate64 [ -1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1
+( 64 64 64 ) ( 64 64 128 ) ( -64 64 128 ) devcrate64 [ -1 0 0 0 ] [ 0 0 -1 16 ] 0 1 1
+( 64 0 80 ) ( 64 64 128 ) ( 64 64 64 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 16 ] 0 1 1
+}
+// brush 2
+{
+( -89.3725830020305 0 60.117749006091444 ) ( -89.3725830020305 64 60.117749006091444 ) ( -179.88225099390857 64 150.62741699796953 ) devcrate64 [ -0.7071067811865475 0 0.7071067811865477 -41.705627 ] [ 0 -1 0 0 ] 0 1 1
+( -134.62741699796953 64 195.88225099390857 ) ( -168.5685424949238 0 161.9411254969543 ) ( -179.88225099390857 0 150.62741699796953 ) devcrate64 [ 0 -1 0 0 ] [ -0.7071067811865476 0 -0.7071067811865475 -4.686288 ] 0 1 1
+( -168.5685424949238 0 161.9411254969543 ) ( -78.05887450304573 0 71.4314575050762 ) ( -89.3725830020305 0 60.117749006091444 ) devcrate64 [ -0.7071067811865475 0 0.7071067811865477 -41.705627 ] [ -0.7071067811865476 0 -0.7071067811865475 -4.686288 ] 45 1 1
+( -89.3725830020305 64 60.117749006091444 ) ( -44.11774900609145 64 105.37258300203048 ) ( -134.62741699796953 64 195.88225099390857 ) devcrate64 [ -0.7071067811865475 0 0.7071067811865477 -41.705627 ] [ -0.7071067811865476 0 -0.7071067811865475 -4.686289 ] 315 1 1
+( -134.62741699796953 64 195.88225099390857 ) ( -44.11774900609145 64 105.37258300203048 ) ( -78.05887450304573 0 71.4314575050762 ) devcrate64 [ 0.7071067811865475 0 -0.7071067811865477 41.705627 ] [ 0 -1 0 0 ] 27.91369 1 1
+( -78.05887450304573 0 71.4314575050762 ) ( -44.11774900609145 64 105.37258300203048 ) ( -89.3725830020305 64 60.117749006091444 ) devcrate64 [ 0 1 0 0 ] [ -0.7071067811865476 0 -0.7071067811865475 -4.686288 ] 0 1 1
+}
+// brush 3
+{
+( -89.3725830020305 -64 60.117749006091444 ) ( -89.3725830020305 0 60.117749006091444 ) ( -179.88225099390857 0 150.62741699796953 ) devcrate64 [ -0.7071067811865475 0 0.7071067811865477 -41.705627 ] [ 0 -1 0 0 ] 0 1 1
+( -168.5685424949238 0 161.9411254969543 ) ( -134.62741699796953 -64 195.88225099390857 ) ( -179.88225099390857 -64 150.62741699796953 ) devcrate64 [ 0 -1 0 0 ] [ -0.7071067811865476 0 -0.7071067811865475 -4.686288 ] 0 1 1
+( -134.62741699796953 -64 195.88225099390857 ) ( -44.11774900609145 -64 105.37258300203048 ) ( -89.3725830020305 -64 60.117749006091444 ) devcrate64 [ 0.7071067811865475 0 -0.7071067811865477 41.705627 ] [ -0.7071067811865476 0 -0.7071067811865475 -4.686289 ] 45 1 1
+( -89.3725830020305 0 60.117749006091444 ) ( -78.05887450304573 0 71.4314575050762 ) ( -168.5685424949238 0 161.9411254969543 ) devcrate64 [ -0.7071067811865475 0 0.7071067811865477 -41.705627 ] [ -0.7071067811865476 0 -0.7071067811865475 -4.686288 ] 315 1 1
+( -168.5685424949238 0 161.9411254969543 ) ( -78.05887450304573 0 71.4314575050762 ) ( -44.11774900609145 -64 105.37258300203048 ) devcrate64 [ 0.7071067811865475 0 -0.7071067811865477 41.705627 ] [ 0 -1 0 0 ] 332.0863 1 1
+( -44.11774900609145 -64 105.37258300203048 ) ( -78.05887450304573 0 71.4314575050762 ) ( -89.3725830020305 0 60.117749006091444 ) devcrate64 [ 0 1 0 0 ] [ -0.7071067811865476 0 -0.7071067811865475 -4.686288 ] 0 1 1
+}
+}
+")
             .work()
             .unwrap();
     }
