@@ -4,13 +4,13 @@ use crate::config::Config;
 
 use super::{
     programs::{
-        map2prop::Map2Prop, s2g::S2GGui, skymod::SkyModGui, textile::TexTileGui, waddy::WaddyGui,
+        map2mdl::Map2MdlGui, s2g::S2GGui, skymod::SkyModGui, textile::TexTileGui, waddy::WaddyGui,
     },
     TabProgram,
 };
 
 pub enum Pane {
-    Map2Prop(Map2Prop),
+    Map2Prop(Map2MdlGui),
     S2G(S2GGui),
     SkyMod(SkyModGui),
     TexTile(TexTileGui),
@@ -47,7 +47,7 @@ pub fn create_tree(app_config: Config) -> egui_tiles::Tree<Pane> {
         tiles.insert_pane(Pane::SkyMod(SkyModGui::new(app_config.clone()))),
         tiles.insert_pane(Pane::TexTile(TexTileGui::default())),
         tiles.insert_pane(Pane::Waddy(WaddyGui::default())),
-        tiles.insert_pane(Pane::Map2Prop(Map2Prop::default())),
+        tiles.insert_pane(Pane::Map2Prop(Map2MdlGui::new(app_config.clone()))),
     ];
 
     let root = tiles.insert_tab_tile(tabs);
