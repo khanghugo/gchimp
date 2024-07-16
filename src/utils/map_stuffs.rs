@@ -1,6 +1,6 @@
 use std::{collections::HashSet, path::PathBuf};
 
-use glam::{DVec2, DVec3, Vec4Swizzles};
+use glam::{DVec2, DVec3, DVec4, Vec4Swizzles};
 use map::{Brush, BrushPlane, Entity, Map};
 use smd::{Triangle, Vertex};
 
@@ -340,9 +340,153 @@ pub fn check_gchimp_info_entity(map: &Map) -> eyre::Result<usize> {
     Ok(entity_index)
 }
 
+/// Creates a .map rectangular prism brush from two lists of mins and maxs
+pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush {
+    let (rotation, u_scale, v_scale) = (0., 1., 1.);
+
+    let left = BrushPlane {
+        p1: DVec3::from([mins[0], mins[1], mins[2]]),
+        p2: DVec3::from([mins[0], mins[1] + 1., mins[2]]),
+        p3: DVec3::from([mins[0], mins[1], mins[2] + 1.]),
+        texture_name: texture.to_owned(),
+        u: DVec4 {
+            x: 0.,
+            y: -1.,
+            z: 0.,
+            w: 0.,
+        },
+        v: DVec4 {
+            x: 0.,
+            y: 0.,
+            z: -1.,
+            w: 0.,
+        },
+        rotation,
+        u_scale,
+        v_scale,
+    };
+
+    let back = BrushPlane {
+        p1: DVec3::from([mins[0], mins[1], mins[2]]),
+        p2: DVec3::from([mins[0], mins[1], mins[2] + 1.]),
+        p3: DVec3::from([mins[0] + 1., mins[1], mins[2]]),
+        texture_name: texture.to_owned(),
+        u: DVec4 {
+            x: 1.,
+            y: 0.,
+            z: 0.,
+            w: 0.,
+        },
+        v: DVec4 {
+            x: 0.,
+            y: 0.,
+            z: -1.,
+            w: 0.,
+        },
+        rotation,
+        u_scale,
+        v_scale,
+    };
+
+    let down = BrushPlane {
+        p1: DVec3::from([mins[0], mins[1], mins[2]]),
+        p2: DVec3::from([mins[0] + 1., mins[1], mins[2]]),
+        p3: DVec3::from([mins[0], mins[1] + 1., mins[2]]),
+        texture_name: texture.to_owned(),
+        u: DVec4 {
+            x: -1.,
+            y: 0.,
+            z: 0.,
+            w: 0.,
+        },
+        v: DVec4 {
+            x: 0.,
+            y: -1.,
+            z: 0.,
+            w: 0.,
+        },
+        rotation,
+        u_scale,
+        v_scale,
+    };
+
+    let up = BrushPlane {
+        p1: DVec3::from([maxs[0], maxs[1], maxs[2]]),
+        p2: DVec3::from([maxs[0], maxs[1] + 1., maxs[2]]),
+        p3: DVec3::from([maxs[0] + 1., maxs[1], maxs[2]]),
+        texture_name: texture.to_owned(),
+        u: DVec4 {
+            x: 1.,
+            y: 0.,
+            z: 0.,
+            w: 0.,
+        },
+        v: DVec4 {
+            x: 0.,
+            y: -1.,
+            z: 0.,
+            w: 0.,
+        },
+        rotation,
+        u_scale,
+        v_scale,
+    };
+
+    let front = BrushPlane {
+        p1: DVec3::from([maxs[0], maxs[1], maxs[2]]),
+        p2: DVec3::from([maxs[0] + 1., maxs[1], maxs[2]]),
+        p3: DVec3::from([maxs[0], maxs[1], maxs[2] + 1.]),
+        texture_name: texture.to_owned(),
+        u: DVec4 {
+            x: -1.,
+            y: 0.,
+            z: 0.,
+            w: 0.,
+        },
+        v: DVec4 {
+            x: 0.,
+            y: 0.,
+            z: -1.,
+            w: 0.,
+        },
+        rotation,
+        u_scale,
+        v_scale,
+    };
+
+    let right = BrushPlane {
+        p1: DVec3::from([maxs[0], maxs[1], maxs[2]]),
+        p2: DVec3::from([maxs[0], maxs[1], maxs[2] + 1.]),
+        p3: DVec3::from([maxs[0], maxs[1] + 1., maxs[2]]),
+        texture_name: texture.to_owned(),
+        u: DVec4 {
+            x: 0.,
+            y: 1.,
+            z: 0.,
+            w: 0.,
+        },
+        v: DVec4 {
+            x: 0.,
+            y: 0.,
+            z: -1.,
+            w: 0.,
+        },
+        rotation,
+        u_scale,
+        v_scale,
+    };
+
+    Brush {
+        planes: vec![left, back, down, up, front, right],
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use map::Attributes;
     use smd::Smd;
+
+    use crate::utils::constants::EMPTY_TEXTURE;
 
     use super::*;
 
@@ -653,5 +797,19 @@ mod test {
         new_smd
             .write("/home/khang/gchimp/examples/map2prop/sphere2.smd")
             .unwrap();
+    }
+
+    #[test]
+    fn rectangular_prism_from_mins_maxs() {
+        let path = "/home/khang/gchimp/examples/map2prop/marked/fuck.map";
+        let mut map = Map::from_file(path).unwrap();
+        let brush = brush_from_mins_maxs(&[0., 0., 0.], &[364., 364., 364.], EMPTY_TEXTURE);
+
+        map.entities.push(Entity {
+            attributes: Attributes::new(),
+            brushes: vec![brush].into(),
+        });
+
+        map.write(path.replace("fuck.map", "fuck2.map")).unwrap();
     }
 }

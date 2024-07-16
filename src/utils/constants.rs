@@ -21,6 +21,7 @@ pub static NO_RENDER_TEXTURE: &[&str] = &[
     ORIGIN_TEXTURE,
     CLIP_TEXTURE,
 ];
+pub static EMPTY_TEXTURE: &str = "__TB_empty";
 
 pub static EPSILON: f64 = 0.000001;
 
