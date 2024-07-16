@@ -304,7 +304,7 @@ pub fn check_gchimp_info_entity(map: &Map) -> eyre::Result<usize> {
     let entity_index = entity_index.unwrap();
     let entity = &map.entities[entity_index];
 
-    // check entity field
+    // check path
     if let Some(hl_path) = entity.attributes.get("hl_path") {
         let game_path = PathBuf::from(hl_path);
 
@@ -327,6 +327,15 @@ pub fn check_gchimp_info_entity(map: &Map) -> eyre::Result<usize> {
     } else {
         return err!("No path to Half-Life provided");
     }
+
+    // check options
+    if let Some(options) = entity.attributes.get("options") {
+        if let Err(err) = options.parse::<usize>() {
+            return err!("Value for \"options\" is not a number: {}", err);
+        }
+    } else {
+        return err!("Cannot find \"options\" key");
+    };
 
     Ok(entity_index)
 }
