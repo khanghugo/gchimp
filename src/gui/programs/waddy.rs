@@ -65,7 +65,7 @@ impl Default for WaddyGui {
     }
 }
 
-static IMAGE_TILE_SIZE: f32 = 96.0;
+static BASE_IMAGE_TILE_SIZE: f32 = 96.0;
 static SUPPORTED_TEXTURE_FORMATS: &[&str] = &["png", "jpeg", "jpg", "bmp"];
 
 impl WaddyGui {
@@ -75,6 +75,7 @@ impl WaddyGui {
         ui: &mut Ui,
         instance_index: usize,
         texture_tile_index: usize,
+        image_tile_size: f32,
     ) -> Option<usize> {
         let instance = &mut self.instances[instance_index];
         let texture_tile = &mut instance.texture_tiles[texture_tile_index];
@@ -84,14 +85,14 @@ impl WaddyGui {
         // FIXME: reduce ram usage by at least 4 times
         egui::Grid::new(format!("tile{}{}", texture_tile.index, texture_tile.name))
             .num_columns(1)
-            .max_col_width(IMAGE_TILE_SIZE)
+            .max_col_width(image_tile_size)
             .spacing([0., 0.])
             .show(ui, |ui| {
                 let texture = texture_tile.image.image.texture();
-                let dimensions = texture.size_vec2() / 512. * IMAGE_TILE_SIZE;
+                let dimensions = texture.size_vec2() / 512. * image_tile_size;
 
                 let clickable_image = ui.add_sized(
-                    [IMAGE_TILE_SIZE, IMAGE_TILE_SIZE],
+                    [image_tile_size, image_tile_size],
                     egui::ImageButton::new(egui::Image::new((texture.id(), dimensions)))
                         .frame(false)
                         .selected(false),
@@ -231,7 +232,9 @@ impl WaddyGui {
     }
 
     fn texture_grid(&mut self, ui: &mut Ui, instance_index: usize) {
-        let texture_per_row = ((ui.min_size().x / IMAGE_TILE_SIZE).floor() as usize).max(4);
+        let image_tile_size =
+            BASE_IMAGE_TILE_SIZE * ui.ctx().options(|options| options.zoom_factor);
+        let texture_per_row = ((ui.min_size().x / image_tile_size).floor() as usize).max(4);
 
         ScrollArea::vertical().show(ui, |ui| {
             egui::Grid::new("waddy_grid")
@@ -245,9 +248,12 @@ impl WaddyGui {
                             ui.end_row()
                         }
 
-                        if let Some(delete) =
-                            self.texture_tile(ui, instance_index, texture_tile_index)
-                        {
+                        if let Some(delete) = self.texture_tile(
+                            ui,
+                            instance_index,
+                            texture_tile_index,
+                            image_tile_size,
+                        ) {
                             self.instances[instance_index].texture_tiles.remove(delete);
                             self.instances[instance_index]
                                 .waddy
