@@ -15,7 +15,7 @@ pub fn find_low_scaling(map: &Map) {
                     let mut texture_name = "";
                     brush.planes.iter().for_each(|plane| if !NO_RENDER_TEXTURE.contains(&plane.texture_name.as_str()) {
                         // hardcoded to care about default layer only
-                        if entity.attributes.get("_tb_layer").is_some() || entity.attributes.get("_tb_id").is_some() {
+                        if entity.attributes.contains_key("_tb_layer") || entity.attributes.contains_key("_tb_id") {
                             return;
                         }
 
