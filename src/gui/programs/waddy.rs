@@ -65,7 +65,6 @@ impl Default for WaddyGui {
     }
 }
 
-static TEXTURE_PER_ROW: usize = 4;
 static IMAGE_TILE_SIZE: f32 = 96.0;
 static SUPPORTED_TEXTURE_FORMATS: &[&str] = &["png", "jpeg", "jpg", "bmp"];
 
@@ -232,15 +231,17 @@ impl WaddyGui {
     }
 
     fn texture_grid(&mut self, ui: &mut Ui, instance_index: usize) {
+        let texture_per_row = ((ui.min_size().x / IMAGE_TILE_SIZE).floor() as usize).max(4);
+
         ScrollArea::vertical().show(ui, |ui| {
             egui::Grid::new("waddy_grid")
-                .num_columns(TEXTURE_PER_ROW)
+                .num_columns(texture_per_row)
                 .spacing([2., 2.])
                 .show(ui, |ui| {
                     let count = self.instances[instance_index].texture_tiles.len();
 
                     for texture_tile_index in 0..count {
-                        if texture_tile_index % TEXTURE_PER_ROW == 0 && texture_tile_index != 0 {
+                        if texture_tile_index % texture_per_row == 0 && texture_tile_index != 0 {
                             ui.end_row()
                         }
 
