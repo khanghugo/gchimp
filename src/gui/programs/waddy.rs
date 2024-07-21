@@ -14,6 +14,8 @@ use crate::{
 pub struct WaddyGui {
     instances: Vec<WaddyInstance>,
     extra_image_viewports: Vec<WadImage>,
+    /// 32x32 texture on 512x512 grid is VERY TINY
+    fit_texture: bool,
 }
 
 struct WaddyInstance {
@@ -61,6 +63,7 @@ impl Default for WaddyGui {
         Self {
             instances: vec![],
             extra_image_viewports: vec![],
+            fit_texture: true,
         }
     }
 }
@@ -89,7 +92,14 @@ impl WaddyGui {
             .spacing([0., 0.])
             .show(ui, |ui| {
                 let texture = texture_tile.image.image.texture();
-                let dimensions = texture.size_vec2() / 512. * image_tile_size;
+                let dimensions = if self.fit_texture {
+                    let dimensions = texture.size_vec2();
+                    let bigger = dimensions.x.max(dimensions.y);
+
+                    dimensions / bigger
+                } else {
+                    texture.size_vec2() / 512.
+                } * image_tile_size;
 
                 let clickable_image = ui.add_sized(
                     [image_tile_size, image_tile_size],
@@ -503,6 +513,14 @@ impl WaddyGui {
 
                 ui.close_menu();
             }
+
+            ui.separator();
+
+            ui.menu_button("Options", |ui| {
+                if ui.checkbox(&mut self.fit_texture, "Fit texture").clicked() {
+                    ui.close_menu();
+                }
+            });
 
             ui.separator();
 
