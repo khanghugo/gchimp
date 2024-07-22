@@ -84,7 +84,7 @@ impl Map2MdlGui {
                 if use_entity {
                     ok_text += &("\n".to_owned()
                         + "Model is saved as map2mdl.mdl at "
-                        + studiomdl.as_str());
+                        + studiomdl.replace("studiomdl.exe", "").as_str());
                 }
 
                 *sync.stdout().lock().unwrap() = ok_text;
