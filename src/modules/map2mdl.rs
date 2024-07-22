@@ -166,7 +166,7 @@ impl Map2Mdl {
         self
     }
 
-    fn log(&mut self, what: &str) {
+    fn log(&self, what: &str) {
         println!("{}", what);
 
         if let Some(sync) = &self.sync {
@@ -482,7 +482,23 @@ impl Map2Mdl {
 
         // check for missing textures
         let textures_used = if let Some(map) = &map_file {
-            textures_used_in_map(map)
+            if self.options.marked_entity {
+                map.entities
+                    .iter()
+                    .filter(|entity| {
+                        entity
+                            .attributes
+                            .get("classname")
+                            .is_some_and(|classname| classname == GCHIMP_MAP2MDL_ENTITY_NAME)
+                    })
+                    .map(textures_used_in_entity)
+                    .fold(HashSet::<String>::new(), |mut acc, e| {
+                        acc.extend(e);
+                        acc
+                    })
+            } else {
+                textures_used_in_map(map)
+            }
         } else if let Some(entity) = &entity_entity {
             textures_used_in_entity(entity)
         } else {
