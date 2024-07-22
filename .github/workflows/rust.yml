@@ -34,10 +34,14 @@ jobs:
 
     name: ${{ matrix.rust }} - ${{ matrix.label }} - ${{ matrix.configuration }}
     runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
   
     steps:
     - uses: actions/checkout@v4
-
+    
+    - if: job.container
+      run: chown -R $(id -u):$(id -g) .
+      
     - name: Install Rust
       uses: actions-rs/toolchain@v1.0.6
       with:
