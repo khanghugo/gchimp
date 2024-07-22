@@ -5,6 +5,7 @@ use wad::FileEntry;
 
 use crate::{
     gui::{
+        constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
         utils::{display_image_viewport_from_texture, preview_file_being_dropped, WadImage},
         TabProgram,
     },
@@ -277,7 +278,7 @@ impl WaddyGui {
     }
 
     // gui when there's WAD loaded
-    fn editor_gui(&mut self, ui: &mut Ui, instance_index: usize) {
+    fn instance_ui(&mut self, ui: &mut Ui, instance_index: usize) {
         // should close to short-circuit the GUI and avoid accessing non existing info
         let mut should_close = false;
 
@@ -440,11 +441,6 @@ impl WaddyGui {
             })
             .collect::<Vec<TextureTile>>();
 
-        // TODO for the time being this can only open 1 wad file
-        if !self.instances.is_empty() {
-            self.instances.remove(0);
-        }
-
         self.instances.push(WaddyInstance {
             path: path.map(|path| path.to_owned()),
             waddy,
@@ -583,6 +579,50 @@ impl WaddyGui {
             }
         }
     }
+
+    fn empy_instance_ui(&mut self, ui: &mut egui::Ui) {
+        ui.separator();
+        ui.menu_button("Menu", |ui| {
+            if ui.button("New").clicked() {
+                let _ = self.start_waddy_instance(ui, None);
+
+                ui.close_menu();
+            }
+
+            if ui.button("Open").clicked() {
+                self.menu_open(ui);
+
+                ui.close_menu();
+            }
+        });
+
+        ui.separator();
+        ui.label("You can drag and drop too.");
+
+        let ctx = ui.ctx();
+
+        preview_file_being_dropped(ctx);
+
+        // Collect dropped files:
+        let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
+
+        for item in &dropped_files {
+            if let Some(path) = &item.path {
+                if path.is_dir() {
+                    continue;
+                }
+
+                if let Some(ext) = path.extension() {
+                    if ext == "wad" {
+                        if let Err(err) = self.start_waddy_instance(ui, Some(path)) {
+                            // TODO TOAST
+                            println!("{}", err);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl TabProgram for WaddyGui {
@@ -592,49 +632,51 @@ impl TabProgram for WaddyGui {
 
     fn tab_ui(&mut self, ui: &mut eframe::egui::Ui) -> egui_tiles::UiResponse {
         if !self.instances.is_empty() {
-            self.editor_gui(ui, 0);
-        } else {
-            ui.separator();
-            ui.menu_button("Menu", |ui| {
-                if ui.button("New").clicked() {
-                    let _ = self.start_waddy_instance(ui, None);
-
-                    ui.close_menu();
-                }
-
-                if ui.button("Open").clicked() {
-                    self.menu_open(ui);
-
-                    ui.close_menu();
-                }
-            });
-
-            ui.separator();
-            ui.label("You can drag and drop too.");
+            self.instance_ui(ui, 0);
 
             let ctx = ui.ctx();
 
-            preview_file_being_dropped(ctx);
+            // show other instances in different viewports
+            let to_remove = (1..self.instances.len())
+                .filter(|instance_index| {
+                    // let instance_name = format!("waddygui_instance{}", instance_index);
+                    let instance_name = if let Some(path) = &self.instances[*instance_index].path {
+                        path.display().to_string()
+                    } else {
+                        format!("waddygui_instance{}", instance_index)
+                    };
 
-            // Collect dropped files:
-            let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
+                    ctx.show_viewport_immediate(
+                        egui::ViewportId::from_hash_of(&instance_name),
+                        egui::ViewportBuilder::default()
+                            .with_title(instance_name)
+                            .with_inner_size(
+                                [PROGRAM_WIDTH, PROGRAM_HEIGHT], // border :()
+                            ),
+                        |ctx, _class| {
+                            egui::CentralPanel::default().show(ctx, |ui| {
+                                self.instance_ui(ui, *instance_index);
 
-            for item in &dropped_files {
-                if let Some(path) = &item.path {
-                    if path.is_dir() {
-                        continue;
-                    }
+                                if ctx.input(|i| {
+                                    i.viewport().close_requested()
+                                        || i.key_pressed(egui::Key::Escape)
+                                }) {
+                                    return true;
+                                };
 
-                    if let Some(ext) = path.extension() {
-                        if ext == "wad" {
-                            if let Err(err) = self.start_waddy_instance(ui, Some(path)) {
-                                // TODO TOAST
-                                println!("{}", err);
-                            }
-                        }
-                    }
-                }
-            }
+                                false
+                            })
+                        },
+                    )
+                    .inner
+                })
+                .collect::<Vec<usize>>();
+
+            to_remove.into_iter().rev().for_each(|index| {
+                self.instances.remove(index);
+            });
+        } else {
+            self.empy_instance_ui(ui);
         }
 
         // Make it non drag-able
