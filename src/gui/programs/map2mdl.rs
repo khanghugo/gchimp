@@ -148,10 +148,10 @@ impl TabProgram for Map2MdlGui {
         ui.horizontal(|ui| {
             ui.checkbox(
                 &mut self.options.marked_entity,
-                "Only converts marked entity",
+                "Only convert marked entity",
             )
             .on_hover_text(format!(
-                "Only converts brush entities {} and this would modify the original map file",
+                "Only convert brush entities {} and this would modify the original map file",
                 GCHIMP_MAP2MDL_ENTITY_NAME
             ));
             ui.checkbox(&mut self.options.move_to_origin, "Center the model")
