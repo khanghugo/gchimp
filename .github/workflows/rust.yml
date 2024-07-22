@@ -81,11 +81,16 @@ jobs:
       with:
         name: gchimp-${{ runner.os }}-${{ matrix.configuration }}
         path: gchimp
-
+    
+    - name: Prepare Release
+      if: startsWith(github.ref, 'refs/tags/') && matrix.rust == 'stable' && matrix.configuration == 'release' && !matrix.cross
+      run: |
+        7z a gchimp-${{ runner.os }}-${{ matrix.configuration }}.7z gchimp
+        
     - name: Release
-      if: startsWith(github.ref, 'refs/tags/') && matrix.rust == 'stable' && !matrix.cross
+      if: startsWith(github.ref, 'refs/tags/') && matrix.rust == 'stable' && matrix.configuration == 'release' && !matrix.cross
       uses: softprops/action-gh-release@v1
       with:
-        files: gchimp-${{ runner.os }}-${{ matrix.configuration }}.zip
+        files: gchimp-${{ runner.os }}-${{ matrix.configuration }}.7z
         draft: true
         fail_on_unmatched_files: true
