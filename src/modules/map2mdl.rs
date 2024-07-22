@@ -204,11 +204,16 @@ impl Map2Mdl {
 
         let smd_and_qc_res = (0..model_count)
             .map(|model_index| {
-                let model_name = format!(
-                    "{}{}",
-                    output_path.file_stem().unwrap().to_str().unwrap(),
-                    model_index,
-                );
+                // "0" suffix is only added when there are more than 1 model count
+                let model_name = if model_count == 1 {
+                    format!("{}", output_path.file_stem().unwrap().to_str().unwrap())
+                } else {
+                    format!(
+                        "{}{}",
+                        output_path.file_stem().unwrap().to_str().unwrap(),
+                        model_index,
+                    )
+                };
 
                 let current_model_textures = texture_used_vec
                     .chunks(MAX_GOLDSRC_MODEL_TEXTURE_COUNT)
@@ -662,16 +667,22 @@ impl Map2Mdl {
                         let model_origin = find_centroid_from_triangles(smd_triangles).unwrap();
                         let model_origin =
                             format!("{} {} {}", model_origin.x, model_origin.y, model_origin.z);
-                        let model_modelname0 = entity
-                            .attributes
-                            .get("output")
-                            .unwrap()
-                            .replace(".mdl", "0.mdl");
+
+                        // "0" suffix is only added when there are more than 1 model count
+                        let model_modelname0 = if model_count == 1 {
+                            entity.attributes.get("output").unwrap().to_owned()
+                        } else {
+                            entity
+                                .attributes
+                                .get("output")
+                                .unwrap()
+                                .replace(".mdl", "0.mdl")
+                        };
                         let model_angles = "0 0 0".to_string();
 
                         let mut entities_to_insert: Vec<Entity> = vec![];
 
-                        // if we have more than 1 models from the conversion, we will add more just like this
+                        // "0" suffix is only added when there are more than 1 model count
                         (1..(model_count)).for_each(|model_index| {
                             let curr_model_name = model_modelname0
                                 .replace("0.mdl", format!("{}.mdl", model_index).as_str());
