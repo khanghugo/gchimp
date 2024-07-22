@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
 };
 
 use map::{Attributes, Entity, Map};
@@ -68,6 +69,25 @@ impl Default for Map2MdlOptions {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Map2MdlSync {
+    stdout: Arc<Mutex<String>>,
+}
+
+impl Default for Map2MdlSync {
+    fn default() -> Self {
+        Self {
+            stdout: Arc::new(Mutex::new("Idle".to_string())),
+        }
+    }
+}
+
+impl Map2MdlSync {
+    pub fn stdout(&self) -> &Arc<Mutex<String>> {
+        &self.stdout
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct Map2Mdl {
     options: Map2MdlOptions,
@@ -80,6 +100,7 @@ pub struct Map2Mdl {
     /// Entity should be a worldbrush, meaning it is part of entity 0
     entity: Option<String>,
     wads: Vec<PathBuf>,
+    sync: Option<Map2MdlSync>,
 }
 
 impl Map2Mdl {
@@ -138,6 +159,21 @@ impl Map2Mdl {
     pub fn marked_entity(&mut self, v: bool) -> &mut Self {
         self.options.marked_entity = v;
         self
+    }
+
+    pub fn sync(&mut self, v: Map2MdlSync) -> &mut Self {
+        self.sync = v.into();
+        self
+    }
+
+    fn log(&mut self, what: &str) {
+        println!("{}", what);
+
+        if let Some(sync) = &self.sync {
+            let mut lock = sync.stdout.lock().unwrap();
+            *lock += what;
+            *lock += "\n";
+        }
     }
 
     fn convert_from_triangles(
@@ -206,7 +242,12 @@ impl Map2Mdl {
             .map(|model_index| {
                 // "0" suffix is only added when there are more than 1 model count
                 let model_name = if model_count == 1 {
-                    format!("{}", output_path.file_stem().unwrap().to_str().unwrap())
+                    output_path
+                        .file_stem()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_string()
                 } else {
                     format!(
                         "{}{}",
@@ -310,6 +351,9 @@ impl Map2Mdl {
     }
 
     pub fn work(&mut self) -> eyre::Result<()> {
+        self.log("Starting Map2Mdl");
+        self.log("Checking settings");
+
         if self.map.is_none() && self.entity.is_none() {
             return err!("No input provided.");
         }
@@ -331,6 +375,7 @@ impl Map2Mdl {
         }
 
         let mut map_file = if let Some(map_file) = map_file {
+            self.log("Converting map");
             map_file.ok()
         } else {
             None
@@ -347,6 +392,7 @@ impl Map2Mdl {
         }
 
         let entity_entity = if let Some(entity_entity) = entity_entity {
+            self.log("Converting entity");
             entity_entity.ok()
         } else {
             None
@@ -406,10 +452,11 @@ impl Map2Mdl {
                 unreachable!()
             };
 
-            hashset
-                .get("wad")
-                .unwrap()
-                .split_terminator(";")
+            let wad = hashset.get("wad").unwrap();
+
+            self.log(format!("Auto pickup WAD found: {}", wad).as_str());
+
+            wad.split_terminator(";")
                 .map(Wad::from_file)
                 .collect::<Vec<eyre::Result<Wad>>>()
         } else {
@@ -459,6 +506,8 @@ impl Map2Mdl {
 
         // if all good, export texture if needed
         if self.options.export_texture {
+            self.log(format!("Exporting {} texture(s)", textures_used.len()).as_str());
+
             if let Some(err) = textures_used
                 .par_iter()
                 .filter(|tex| {
@@ -495,6 +544,8 @@ impl Map2Mdl {
         // if we don't have a map, we might have an entity pasted in the GUI part
         if let Some(map) = &mut map_file {
             if self.options.marked_entity {
+                self.log(format!("Converting {} only", GCHIMP_MAP2MDL_ENTITY_NAME).as_str());
+
                 // check if the the info entity is there
                 let gchimp_info_entity = &map.entities[check_gchimp_info_entity(map)?];
 
@@ -572,6 +623,13 @@ impl Map2Mdl {
                 }
 
                 // triangulate
+                self.log(
+                    format!(
+                        "Running convex hull clipping algorithm over {} entities",
+                        marked_entities.len()
+                    )
+                    .as_str(),
+                );
                 let (ok, err): (Vec<Vec<Triangle>>, Vec<eyre::Report>) =
                     marked_entities.par_iter().partition_map(|(_, entity)| {
                         let res = entity_to_triangulated_smd(entity, &simple_wads, false);
@@ -585,6 +643,15 @@ impl Map2Mdl {
                         }
                     });
 
+                self.log(
+                    format!(
+                        "Created {} triangles over {} entities",
+                        ok.iter().fold(0, |acc, e| acc + e.len()),
+                        marked_entities.len()
+                    )
+                    .as_str(),
+                );
+
                 if !err.is_empty() {
                     return err!(
                         "Cannot triangulate all marked entities: {}",
@@ -597,6 +664,8 @@ impl Map2Mdl {
 
                 // create the models
                 // due to some rust stuff, this cannot be done in parallel (first)
+                self.log(format!("Creating {} models", marked_entities.len()).as_str());
+
                 let (map2mdl_ok, map2mdl_err): (Vec<eyre::Result<usize>>, _) = marked_entities
                     .iter()
                     .zip(ok.iter()) // safe to assume this is all in order?
@@ -633,6 +702,8 @@ impl Map2Mdl {
 
                 // change entity and maybe create clip brush
                 // TODO verify TB's layer stuffs
+                self.log(format!("Modifying {}", self.map.as_ref().unwrap().display()).as_str());
+
                 let to_insert = marked_entities
                     .iter_mut()
                     .zip(ok.iter()) // safe to assume this is all in order?
@@ -773,10 +844,15 @@ impl Map2Mdl {
                     });
 
                 // lastly^2 write the map file
+                self.log(format!("Writing new {}", self.map.as_ref().unwrap().display()).as_str());
                 map.write(self.map.as_ref().unwrap())?;
             } else {
+                self.log("Converting whole map file");
+
                 // just convert the whole map, very simple
+                self.log("Running convex hull clipping algorithm");
                 let smd_triangles = map_to_triangulated_smd(map, &simple_wads, false)?;
+                self.log(format!("Created {} triangles", smd_triangles.len()).as_str());
 
                 let output_path = self.map.as_ref().unwrap();
 
@@ -789,7 +865,11 @@ impl Map2Mdl {
                 )?;
             }
         } else if let Some(entity) = &entity_entity {
+            self.log("Converting entity");
+
+            self.log("Running convex hull clipping algorithm");
             let smd_triangles = entity_to_triangulated_smd(entity, &simple_wads, false)?;
+            self.log(format!("Created {} triangles", smd_triangles.len()).as_str());
 
             let output_path = self
                 .options
@@ -798,6 +878,7 @@ impl Map2Mdl {
                 .unwrap()
                 .with_file_name("map2mdl.mdl");
 
+            self.log("Creating model");
             self.convert_from_triangles(
                 &smd_triangles,
                 &textures_used,

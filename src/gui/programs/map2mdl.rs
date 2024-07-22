@@ -1,8 +1,4 @@
-use std::{
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    thread,
-};
+use std::{path::PathBuf, thread};
 
 use eframe::egui::{self, ScrollArea};
 
@@ -13,7 +9,7 @@ use crate::{
         utils::preview_file_being_dropped,
         TabProgram,
     },
-    modules::map2mdl::{Map2Mdl, Map2MdlOptions, GCHIMP_MAP2MDL_ENTITY_NAME},
+    modules::map2mdl::{Map2Mdl, Map2MdlOptions, Map2MdlSync, GCHIMP_MAP2MDL_ENTITY_NAME},
 };
 
 pub struct Map2MdlGui {
@@ -22,7 +18,7 @@ pub struct Map2MdlGui {
     entity: String,
     use_entity: bool,
     options: Map2MdlOptions,
-    status_text: Arc<Mutex<String>>,
+    sync: Map2MdlSync,
 }
 
 impl Map2MdlGui {
@@ -33,7 +29,7 @@ impl Map2MdlGui {
             entity: Default::default(),
             use_entity: false,
             options: Map2MdlOptions::default(),
-            status_text: Arc::new(Mutex::new(String::from("Idle"))),
+            sync: Map2MdlSync::default(),
         }
     }
 
@@ -58,7 +54,7 @@ impl Map2MdlGui {
         let map = self.map.clone();
         let use_entity = self.use_entity;
 
-        let lock = self.status_text.clone();
+        let sync = self.sync.clone();
 
         thread::spawn(move || {
             let mut binding = Map2Mdl::default();
@@ -68,7 +64,8 @@ impl Map2MdlGui {
                 .export_texture(export_texture)
                 .ignore_nodraw(ignore_nodraw)
                 .studiomdl(PathBuf::from(&studiomdl).as_path())
-                .marked_entity(marked_entity);
+                .marked_entity(marked_entity)
+                .sync(sync.clone());
 
             if use_entity {
                 binding.entity(&entity);
@@ -80,7 +77,7 @@ impl Map2MdlGui {
             binding.wineprefix(wineprefix.as_ref().unwrap());
 
             if let Err(err) = binding.work() {
-                *lock.lock().unwrap() = err.to_string();
+                *sync.stdout().lock().unwrap() = err.to_string();
             } else {
                 let mut ok_text = "OK".to_string();
 
@@ -90,7 +87,7 @@ impl Map2MdlGui {
                         + studiomdl.as_str());
                 }
 
-                *lock.lock().unwrap() = ok_text;
+                *sync.stdout().lock().unwrap() = ok_text;
             }
         });
     }
@@ -161,14 +158,12 @@ impl TabProgram for Map2MdlGui {
         ui.separator();
 
         if ui.button("Run").clicked() {
-            "Running".clone_into(&mut self.status_text.lock().unwrap());
-
             self.run();
         }
 
         ui.separator();
 
-        let binding = self.status_text.lock().unwrap();
+        let binding = self.sync.stdout().lock().unwrap();
         let mut readonly_buffer = binding.as_str();
 
         ScrollArea::vertical().show(ui, |ui| {
