@@ -521,12 +521,6 @@ impl WaddyGui {
             ui.separator();
 
             if ui.button("Close").clicked() {
-                self.instances[instance_index]
-                    .texture_tiles
-                    .iter_mut()
-                    .for_each(|tile| {
-                        // tile.
-                    });
                 self.instances.remove(instance_index);
 
                 should_close = true;
