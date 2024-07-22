@@ -87,7 +87,7 @@ impl Map2MdlGui {
                         + studiomdl.replace("studiomdl.exe", "").as_str());
                 }
 
-                *sync.stdout().lock().unwrap() = ok_text;
+                *sync.stdout().lock().unwrap() += ok_text.as_str();
             }
         });
     }
