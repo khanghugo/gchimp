@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet,
+    fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -616,14 +617,26 @@ impl Map2Mdl {
                     .iter()
                     .filter_map(|(_, entity)| entity.attributes.get("output"))
                     .filter_map(|output| PathBuf::from(output).parent().map(|what| what.to_owned()))
-                    .filter(|output| !output_base_path.join(output).exists())
+                    .map(|output| output_base_path.join(output))
+                    .filter(|output| !output.exists())
                     .collect::<Vec<PathBuf>>();
 
                 if !nonexistent_output.is_empty() {
-                    return err!(
-                        "The path to the output does not exist: {:?}",
-                        nonexistent_output
-                    );
+                    self.log(format!("Some paths to output model do not exist: {:?}\nThis means the directory is not created. Attempting to create directory.", nonexistent_output).as_str());
+
+                    let create_dir_err = nonexistent_output
+                        .iter()
+                        .filter_map(|path| fs::create_dir_all(path).err())
+                        .collect::<Vec<_>>();
+
+                    if !create_dir_err.is_empty() {
+                        return err!(
+                            "Fail to create directories for output models: {}",
+                            create_dir_err
+                                .into_iter()
+                                .fold(String::new(), |acc, e| acc + e.to_string().as_str())
+                        );
+                    }
                 }
 
                 // TOOD: this might be redundant if we realy do a brush entity, phase out bitch
