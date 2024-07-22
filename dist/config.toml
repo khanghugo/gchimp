@@ -2,4 +2,12 @@ studiomdl = "./dist/studiomdl.exe"
 crowbar = "./dist/CrowbarCommandLineDecomp.exe"
 no_vtf = "./dist/no_vtf/no_vtf"
 
+# For Linux users:
+# You need to set the WINEPREFIX here to run Crowbar and studiomdl binaries.
+# By default Wine prefix path is usually located in your home directory
+
+# Replace 'username' with your actual username:
+# wineprefix = "/home/username/.wine"
+
+# Or you can use custom Wine prefixes:
 # wineprefix = "/home/khang/.local/share/wineprefixes/wine32/"
