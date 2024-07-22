@@ -1,7 +1,6 @@
 name: Rust
 
 on:
-  release:
   push:
   pull_request:
   workflow_dispatch:
