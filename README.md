@@ -2,7 +2,7 @@
 
 A collection of various GoldSrc mapping tools with both graphical and command line interface
 
-![default](./docs/screenshot_s2g_populated.png)
+![default](./docs/gchimp.gif)
 
 ## Installation
 
