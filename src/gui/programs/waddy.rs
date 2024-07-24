@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use eframe::egui::{self, Context, Modifiers, RichText, ScrollArea, Sense, Ui};
 use wad::FileEntry;
 
+use rayon::prelude::*;
+
 use crate::{
     gui::{
         constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
@@ -25,6 +27,7 @@ struct WaddyInstance {
     texture_tiles: Vec<TextureTile>,
     // so the user can save the file
     is_changed: bool,
+    selected: Vec<usize>,
 }
 
 struct LoadedImage {
@@ -80,19 +83,37 @@ impl WaddyGui {
         instance_index: usize,
         texture_tile_index: usize,
         image_tile_size: f32,
-    ) -> Option<usize> {
+    ) -> Option<Vec<usize>> {
         let instance = &mut self.instances[instance_index];
-        let texture_tile = &mut instance.texture_tiles[texture_tile_index];
 
-        let mut texture_tile_to_delete: Option<usize> = None;
+        let mut texture_tile_to_delete: Option<Vec<usize>> = None;
 
         // FIXME: reduce ram usage by at least 4 times
-        egui::Grid::new(format!("tile{}{}", texture_tile.index, texture_tile.name))
+        let current_id = egui::Id::new(format!(
+            "{}{}",
+            instance.texture_tiles[texture_tile_index].index,
+            instance.texture_tiles[texture_tile_index].name
+        ));
+
+        let is_selected = instance.selected.contains(&texture_tile_index);
+        let selected_color = ui.style().visuals.selection.bg_fill;
+
+        egui::Grid::new(current_id)
             .num_columns(1)
             .max_col_width(image_tile_size)
             .spacing([0., 0.])
+            .with_row_color(move |_row, _style| {
+                if is_selected {
+                    Some(selected_color)
+                } else {
+                    None
+                }
+            })
             .show(ui, |ui| {
-                let texture = texture_tile.image.image.texture();
+                let texture = instance.texture_tiles[texture_tile_index]
+                    .image
+                    .image
+                    .texture();
                 let dimensions = if self.fit_texture {
                     let dimensions = texture.size_vec2();
                     let bigger = dimensions.x.max(dimensions.y);
@@ -112,17 +133,19 @@ impl WaddyGui {
                 let mut context_menu_clicked = false;
 
                 clickable_image.context_menu(|ui| {
+                    let current_tile = &mut instance.texture_tiles[texture_tile_index];
+
                     // if clicked then copy the name of the texture
                     if ui
                         .add(
-                            egui::Label::new(&texture_tile.name)
+                            egui::Label::new(&current_tile.name)
                                 .selectable(false)
                                 .sense(Sense::click()),
                         )
                         .on_hover_text("Click to copy name")
                         .clicked()
                     {
-                        ui.output_mut(|o| o.copied_text = texture_tile.name.to_string());
+                        ui.output_mut(|o| o.copied_text = current_tile.name.to_string());
                         ui.close_menu();
                     }
 
@@ -130,83 +153,153 @@ impl WaddyGui {
 
                     if ui.button("View").clicked() {
                         self.extra_image_viewports
-                            .push(WadImage::new(texture_tile.image.image.texture()));
+                            .push(WadImage::new(current_tile.image.image.texture()));
                         ui.close_menu();
                     }
 
                     ui.separator();
 
                     if ui.button("Rename").clicked() {
-                        texture_tile.in_rename = true;
+                        current_tile.in_rename = true;
                         context_menu_clicked = true;
-                        texture_tile.prev_name.clone_from(&texture_tile.name);
+
+                        current_tile.prev_name.clone_from(&current_tile.name);
                         ui.close_menu();
                     }
 
-                    if ui.button("Export").clicked() {
-                        if let Some(path) = rfd::FileDialog::new()
-                            .set_file_name(&texture_tile.name)
-                            .add_filter("All Files", &["bmp"])
-                            .save_file()
-                        {
-                            // tODO TOAST
-                            if let Err(err) = instance
-                                .waddy
-                                .dump_texture_to_file(texture_tile_index, path)
+                    // export when there's lots of selected or not
+                    if instance.selected.is_empty() {
+                        if ui.button("Export").clicked() {
+                            if let Some(path) = rfd::FileDialog::new()
+                                .set_file_name(&instance.texture_tiles[texture_tile_index].name)
+                                .add_filter("All Files", &["bmp"])
+                                .save_file()
                             {
-                                println!("{}", err);
+                                // tODO TOAST
+                                if let Err(err) = instance
+                                    .waddy
+                                    .dump_texture_to_file(texture_tile_index, path)
+                                {
+                                    println!("{}", err);
+                                }
                             }
+
+                            ui.close_menu();
+                        }
+                    } else {
+                        // when lots of selected there will be option to deselect
+                        if ui.button("Deselect all").clicked() {
+                            instance.selected.clear();
+                            ui.close_menu();
                         }
 
-                        ui.close_menu();
+                        if ui
+                            .button(format!("Export ({})", instance.selected.len()))
+                            .clicked()
+                        {
+                            if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                                instance
+                                    .selected
+                                    .par_iter()
+                                    .for_each(|&texture_tile_index| {
+                                        let current_tile =
+                                            &instance.texture_tiles[texture_tile_index];
+
+                                        let texture_file_name = &current_tile.name;
+
+                                        // tODO TOAST
+                                        if let Err(err) = instance.waddy.dump_texture_to_file(
+                                            texture_tile_index,
+                                            path.join(texture_file_name),
+                                        ) {
+                                            println!("{}", err);
+                                        };
+                                    });
+                            }
+
+                            ui.close_menu();
+                        }
                     }
 
                     ui.separator();
 
-                    if ui.button("Delete").clicked() {
-                        texture_tile_to_delete = Some(texture_tile_index);
-                        ui.close_menu();
+                    // delete when lots of selected or not
+                    if instance.selected.is_empty() {
+                        if ui.button("Delete").clicked() {
+                            texture_tile_to_delete = Some(vec![texture_tile_index]);
+                            ui.close_menu();
+                        }
+                    } else if ui
+                        .button(format!("Delete ({})", instance.selected.len()))
+                        .clicked()
+                    {
+                        texture_tile_to_delete = Some(instance.selected.clone());
+                        instance.selected.clear();
+
+                        ui.close_menu()
                     }
                 });
 
-                // double click wound bring a new viewport
-                if clickable_image.double_clicked() {
-                    self.extra_image_viewports
-                        .push(WadImage::new(texture_tile.image.image.texture()));
+                // if left clicked, add to the list of selected
+                if clickable_image.clicked() {
+                    if is_selected {
+                        instance.selected.remove(
+                            instance
+                                .selected
+                                .iter()
+                                .position(|&idx| idx == texture_tile_index)
+                                .unwrap(),
+                        );
+                    } else {
+                        instance.selected.push(texture_tile_index);
+                    }
+                }
+
+                // middle click wound bring a new viewport
+                if clickable_image.middle_clicked() {
+                    self.extra_image_viewports.push(WadImage::new(
+                        instance.texture_tiles[texture_tile_index]
+                            .image
+                            .image
+                            .texture(),
+                    ));
                 };
 
                 ui.end_row();
-                if texture_tile.in_rename {
+
+                let current_tile = &mut instance.texture_tiles[texture_tile_index];
+
+                if current_tile.in_rename {
                     let widget = ui.add(
-                        egui::TextEdit::singleline(&mut texture_tile.name)
+                        egui::TextEdit::singleline(&mut current_tile.name)
                             .font(egui::TextStyle::Small),
                     );
 
                     widget.request_focus();
 
                     if ui.input(|i| i.key_pressed(egui::Key::Escape))
-                        || (widget.clicked_elsewhere() && !context_menu_clicked) // does not work because rename is clicked on the same tick
-                        || widget.lost_focus()
-                        || !widget.has_focus()
+                                || (widget.clicked_elsewhere() && !context_menu_clicked) // does not work because rename is clicked on the same tick
+                                || widget.lost_focus()
+                                || !widget.has_focus()
                     {
-                        texture_tile.in_rename = false;
-                        texture_tile.name.clone_from(&texture_tile.prev_name);
+                        current_tile.in_rename = false;
+                        current_tile.name.clone_from(&current_tile.prev_name);
                     } else if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         // this is the only case where the name is changed successfully
-                        texture_tile.in_rename = false;
+                        current_tile.in_rename = false;
 
                         if let Err(err) = instance
                             .waddy
-                            .rename_texture(texture_tile_index, texture_tile.name.clone())
+                            .rename_texture(texture_tile_index, current_tile.name.clone())
                         {
                             // TODO learn how to do toast
                             println!("{:?}", err);
 
-                            texture_tile.name.clone_from(&texture_tile.prev_name);
-                        } else if texture_tile.name.len() >= 16 {
+                            current_tile.name.clone_from(&current_tile.prev_name);
+                        } else if current_tile.name.len() >= 16 {
                             println!("Texture name is too long");
 
-                            texture_tile.name.clone_from(&texture_tile.prev_name);
+                            current_tile.name.clone_from(&current_tile.prev_name);
                         } else {
                             // this means things are good
                             instance.is_changed = true;
@@ -215,18 +308,18 @@ impl WaddyGui {
                 } else {
                     // beside the context menu, double click on the name would also enter rename mode
                     if ui
-                        .label(custom_font(texture_tile.name.clone()))
+                        .label(custom_font(current_tile.name.clone()))
                         .double_clicked()
                     {
-                        texture_tile.in_rename = true;
-                        texture_tile.prev_name.clone_from(&texture_tile.name);
+                        current_tile.in_rename = true;
+                        current_tile.prev_name.clone_from(&current_tile.name);
                     };
                 }
 
                 ui.end_row();
                 ui.label(custom_font(format!(
                     "{}x{}",
-                    texture_tile.dimensions.0, texture_tile.dimensions.1
+                    current_tile.dimensions.0, current_tile.dimensions.1
                 )));
             });
 
@@ -259,16 +352,19 @@ impl WaddyGui {
                             ui.end_row()
                         }
 
-                        if let Some(delete) = self.texture_tile(
+                        if let Some(mut to_delete) = self.texture_tile(
                             ui,
                             instance_index,
                             texture_tile_index,
                             image_tile_size,
                         ) {
-                            self.instances[instance_index].texture_tiles.remove(delete);
-                            self.instances[instance_index]
-                                .waddy
-                                .remove_texture(texture_tile_index);
+                            to_delete.sort();
+
+                            to_delete.iter().rev().for_each(|&delete| {
+                                self.instances[instance_index].texture_tiles.remove(delete);
+                                self.instances[instance_index].waddy.remove_texture(delete);
+                            });
+
                             self.instances[instance_index].is_changed = true;
                             break;
                         }
@@ -446,6 +542,7 @@ impl WaddyGui {
             waddy,
             texture_tiles,
             is_changed: false,
+            selected: vec![],
         });
 
         Ok(())
@@ -496,7 +593,7 @@ impl WaddyGui {
                 ui.close_menu();
             }
 
-            if ui.button("Export").clicked() {
+            if ui.button("Export All").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     // TODO TOAST TOAST
                     if let Err(err) = self.instances[instance_index]
