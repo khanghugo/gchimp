@@ -309,6 +309,7 @@ impl Map2Mdl {
                 new_qc.add_cd_texture(resource_path.parent().unwrap().to_str().unwrap());
 
                 current_model_textures.iter().for_each(|texture| {
+                    // for the best results, TexTile does convert to compliant transparent texture
                     if texture.starts_with("{") {
                         new_qc.add_texrendermode(
                             // ".bmp" is required
