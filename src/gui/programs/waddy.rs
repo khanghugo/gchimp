@@ -688,7 +688,7 @@ impl WaddyGui {
         });
 
         ui.separator();
-        ui.label("You can drag and drop too.");
+        ui.label("Drag and drop a WAD file to start");
 
         let ctx = ui.ctx();
 
