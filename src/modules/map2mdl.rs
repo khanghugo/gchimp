@@ -228,7 +228,7 @@ impl Map2Mdl {
 
         // before splitting smd, we need to check if we want to split model
         let model_count = textures_used.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
-        let texture_used_vec = textures_used.iter().collect::<Vec<&String>>();
+        let textures_used_vec = textures_used.iter().collect::<Vec<&String>>();
 
         // the format of the file will follow
         // smd: <output><model index>_<smd_index>
@@ -257,7 +257,7 @@ impl Map2Mdl {
                     )
                 };
 
-                let current_model_textures = texture_used_vec
+                let current_model_textures = textures_used_vec
                     .chunks(MAX_GOLDSRC_MODEL_TEXTURE_COUNT)
                     .nth(model_index)
                     .unwrap();
@@ -307,6 +307,16 @@ impl Map2Mdl {
                 );
                 new_qc.add_cd(resource_path.parent().unwrap().to_str().unwrap());
                 new_qc.add_cd_texture(resource_path.parent().unwrap().to_str().unwrap());
+
+                current_model_textures.iter().for_each(|texture| {
+                    if texture.starts_with("{") {
+                        new_qc.add_texrendermode(
+                            // ".bmp" is required
+                            format!("{}.bmp", texture).as_str(),
+                            qc::RenderMode::Masked,
+                        );
+                    }
+                });
 
                 for smd_index in 0..smd_count {
                     new_qc.add_body(
