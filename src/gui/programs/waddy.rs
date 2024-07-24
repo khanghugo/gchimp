@@ -84,18 +84,18 @@ impl WaddyGui {
         texture_tile_index: usize,
         image_tile_size: f32,
     ) -> Option<Vec<usize>> {
-        let instance = &mut self.instances[instance_index];
-
         let mut texture_tile_to_delete: Option<Vec<usize>> = None;
 
         // FIXME: reduce ram usage by at least 4 times
         let current_id = egui::Id::new(format!(
             "{}{}",
-            instance.texture_tiles[texture_tile_index].index,
-            instance.texture_tiles[texture_tile_index].name
+            self.instances[instance_index].texture_tiles[texture_tile_index].index,
+            self.instances[instance_index].texture_tiles[texture_tile_index].name
         ));
 
-        let is_selected = instance.selected.contains(&texture_tile_index);
+        let is_selected = self.instances[instance_index]
+            .selected
+            .contains(&texture_tile_index);
         let selected_color = ui.style().visuals.selection.bg_fill;
 
         egui::Grid::new(current_id)
@@ -110,7 +110,7 @@ impl WaddyGui {
                 }
             })
             .show(ui, |ui| {
-                let texture = instance.texture_tiles[texture_tile_index]
+                let texture = self.instances[instance_index].texture_tiles[texture_tile_index]
                     .image
                     .image
                     .texture();
@@ -133,7 +133,8 @@ impl WaddyGui {
                 let mut context_menu_clicked = false;
 
                 clickable_image.context_menu(|ui| {
-                    let current_tile = &mut instance.texture_tiles[texture_tile_index];
+                    let current_tile =
+                        &mut self.instances[instance_index].texture_tiles[texture_tile_index];
 
                     // if clicked then copy the name of the texture
                     if ui
@@ -168,15 +169,19 @@ impl WaddyGui {
                     }
 
                     // export when there's lots of selected or not
-                    if instance.selected.is_empty() {
+                    if self.instances[instance_index].selected.is_empty() {
                         if ui.button("Export").clicked() {
                             if let Some(path) = rfd::FileDialog::new()
-                                .set_file_name(&instance.texture_tiles[texture_tile_index].name)
+                                .set_file_name(
+                                    &self.instances[instance_index].texture_tiles
+                                        [texture_tile_index]
+                                        .name,
+                                )
                                 .add_filter("All Files", &["bmp"])
                                 .save_file()
                             {
                                 // tODO TOAST
-                                if let Err(err) = instance
+                                if let Err(err) = self.instances[instance_index]
                                     .waddy
                                     .dump_texture_to_file(texture_tile_index, path)
                                 {
@@ -189,32 +194,37 @@ impl WaddyGui {
                     } else {
                         // when lots of selected there will be option to deselect
                         if ui.button("Deselect all").clicked() {
-                            instance.selected.clear();
+                            self.instances[instance_index].selected.clear();
                             ui.close_menu();
                         }
 
                         if ui
-                            .button(format!("Export ({})", instance.selected.len()))
+                            .button(format!(
+                                "Export ({})",
+                                self.instances[instance_index].selected.len()
+                            ))
                             .clicked()
                         {
                             if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                instance
-                                    .selected
-                                    .par_iter()
-                                    .for_each(|&texture_tile_index| {
-                                        let current_tile =
-                                            &instance.texture_tiles[texture_tile_index];
+                                self.instances[instance_index].selected.par_iter().for_each(
+                                    |&texture_tile_index| {
+                                        let current_tile = &self.instances[instance_index]
+                                            .texture_tiles[texture_tile_index];
 
                                         let texture_file_name = &current_tile.name;
 
                                         // tODO TOAST
-                                        if let Err(err) = instance.waddy.dump_texture_to_file(
-                                            texture_tile_index,
-                                            path.join(texture_file_name),
-                                        ) {
+                                        if let Err(err) = self.instances[instance_index]
+                                            .waddy
+                                            .dump_texture_to_file(
+                                                texture_tile_index,
+                                                path.join(texture_file_name),
+                                            )
+                                        {
                                             println!("{}", err);
                                         };
-                                    });
+                                    },
+                                );
                             }
 
                             ui.close_menu();
@@ -222,19 +232,92 @@ impl WaddyGui {
                     }
 
                     ui.separator();
+                    if self.instances.len() > 1 {
+                        ui.menu_button("Copy to", |ui| {
+                            // very fucky rust borrow checker shit so it is like this way
+                            let instance_to_add_idx = self
+                                .instances
+                                .iter()
+                                .enumerate()
+                                .filter(|(idx, _)| *idx != instance_index)
+                                .fold(None, |acc, (idx, instance)| {
+                                    if ui
+                                        .button(
+                                            instance
+                                                .path
+                                                .as_ref()
+                                                .unwrap()
+                                                .file_name()
+                                                .unwrap()
+                                                .to_str()
+                                                .unwrap(),
+                                        )
+                                        .clicked()
+                                    {
+                                        ui.close_menu();
+                                        Some(idx)
+                                    } else {
+                                        acc
+                                    }
+                                });
+
+                            if let Some(instance_to_add_idx) = instance_to_add_idx {
+                                let to_add = if self.instances[instance_index].selected.is_empty() {
+                                    vec![self.instances[instance_index].waddy.wad().entries
+                                        [texture_tile_index]
+                                        .clone()]
+                                } else {
+                                    self.instances[instance_index]
+                                        .selected
+                                        .iter()
+                                        .map(|&tile_idx| {
+                                            self.instances[instance_index].waddy.wad().entries
+                                                [tile_idx]
+                                                .clone()
+                                        })
+                                        .collect()
+                                };
+
+                                // manually add seems very sad
+                                to_add.into_iter().for_each(|new_entry| {
+                                    self.instances[instance_to_add_idx]
+                                        .waddy
+                                        .wad_mut()
+                                        .entries
+                                        .push(new_entry);
+
+                                    // update num_dirs
+                                    // TODO don't do this and have the writer write the numbers for us
+                                    self.instances[instance_to_add_idx]
+                                        .waddy
+                                        .wad_mut()
+                                        .header
+                                        .num_dirs += 1;
+
+                                    self.update_after_add_image(ui, instance_to_add_idx);
+                                });
+                            }
+                        });
+                    }
+
+                    ui.separator();
 
                     // delete when lots of selected or not
-                    if instance.selected.is_empty() {
+                    if self.instances[instance_index].selected.is_empty() {
                         if ui.button("Delete").clicked() {
                             texture_tile_to_delete = Some(vec![texture_tile_index]);
                             ui.close_menu();
                         }
                     } else if ui
-                        .button(format!("Delete ({})", instance.selected.len()))
+                        .button(format!(
+                            "Delete ({})",
+                            self.instances[instance_index].selected.len()
+                        ))
                         .clicked()
                     {
-                        texture_tile_to_delete = Some(instance.selected.clone());
-                        instance.selected.clear();
+                        texture_tile_to_delete =
+                            Some(self.instances[instance_index].selected.clone());
+                        self.instances[instance_index].selected.clear();
 
                         ui.close_menu()
                     }
@@ -243,22 +326,24 @@ impl WaddyGui {
                 // if left clicked, add to the list of selected
                 if clickable_image.clicked() {
                     if is_selected {
-                        instance.selected.remove(
-                            instance
-                                .selected
-                                .iter()
-                                .position(|&idx| idx == texture_tile_index)
-                                .unwrap(),
-                        );
+                        let to_delete = self.instances[instance_index]
+                            .selected
+                            .iter()
+                            .position(|&idx| idx == texture_tile_index)
+                            .unwrap();
+
+                        self.instances[instance_index].selected.remove(to_delete);
                     } else {
-                        instance.selected.push(texture_tile_index);
+                        self.instances[instance_index]
+                            .selected
+                            .push(texture_tile_index);
                     }
                 }
 
                 // middle click wound bring a new viewport
                 if clickable_image.middle_clicked() {
                     self.extra_image_viewports.push(WadImage::new(
-                        instance.texture_tiles[texture_tile_index]
+                        self.instances[instance_index].texture_tiles[texture_tile_index]
                             .image
                             .image
                             .texture(),
@@ -267,12 +352,13 @@ impl WaddyGui {
 
                 ui.end_row();
 
-                let current_tile = &mut instance.texture_tiles[texture_tile_index];
-
-                if current_tile.in_rename {
+                if self.instances[instance_index].texture_tiles[texture_tile_index].in_rename {
                     let widget = ui.add(
-                        egui::TextEdit::singleline(&mut current_tile.name)
-                            .font(egui::TextStyle::Small),
+                        egui::TextEdit::singleline(
+                            &mut self.instances[instance_index].texture_tiles[texture_tile_index]
+                                .name,
+                        )
+                        .font(egui::TextStyle::Small),
                     );
 
                     widget.request_focus();
@@ -282,13 +368,19 @@ impl WaddyGui {
                                 || widget.lost_focus()
                                 || !widget.has_focus()
                     {
+                        let current_tile =
+                            &mut self.instances[instance_index].texture_tiles[texture_tile_index];
+
                         current_tile.in_rename = false;
                         current_tile.name.clone_from(&current_tile.prev_name);
                     } else if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        let current_instance = &mut self.instances[instance_index];
+                        let current_tile = &mut current_instance.texture_tiles[texture_tile_index];
+
                         // this is the only case where the name is changed successfully
                         current_tile.in_rename = false;
 
-                        if let Err(err) = instance
+                        if let Err(err) = current_instance
                             .waddy
                             .rename_texture(texture_tile_index, current_tile.name.clone())
                         {
@@ -302,10 +394,13 @@ impl WaddyGui {
                             current_tile.name.clone_from(&current_tile.prev_name);
                         } else {
                             // this means things are good
-                            instance.is_changed = true;
+                            self.instances[instance_index].is_changed = true;
                         }
                     }
                 } else {
+                    let current_instance = &mut self.instances[instance_index];
+                    let current_tile = &mut current_instance.texture_tiles[texture_tile_index];
+
                     // beside the context menu, double click on the name would also enter rename mode
                     if ui
                         .label(custom_font(current_tile.name.clone()))
@@ -319,7 +414,12 @@ impl WaddyGui {
                 ui.end_row();
                 ui.label(custom_font(format!(
                     "{}x{}",
-                    current_tile.dimensions.0, current_tile.dimensions.1
+                    self.instances[instance_index].texture_tiles[texture_tile_index]
+                        .dimensions
+                        .0,
+                    self.instances[instance_index].texture_tiles[texture_tile_index]
+                        .dimensions
+                        .1
                 )));
             });
 
@@ -340,7 +440,7 @@ impl WaddyGui {
             BASE_IMAGE_TILE_SIZE * ui.ctx().options(|options| options.zoom_factor);
         let texture_per_row = ((ui.min_size().x / image_tile_size).floor() as usize).max(4);
 
-        ScrollArea::vertical().show(ui, |ui| {
+        ScrollArea::vertical().drag_to_scroll(false).show(ui, |ui| {
             egui::Grid::new("waddy_grid")
                 .num_columns(texture_per_row)
                 .spacing([2., 2.])
@@ -451,52 +551,58 @@ impl WaddyGui {
                         }
                     // if an image file is dropped, we will add that to the current wad file
                     } else if SUPPORTED_TEXTURE_FORMATS.contains(&ext.to_str().unwrap()) {
-                        if let Err(err) = self.instances[instance_index].waddy.add_texture(path) {
+                        if let Err(err) = self.instances[instance_index]
+                            .waddy
+                            .add_texture_from_path(path)
+                        {
                             println!("{}", err);
                         } else {
-                            // after adding a new texture, we have to update the gui to include that new file
-                            let new_entry = self.instances[instance_index]
-                                .waddy
-                                .wad()
-                                .entries
-                                .last()
-                                .unwrap();
-
-                            let texture_name = new_entry.directory_entry.texture_name.get_string();
-                            let dimensions =
-                                if let FileEntry::MipTex(miptex) = &new_entry.file_entry {
-                                    (miptex.width, miptex.height)
-                                } else {
-                                    unreachable!()
-                                };
-                            let wad_image = if let FileEntry::MipTex(miptex) = &new_entry.file_entry
-                            {
-                                WadImage::from_wad_image(
-                                    ui,
-                                    texture_name.clone(),
-                                    miptex.mip_images[0].data.get_bytes(),
-                                    miptex.palette.get_bytes(),
-                                    dimensions,
-                                )
-                            } else {
-                                unreachable!()
-                            };
-
-                            self.instances[instance_index]
-                                .texture_tiles
-                                .push(TextureTile::new(
-                                    instance_index,
-                                    texture_name,
-                                    LoadedImage { image: wad_image },
-                                    dimensions,
-                                ));
-
-                            self.instances[instance_index].is_changed = true;
+                            self.update_after_add_image(ui, instance_index);
                         }
                     }
                 }
             }
         }
+    }
+
+    // call it right after adding ONE image to the underlying WAD file to add new tile
+    fn update_after_add_image(&mut self, ui: &mut Ui, instance_index: usize) {
+        // after adding a new texture, we have to update the gui to include that new file
+        let new_entry = self.instances[instance_index]
+            .waddy
+            .wad()
+            .entries
+            .last()
+            .unwrap();
+
+        let texture_name = new_entry.directory_entry.texture_name.get_string();
+        let dimensions = if let FileEntry::MipTex(miptex) = &new_entry.file_entry {
+            (miptex.width, miptex.height)
+        } else {
+            unreachable!()
+        };
+        let wad_image = if let FileEntry::MipTex(miptex) = &new_entry.file_entry {
+            WadImage::from_wad_image(
+                ui,
+                texture_name.clone(),
+                miptex.mip_images[0].data.get_bytes(),
+                miptex.palette.get_bytes(),
+                dimensions,
+            )
+        } else {
+            unreachable!()
+        };
+
+        self.instances[instance_index]
+            .texture_tiles
+            .push(TextureTile::new(
+                instance_index,
+                texture_name,
+                LoadedImage { image: wad_image },
+                dimensions,
+            ));
+
+        self.instances[instance_index].is_changed = true;
     }
 
     // FIXME: it is ram guzzler

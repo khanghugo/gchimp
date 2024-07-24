@@ -48,6 +48,10 @@ impl Waddy {
         &self.wad
     }
 
+    pub fn wad_mut(&mut self) -> &mut Wad {
+        &mut self.wad
+    }
+
     /// Returns the info of the WAD file including header and non-content
     pub fn dump_info(&self) -> String {
         let mut res = String::new();
@@ -241,7 +245,10 @@ impl Waddy {
         self.wad.entries.remove(texture_index);
     }
 
-    pub fn add_texture(&mut self, path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
+    pub fn add_texture_from_path(
+        &mut self,
+        path: impl AsRef<Path> + Into<PathBuf>,
+    ) -> eyre::Result<()> {
         let res = generate_mipmaps(path.as_ref());
 
         if let Err(err) = res {
@@ -258,6 +265,8 @@ impl Waddy {
 
         let texture_name = path.as_ref().file_stem().unwrap().to_str().unwrap();
 
+        // remember to add numb_dirs explicitly....
+        // TODO maybe don't do this and have the writer write the numdirs for us
         self.wad.header.num_dirs += 1;
 
         let ([mip0, mip1, mip2, mip3], palette, dimensions) = res.unwrap();
@@ -330,7 +339,7 @@ mod test {
         //     .unwrap();
 
         waddy
-            .add_texture("/home/khang/gchimp/examples/waddy/cyberwave/z.bmp")
+            .add_texture_from_path("/home/khang/gchimp/examples/waddy/cyberwave/z.bmp")
             .unwrap();
 
         waddy
