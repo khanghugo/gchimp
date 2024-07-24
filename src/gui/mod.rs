@@ -17,8 +17,16 @@ mod programs;
 mod utils;
 
 trait TabProgram {
-    fn tab_title(&self) -> egui::WidgetText;
-    fn tab_ui(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse;
+    fn tab_title(&self) -> egui::WidgetText {
+        "MyProgram".into()
+    }
+
+    fn tab_ui(&mut self, ui: &mut egui::Ui) -> egui_tiles::UiResponse {
+        ui.separator();
+
+        // Make it non drag-able
+        egui_tiles::UiResponse::None
+    }
 }
 
 pub fn gui() -> Result<(), eframe::Error> {
