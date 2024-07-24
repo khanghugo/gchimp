@@ -188,7 +188,19 @@ impl Map2Mdl {
         // usually it should be the .map file
         resource_path: &Path,
         move_to_origin: bool,
+        export_resource: bool,
     ) -> eyre::Result<usize> {
+        // before splitting smd, we need to check if we want to split model
+        let model_count = textures_used.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
+        let textures_used_vec = textures_used.iter().collect::<Vec<&String>>();
+
+        // if we dont create any new resource, this is enough
+        if !export_resource {
+            self.log("Skipped creating qc, smd, and model files");
+
+            return Ok(model_count);
+        }
+
         let mut main_smd = Smd::new_basic();
 
         // if no ORIGIN brush given, then the centroid will be the centroid of the brush
@@ -225,10 +237,6 @@ impl Map2Mdl {
         // it should be the last step
         // because we are still processing over some data
         // add_bitmap_extension_to_texture(&mut main_smd);
-
-        // before splitting smd, we need to check if we want to split model
-        let model_count = textures_used.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
-        let textures_used_vec = textures_used.iter().collect::<Vec<&String>>();
 
         // the format of the file will follow
         // smd: <output><model index>_<smd_index>
@@ -360,6 +368,50 @@ impl Map2Mdl {
         });
 
         Ok(model_count)
+    }
+
+    fn maybe_export_texture(
+        &self,
+        textures_used: &HashSet<String>,
+        wads: &[&Wad],
+        simple_wads: &SimpleWad,
+    ) -> eyre::Result<()> {
+        // if all good, export texture if needed
+        if self.options.export_texture {
+            self.log(format!("Exporting {} texture(s)", textures_used.len()).as_str());
+
+            if let Some(err) = textures_used
+                .par_iter()
+                .filter(|tex| {
+                    if self.options.ignore_nodraw {
+                        !NO_RENDER_TEXTURE.contains(&tex.as_str())
+                    } else {
+                        true
+                    }
+                })
+                .map(|tex| {
+                    // textures will be exported inside studiomdl folder if convert entity
+                    let out_path_file = if let Some(map) = &self.map {
+                        map
+                    } else if let Some(studiomdl) = &self.options.studiomdl {
+                        studiomdl
+                    } else {
+                        unreachable!()
+                    };
+
+                    export_texture(
+                        wads[simple_wads.get(tex).unwrap().wad_file_index()],
+                        tex,
+                        out_path_file.with_file_name(tex),
+                    )
+                })
+                .find_any(|res| res.is_err())
+            {
+                return err;
+            }
+        }
+
+        Ok(())
     }
 
     pub fn work(&mut self) -> eyre::Result<()> {
@@ -532,41 +584,6 @@ impl Map2Mdl {
             return err!("Missing textures: {:?}", textures_missing);
         }
 
-        // if all good, export texture if needed
-        if self.options.export_texture {
-            self.log(format!("Exporting {} texture(s)", textures_used.len()).as_str());
-
-            if let Some(err) = textures_used
-                .par_iter()
-                .filter(|tex| {
-                    if self.options.ignore_nodraw {
-                        !NO_RENDER_TEXTURE.contains(&tex.as_str())
-                    } else {
-                        true
-                    }
-                })
-                .map(|tex| {
-                    // textures will be exported inside studiomdl folder if convert entity
-                    let out_path_file = if let Some(map) = &self.map {
-                        map
-                    } else if let Some(studiomdl) = &self.options.studiomdl {
-                        studiomdl
-                    } else {
-                        unreachable!()
-                    };
-
-                    export_texture(
-                        wads[simple_wads.get(tex).unwrap().wad_file_index()],
-                        tex,
-                        out_path_file.with_file_name(tex),
-                    )
-                })
-                .find_any(|res| res.is_err())
-            {
-                return err;
-            }
-        }
-
         // this is the main part
         // if we have a map file, we either convert the whole map or just selected entitities
         // if we don't have a map, we might have an entity pasted in the GUI part
@@ -591,6 +608,29 @@ impl Map2Mdl {
                         GCHIMP_INFO_ENTITY
                     );
                     return Ok(());
+                }
+
+                let map2mdl_export_resource = gchimp_info_entity
+                    .attributes
+                    .get("options")
+                    .unwrap()
+                    .parse::<usize>()
+                    .unwrap()
+                    & 2
+                    != 0;
+
+                if !map2mdl_export_resource {
+                    println!(
+                        "\
+map2mdl model export is not enabled as specified in {}. \
+This means gchimp will not export textures and convert entities into models. \
+However, it will still turn {} into model displaying entities such as cycler_sprite.",
+                        GCHIMP_INFO_ENTITY, GCHIMP_MAP2MDL_ENTITY_NAME
+                    );
+
+                    println!("Skipped creating textures")
+                } else {
+                    self.maybe_export_texture(&textures_used, &wads, &simple_wads)?;
                 }
 
                 let output_base_path =
@@ -723,6 +763,8 @@ impl Map2Mdl {
                             // always move to origin
                             // this makes the centroid more consistent when we move it back with entity
                             true,
+                            // if no export then the function returns right away
+                            map2mdl_export_resource,
                         )
                     })
                     .partition(|res| res.is_ok());
@@ -889,6 +931,8 @@ impl Map2Mdl {
             } else {
                 self.log("Converting whole map file");
 
+                self.maybe_export_texture(&textures_used, &wads, &simple_wads)?;
+
                 // just convert the whole map, very simple
                 self.log("Running convex hull clipping algorithm");
                 let smd_triangles = map_to_triangulated_smd(map, &simple_wads, false)?;
@@ -902,10 +946,13 @@ impl Map2Mdl {
                     output_path,
                     output_path,
                     self.options.move_to_origin,
+                    true,
                 )?;
             }
         } else if let Some(entity) = &entity_entity {
             self.log("Converting entity");
+
+            self.maybe_export_texture(&textures_used, &wads, &simple_wads)?;
 
             self.log("Running convex hull clipping algorithm");
             let smd_triangles = entity_to_triangulated_smd(entity, &simple_wads, false)?;
@@ -925,6 +972,7 @@ impl Map2Mdl {
                 output_path.as_path(),
                 output_path.as_path(),
                 self.options.move_to_origin,
+                true,
             )?;
         } else {
             unreachable!()

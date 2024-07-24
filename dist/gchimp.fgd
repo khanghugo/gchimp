@@ -5,6 +5,7 @@
     options(Flags) =
 	[
 		1: "Enable map2mdl" : 0
+		2: "Enable map2mdl resource export (still converts gchimp_map2mdl to cycler_sprite)" : 0
 	]
 ] 
 
