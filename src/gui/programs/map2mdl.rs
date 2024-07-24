@@ -34,6 +34,8 @@ impl Map2MdlGui {
     }
 
     fn run(&mut self) {
+        *self.sync.stdout().lock().unwrap() = "".to_string();
+
         let Config {
             studiomdl,
             crowbar: _,
