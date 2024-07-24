@@ -70,7 +70,30 @@ impl From<Vec<&Wad>> for SimpleWad {
     }
 }
 
+impl FromIterator<(std::string::String, SimpleWadEntry)> for SimpleWad {
+    fn from_iter<T: IntoIterator<Item = (std::string::String, SimpleWadEntry)>>(iter: T) -> Self {
+        let mut res = SimpleWad::new();
+
+        for (
+            key,
+            SimpleWadEntry {
+                wad_file_index,
+                dimensions,
+            },
+        ) in iter
+        {
+            res.insert(key, wad_file_index, dimensions);
+        }
+
+        res
+    }
+}
+
 impl SimpleWad {
+    pub fn new() -> Self {
+        Self(HashMap::<_, _>::new())
+    }
+
     pub fn from_wads(value: &[Wad]) -> Self {
         value.into()
     }

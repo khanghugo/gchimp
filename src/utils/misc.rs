@@ -3,6 +3,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use super::constants::TEXTURE_PREFIXES;
+
 pub fn maybe_add_extension_to_string(s: &str, ext: &str) -> String {
     let ext_with_dot = format!(".{}", ext);
 
@@ -30,6 +32,12 @@ pub fn relative_to_less_relative(root: &Path, relative: &Path) -> PathBuf {
 // i use linux to do things
 pub fn fix_backslash(i: &str) -> String {
     i.replace("\\", "/")
+}
+
+pub fn remove_texture_prefix(i: &str) -> String {
+    TEXTURE_PREFIXES
+        .iter()
+        .fold(i.to_owned(), |acc, e| acc.replace(e, ""))
 }
 
 #[macro_export]

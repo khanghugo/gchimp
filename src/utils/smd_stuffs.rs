@@ -4,7 +4,7 @@ use smd::{Smd, Triangle};
 
 use crate::err;
 
-use super::constants::MAX_SMD_TRIANGLE;
+use super::{constants::MAX_SMD_TRIANGLE, misc::remove_texture_prefix};
 
 pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
     maybe_split_smd(smd)
@@ -113,6 +113,16 @@ pub fn add_bitmap_extension_to_texture(smd: &mut Smd) {
     smd.triangles
         .iter_mut()
         .for_each(|triangle| triangle.material += ".bmp");
+}
+
+pub fn remove_texture_prefix_smd(smd: &mut Smd) {
+    if smd.triangles.is_empty() {
+        return;
+    }
+
+    smd.triangles.iter_mut().for_each(|triangle| {
+        triangle.material = remove_texture_prefix(triangle.material.as_str());
+    })
 }
 
 pub fn with_selected_textures(smd: &Smd, textures: &[&String]) -> eyre::Result<Smd> {

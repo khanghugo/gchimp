@@ -503,7 +503,7 @@ mod test {
     use map::Attributes;
     use smd::Smd;
 
-    use crate::utils::constants::EMPTY_TEXTURE;
+    use crate::utils::constants::TRENCHBROOM_EMPTY_TEXTURE;
 
     use super::*;
 
@@ -820,7 +820,11 @@ mod test {
     fn rectangular_prism_from_mins_maxs() {
         let path = "/home/khang/gchimp/examples/map2prop/marked/fuck.map";
         let mut map = Map::from_file(path).unwrap();
-        let brush = brush_from_mins_maxs(&[0., 0., 0.], &[364., 364., 364.], EMPTY_TEXTURE);
+        let brush = brush_from_mins_maxs(
+            &[0., 0., 0.],
+            &[364., 364., 364.],
+            TRENCHBROOM_EMPTY_TEXTURE,
+        );
 
         map.entities.push(Entity {
             attributes: Attributes::new(),
