@@ -125,7 +125,7 @@ impl TabProgram for Map2MdlGui {
                     ui.add_enabled_ui(self.use_entity, |ui| {
                         ui.add(
                             egui::TextEdit::singleline(&mut self.entity)
-                                .hint_text("Worldbrush entity copied from TB"),
+                                .hint_text("Worldbrush entity copied from TrechBroom"),
                         );
                     });
                     if ui.button("Clear").clicked() {
