@@ -437,7 +437,7 @@ impl fmt::Display for QcCommand {
             QcCommand::ClipToTextures => Ok(()),
             QcCommand::Scale(x) => write!(f, "{}", x),
             QcCommand::TextureRenderMode { texture, render } => {
-                write!(f, "{} {}", texture, render)
+                write!(f, "\"{}\" {}", texture, render)
             }
             QcCommand::Gamma(x) => write!(f, "{}", x),
             QcCommand::Origin(x) => write!(
