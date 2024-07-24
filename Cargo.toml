@@ -26,7 +26,7 @@ clap = { version = "4.5.4", features = ["derive"] }
 ndarray = "0.15.6"
 
 # egui stuffs
-eframe = { version = "0.28.0", features = ["accesskit", "default_fonts", "wayland", "x11"] }
+eframe = { version = "0.28.1", features = ["accesskit", "default_fonts", "wayland", "x11"] }
 env_logger = "0.11.3"
 egui_tiles = "0.9.0"
 rfd = "0.14.1"
