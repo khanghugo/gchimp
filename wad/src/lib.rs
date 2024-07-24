@@ -52,7 +52,7 @@ impl Default for Header {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DirectoryEntry {
     pub entry_offset: i32,
     pub disk_size: i32,
@@ -79,7 +79,7 @@ impl DirectoryEntry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Don't use to_string() method.
 ///
 /// Use get_string() instead
@@ -127,7 +127,7 @@ impl TextureName {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Image(Vec<u8>);
 
 impl Image {
@@ -140,7 +140,7 @@ impl Image {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Palette(Vec<[u8; 3]>);
 
 impl Palette {
@@ -168,7 +168,7 @@ impl Display for TextureName {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Qpic {
     pub width: u32,
     pub height: u32,
@@ -179,7 +179,7 @@ pub struct Qpic {
     pub palette: Palette,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MipMap {
     // [[u8; width]; height]
     pub data: Image,
@@ -193,7 +193,7 @@ impl MipMap {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MipTex {
     /// The texture name might be different from the directory entry.
     ///
@@ -243,13 +243,13 @@ impl MipTex {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CharInfo {
     pub startoffset: i16,
     pub charwidth: i16,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Font {
     pub width: u32,
     pub height: u32,
@@ -263,7 +263,7 @@ pub struct Font {
 }
 
 // this is not how it looks in file
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Entry {
     pub directory_entry: DirectoryEntry,
     pub file_entry: FileEntry,
@@ -299,7 +299,7 @@ impl Entry {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FileEntry {
     Qpic(Qpic),
     MipTex(MipTex),
