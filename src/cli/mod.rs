@@ -17,10 +17,24 @@ pub enum CliRes {
 }
 
 pub trait Cli {
-    fn name(&self) -> &'static str;
+    fn name(&self) -> &'static str {
+        "my_module"
+    }
+
     /// Each module has to handle the arguments by itself.
-    fn cli(&self) -> CliRes;
-    fn cli_help(&self);
+    fn cli(&self) -> CliRes {
+        CliRes::Ok
+    }
+
+    fn cli_help(&self) {
+        println!(
+            "\
+my_module
+
+Some help text
+"
+        );
+    }
 }
 
 /// Runs command-line options
