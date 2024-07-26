@@ -8,6 +8,7 @@ pub mod map2mdl;
 pub mod rotate_prop_static;
 pub mod s2g;
 pub mod skymod;
+pub mod split_model;
 pub mod textile;
 pub mod texture_scale;
 pub mod waddy;

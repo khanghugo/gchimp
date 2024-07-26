@@ -7,6 +7,7 @@ mod light_scale;
 mod map2mdl;
 mod rotate_prop_static;
 mod s2g;
+mod split_model;
 mod texture_scale;
 
 pub enum CliRes {
@@ -43,6 +44,7 @@ pub fn cli() -> CliRes {
         &check_missing_texture::CheckMissingTexture,
         &check_illegal_brush::CheckIllegalBrush,
         &map2mdl::Map2MdlCli,
+        &split_model::SplitModel,
     ];
 
     let help = || {
