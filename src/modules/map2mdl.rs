@@ -1120,4 +1120,37 @@ mod test {
             .work()
             .unwrap();
     }
+
+    #[test]
+    fn edge_case_cut_cube_diagonally_first() {
+        let mut binding = Map2Mdl::default();
+        binding
+            .auto_pickup_wad(true)
+            .move_to_origin(false)
+            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
+            .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
+            .entity("\
+// Game: Half-Life
+// Format: Valve
+// entity 0
+{
+\"mapversion\" \"220\"
+\"wad\" \"/home/khang/map_compiler/sdhlt.wad;/home/khang/map_compiler/surf_ben10.wad\"
+\"classname\" \"worldspawn\"
+\"_tb_mod\" \"cstrike;cstrike_downloads\"
+\"_tb_def\" \"external:/home/khang/map_compiler/combined.fgd\"
+// brush 0
+{
+( -32 32 -32 ) ( -32 -32 32 ) ( 96 -32 32 ) benowykingkurti [ -1 0 0 0 ] [ 0 -0.7071067811865476 0.7071067811865476 0 ] 0 1 1
+( -32 -32 16 ) ( -32 -31 16 ) ( -32 -32 17 ) benowykingkurti [ 0 -1 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( -16 32 32 ) ( -16 33 32 ) ( -15 32 32 ) benowykingkurti [ 1 0 0 0 ] [ 0 -1 0 0 ] 0 1 1
+( -16 32 32 ) ( -15 32 32 ) ( -16 32 33 ) benowykingkurti [ -1 0 0 0 ] [ 0 0 -1 0 ] 0 1 1
+( 32 32 32 ) ( 32 32 33 ) ( 32 33 32 ) benowykingkurti [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
+}
+}
+
+")
+            .work()
+            .unwrap();
+    }
 }

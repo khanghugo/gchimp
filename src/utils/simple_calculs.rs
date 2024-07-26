@@ -922,10 +922,7 @@ impl ConvexPolytope {
                     .cloned()
                     .enumerate()
                     .partition(|(_, vertex)| {
-                        matches!(
-                            plane.side_of_point(*vertex),
-                            SideOfPoint::In | SideOfPoint::On
-                        )
+                        matches!(plane.side_of_point(*vertex), SideOfPoint::In)
                     });
                 // lemma: since we are doing convex polygon, only the firstmost and fartmost vertices are connected
                 // to the other cut
