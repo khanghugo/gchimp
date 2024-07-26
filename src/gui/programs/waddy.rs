@@ -544,13 +544,8 @@ impl WaddyGui {
         });
 
         // Pasting an image from clipboard with Ctrl + V
-        let should_add_pasted_image = ui.input(|i| {
-            if i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::V) {
-                true
-            } else {
-                false
-            }
-        });
+        let should_add_pasted_image = ui
+            .input(|i| i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::V));
 
         if should_add_pasted_image {
             if let Ok(mut clipboard) = Clipboard::new() {
@@ -584,13 +579,7 @@ impl WaddyGui {
         }
 
         // ESC to clear selected and close menu
-        let is_escape_pressed = ui.input(|i| {
-            if i.key_released(egui::Key::Escape) {
-                true
-            } else {
-                false
-            }
-        });
+        let is_escape_pressed = ui.input(|i| i.key_released(egui::Key::Escape));
 
         if is_escape_pressed {
             ui.close_menu();
