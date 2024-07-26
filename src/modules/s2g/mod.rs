@@ -586,12 +586,12 @@ impl S2GBuilder {
             let goldsrc_mdl_path = goldsrc_qc_path.with_extension("mdl");
 
             if self.options.add_suffix {
-                goldsrc_qc.add_model_name(goldsrc_mdl_path.display().to_string().as_str());
+                goldsrc_qc.set_model_name(goldsrc_mdl_path.display().to_string().as_str());
             } else {
                 let goldsrc_model_path = goldsrc_qc_path
                     .with_file_name(qc_path.file_stem().unwrap().to_str().unwrap())
                     .with_extension("mdl");
-                goldsrc_qc.add_model_name(goldsrc_model_path.display().to_string().as_str());
+                goldsrc_qc.set_model_name(goldsrc_model_path.display().to_string().as_str());
             };
 
             if self.options.flatshade {

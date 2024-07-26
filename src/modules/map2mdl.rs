@@ -307,14 +307,14 @@ impl Map2Mdl {
                 // fix rotation
                 new_qc.add_origin(0., 0., 0., Some(270.));
 
-                new_qc.add_model_name(
+                new_qc.set_model_name(
                     output_path
                         .with_file_name(format!("{}.mdl", model_name))
                         .to_str()
                         .unwrap(),
                 );
-                new_qc.add_cd(resource_path.parent().unwrap().to_str().unwrap());
-                new_qc.add_cd_texture(resource_path.parent().unwrap().to_str().unwrap());
+                new_qc.set_cd(resource_path.parent().unwrap().to_str().unwrap());
+                new_qc.set_cd_texture(resource_path.parent().unwrap().to_str().unwrap());
 
                 current_model_textures.iter().for_each(|texture| {
                     // for the best results, TexTile does convert to compliant transparent texture

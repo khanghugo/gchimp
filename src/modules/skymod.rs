@@ -421,9 +421,9 @@ impl SkyModBuilder {
                 .with_file_name(format!("{}{}", &self.options.output_name, model_index))
                 .with_extension("mdl");
 
-            qc.add_model_name(model_name.to_str().unwrap());
-            qc.add_cd(root_path.to_str().unwrap());
-            qc.add_cd_texture(root_path.to_str().unwrap());
+            qc.set_model_name(model_name.to_str().unwrap());
+            qc.set_cd(root_path.to_str().unwrap());
+            qc.set_cd_texture(root_path.to_str().unwrap());
 
             if self.options.flatshade {
                 for texture_index in 0..6 {
