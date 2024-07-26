@@ -2,7 +2,7 @@ pub static MAX_GOLDSRC_TEXTURE_SIZE: u32 = 512;
 
 // divided by 2 just to be safe
 // divided by 2 again because what the fuck
-pub static MAX_SMD_TRIANGLE: usize = 4080 / 2 / 2;
+pub static MAX_SMD_TRIANGLE: usize = 1500;
 pub static MAX_SMD_PER_MODEL: usize = 32;
 
 pub static STUDIOMDL_ERROR_PATTERN: &str = "************ ERROR ************";
