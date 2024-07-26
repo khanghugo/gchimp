@@ -30,13 +30,16 @@ trait TabProgram {
 }
 
 pub fn gui() -> Result<(), eframe::Error> {
-    env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
+    // let icon = egui::IconData::from("../.././media/logo.png");
+    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../.././media/logo.png")).unwrap();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             // This is OKAY for now.
             .with_inner_size([PROGRAM_WIDTH, PROGRAM_HEIGHT])
-            .with_drag_and_drop(true),
+            .with_drag_and_drop(true)
+            .with_icon(icon),
+
         ..Default::default()
     };
 
