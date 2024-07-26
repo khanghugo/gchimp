@@ -623,6 +623,10 @@ impl Qc {
         &self.commands
     }
 
+    pub fn commands_mut(&mut self) -> &mut Vec<QcCommand> {
+        &mut self.commands
+    }
+
     /// Add a [`QcCommand::Body`]
     pub fn add_body(
         &mut self,
@@ -655,7 +659,7 @@ impl Qc {
     }
 
     /// Sets [`QcCommand::ModelName`] if exists or adds new one
-    pub fn add_model_name(&mut self, name: &str) -> &mut Self {
+    pub fn set_model_name(&mut self, name: &str) -> &mut Self {
         let model_name = self
             .commands
             .iter_mut()
@@ -669,7 +673,7 @@ impl Qc {
         }
     }
 
-    pub fn add_cd(&mut self, cd_path: &str) -> &mut Self {
+    pub fn set_cd(&mut self, cd_path: &str) -> &mut Self {
         let cd = self
             .commands
             .iter_mut()
@@ -683,7 +687,7 @@ impl Qc {
         }
     }
 
-    pub fn add_cd_texture(&mut self, cd_path: &str) -> &mut Self {
+    pub fn set_cd_texture(&mut self, cd_path: &str) -> &mut Self {
         let cd = self
             .commands
             .iter_mut()
