@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use qc::{Qc, QcCommand};
+use qc::Qc;
 use rayon::prelude::*;
 
 use smd::Smd;
