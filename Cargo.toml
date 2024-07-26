@@ -24,6 +24,7 @@ quantette = { version = "0.2.0", features = ["kmeans", "threads", "pipelines", "
 image = { version = "0.25.1", features = ["png"] }
 clap = { version = "4.5.4", features = ["derive"] }
 ndarray = "0.15.6"
+arboard = "3.4.0"
 
 # egui stuffs
 eframe = { version = "0.28.1", features = ["accesskit", "default_fonts", "wayland", "x11"] }

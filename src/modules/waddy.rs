@@ -4,13 +4,15 @@ use std::{
     str::from_utf8,
 };
 
+use image::RgbaImage;
 use rayon::prelude::*;
 
 use eyre::eyre;
 use wad::{Entry, Wad};
 
 use crate::utils::img_stuffs::{
-    eight_bpp_bitmap_to_png_bytes, generate_mipmaps, write_8bpp_to_file,
+    eight_bpp_bitmap_to_png_bytes, generate_mipmaps_from_path, generate_mipmaps_from_rgba_image,
+    write_8bpp_to_file, GenerateMipmapsResult,
 };
 
 pub struct Waddy {
@@ -245,31 +247,16 @@ impl Waddy {
         self.wad.entries.remove(texture_index);
     }
 
-    pub fn add_texture_from_path(
+    fn add_texture_from_generated_mipmaps(
         &mut self,
-        path: impl AsRef<Path> + Into<PathBuf>,
-    ) -> eyre::Result<()> {
-        let res = generate_mipmaps(path.as_ref());
-
-        if let Err(err) = res {
-            let err_str = format!(
-                "Cannot convert {} to 8bpp: {}",
-                path.as_ref().display(),
-                err
-            );
-
-            self.log(&err_str);
-
-            return Err(eyre!(err_str));
-        }
-
-        let texture_name = path.as_ref().file_stem().unwrap().to_str().unwrap();
-
-        // remember to add numb_dirs explicitly....
-        // TODO maybe don't do this and have the writer write the numdirs for us
-        self.wad.header.num_dirs += 1;
-
-        let ([mip0, mip1, mip2, mip3], palette, dimensions) = res.unwrap();
+        texture_name: &str,
+        res: GenerateMipmapsResult,
+    ) {
+        let GenerateMipmapsResult {
+            mips: [mip0, mip1, mip2, mip3],
+            palette,
+            dimensions,
+        } = res;
 
         let new_entry = Entry::new(
             texture_name,
@@ -278,7 +265,34 @@ impl Waddy {
             palette.as_slice(),
         );
 
+        // remember to add numb_dirs explicitly....
+        // TODO maybe don't do this and have the writer write the numdirs for us
+        self.wad.header.num_dirs += 1;
+
         self.wad.entries.push(new_entry);
+    }
+
+    pub fn add_texture_from_rgba_image(
+        &mut self,
+        texture_name: &str,
+        image: RgbaImage,
+    ) -> eyre::Result<()> {
+        let res = generate_mipmaps_from_rgba_image(image)?;
+
+        self.add_texture_from_generated_mipmaps(texture_name, res);
+
+        Ok(())
+    }
+
+    pub fn add_texture_from_path(
+        &mut self,
+        path: impl AsRef<Path> + Into<PathBuf>,
+    ) -> eyre::Result<()> {
+        let res = generate_mipmaps_from_path(path.as_ref())?;
+
+        let texture_name = path.as_ref().file_stem().unwrap().to_str().unwrap();
+
+        self.add_texture_from_generated_mipmaps(texture_name, res);
 
         Ok(())
     }

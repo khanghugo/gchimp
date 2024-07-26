@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
+use arboard::Clipboard;
 use eframe::egui::{self, Context, Modifiers, RichText, ScrollArea, Sense, Ui};
+use image::{ImageBuffer, RgbaImage};
 use wad::FileEntry;
 
 use rayon::prelude::*;
@@ -520,16 +522,56 @@ impl WaddyGui {
         ui.separator();
         self.texture_grid(ui, instance_index);
 
-        let ctx = ui.ctx();
-
-        self.display_image_viewports(ctx);
-
-        // CTRL+S
+        // Save WAD file with Ctrl + S
         ui.input(|i| {
             if i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::S) {
                 self.menu_save(instance_index);
             }
         });
+
+        // Pasting an image from clipboard with Ctrl + V
+        let should_add_pasted_image = ui.input(|i| {
+            if i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::V) {
+                true
+            } else {
+                false
+            }
+        });
+
+        if should_add_pasted_image {
+            if let Ok(mut clipboard) = Clipboard::new() {
+                if let Ok(image) = clipboard.get_image() {
+                    let rgba_image: RgbaImage = ImageBuffer::from_raw(
+                        image.width as u32,
+                        image.height as u32,
+                        image.bytes.into_owned(),
+                    )
+                    .unwrap();
+
+                    self.instances[instance_index]
+                        .waddy
+                        .add_texture_from_rgba_image("pasted_texture", rgba_image)
+                        .unwrap();
+                    self.update_after_add_image(ui, instance_index);
+                } else if let Ok(uri) = clipboard.get_text() {
+                    if uri.starts_with("file://") {
+                        if let Ok(image) = image::open(uri.replace("file://", "")) {
+                            let rgba_image = image.into_rgba8();
+
+                            self.instances[instance_index]
+                                .waddy
+                                .add_texture_from_rgba_image("pasted_texture", rgba_image)
+                                .unwrap();
+                            self.update_after_add_image(ui, instance_index);
+                        }
+                    }
+                }
+            }
+        }
+
+        let ctx = ui.ctx();
+
+        self.display_image_viewports(ctx);
 
         preview_file_being_dropped(ctx);
 

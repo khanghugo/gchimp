@@ -16,6 +16,8 @@ use crate::utils::constants::MAX_GOLDSRC_TEXTURE_SIZE;
 
 use super::constants::{PALETTE_PAD_COLOR, PALETTE_TRANSPARENT_COLOR};
 
+use crate::err;
+
 type Palette = Vec<quantette::palette::rgb::Rgb<quantette::palette::encoding::Srgb, u8>>;
 
 /// The pixels are quantized with following palette.
@@ -333,11 +335,17 @@ pub fn eight_bpp_transparent_img(
     (new_img, new_palette)
 }
 
+pub struct GenerateMipmapsResult {
+    pub mips: [Vec<u8>; 4],
+    pub palette: Vec<[u8; 3]>,
+    pub dimensions: (u32, u32),
+}
+
 // the idea is that if the input file is a bitmap, just don't do anything :)
 #[allow(clippy::type_complexity)]
 fn _generate_mipmaps_indexed_bmp(
     img_path: impl AsRef<Path> + Into<PathBuf>,
-) -> eyre::Result<([Vec<u8>; 4], Vec<[u8; 3]>, (u32, u32))> {
+) -> eyre::Result<GenerateMipmapsResult> {
     let img_file = OpenOptions::new().read(true).open(img_path.as_ref())?;
 
     let decoder = BmpDecoder::new(BufReader::new(img_file))?;
@@ -369,31 +377,32 @@ fn _generate_mipmaps_indexed_bmp(
     let mip2 = vec![0u8; width as usize * height as usize / 4 / 4];
     let mip3 = vec![0u8; width as usize * height as usize / 4 / 4 / 4];
 
-    Ok(([mip0, mip1, mip2, mip3], palette, (width, height)))
+    Ok(GenerateMipmapsResult {
+        mips: [mip0, mip1, mip2, mip3],
+        palette,
+        dimensions: (width, height),
+    })
 }
 
 // TODO: better mipmaps generation because this is very SHIT
-#[allow(clippy::type_complexity)]
-pub fn generate_mipmaps(
-    img_path: impl AsRef<Path> + Into<PathBuf>,
-) -> eyre::Result<([Vec<u8>; 4], Vec<[u8; 3]>, (u32, u32))> {
-    // if it is bitmap, then for now don't generate any bitmap
-    // dont even do any thing really.
-    // just return the original image and mipmaps are dummy
-    // unless the bitmap is not indexed, then process normally
-    if img_path.as_ref().extension().unwrap() == "bmp" {
-        let res = _generate_mipmaps_indexed_bmp(img_path.as_ref());
-
-        if let Ok(res) = res {
-            return Ok(res);
-        }
-    };
-
-    let img = image::open(img_path.as_ref())?.into_rgba8();
+pub fn generate_mipmaps_from_rgba_image(img: RgbaImage) -> eyre::Result<GenerateMipmapsResult> {
     let mip0 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
 
-    let mip0 = rgba8_to_rgb8(mip0)?;
-    let (mip0, palette_color) = quantize_image(mip0)?;
+    let mip0 = rgba8_to_rgb8(mip0);
+
+    if let Err(err) = mip0 {
+        return err!("Cannot convert rgba8 to rgb8: {}", err);
+    }
+
+    let mip0 = mip0.unwrap();
+
+    let quantize_res = quantize_image(mip0);
+
+    if let Err(err) = quantize_res {
+        return err!("Cannot quantize image: {}", err);
+    }
+
+    let (mip0, palette_color) = quantize_res.unwrap();
 
     let (width, height) = mip0.dimensions();
 
@@ -418,7 +427,31 @@ pub fn generate_mipmaps(
     let mip2 = rgb8_to_8bpp(mip2, &palette);
     let mip3 = rgb8_to_8bpp(mip3, &palette);
 
-    Ok(([mip0, mip1, mip2, mip3], palette, (width, height)))
+    Ok(GenerateMipmapsResult {
+        mips: [mip0, mip1, mip2, mip3],
+        palette,
+        dimensions: (width, height),
+    })
+}
+
+pub fn generate_mipmaps_from_path(
+    img_path: impl AsRef<Path> + Into<PathBuf>,
+) -> eyre::Result<GenerateMipmapsResult> {
+    // if it is bitmap, then for now don't generate any bitmap
+    // dont even do any thing really.
+    // just return the original image and mipmaps are dummy
+    // unless the bitmap is not indexed, then process normally
+    if img_path.as_ref().extension().unwrap() == "bmp" {
+        let res = _generate_mipmaps_indexed_bmp(img_path.as_ref());
+
+        if let Ok(res) = res {
+            return Ok(res);
+        }
+    };
+
+    let img = image::open(img_path.as_ref())?.into_rgba8();
+
+    generate_mipmaps_from_rgba_image(img)
 }
 
 #[derive(Debug)]
