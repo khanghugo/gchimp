@@ -30,6 +30,7 @@ struct WaddyInstance {
     // so the user can save the file
     is_changed: bool,
     selected: Vec<usize>,
+    to_delete: Vec<usize>,
 }
 
 struct LoadedImage {
@@ -85,9 +86,7 @@ impl WaddyGui {
         instance_index: usize,
         texture_tile_index: usize,
         image_tile_size: f32,
-    ) -> Option<Vec<usize>> {
-        let mut texture_tile_to_delete: Option<Vec<usize>> = None;
-
+    ) {
         // FIXME: reduce ram usage by at least 4 times
         let current_id = egui::Id::new(format!(
             "{}{}",
@@ -233,8 +232,36 @@ impl WaddyGui {
                         }
                     }
 
-                    ui.separator();
+                    if ui.button("Clipboard").clicked() {
+                        let image =
+                            &self.instances[instance_index].waddy.wad().entries[texture_tile_index];
+
+                        if let Ok(mut clipboard) = Clipboard::new() {
+                            clipboard
+                                .set_image(arboard::ImageData {
+                                    width: image.file_entry.dimensions().0 as usize,
+                                    height: image.file_entry.dimensions().1 as usize,
+                                    bytes: image
+                                        .file_entry
+                                        .image()
+                                        .iter()
+                                        .flat_map(|color_idx| {
+                                            let [r, g, b] =
+                                                image.file_entry.palette()[*color_idx as usize];
+                                            [r, g, b, 255]
+                                        })
+                                        .collect::<Vec<u8>>()
+                                        .into(),
+                                })
+                                .unwrap();
+                        }
+
+                        ui.close_menu();
+                    }
+
                     if self.instances.len() > 1 {
+                        ui.separator();
+
                         ui.menu_button("Copy to", |ui| {
                             // very fucky rust borrow checker shit so it is like this way
                             let instance_to_add_idx = self
@@ -307,7 +334,10 @@ impl WaddyGui {
                     // delete when lots of selected or not
                     if self.instances[instance_index].selected.is_empty() {
                         if ui.button("Delete").clicked() {
-                            texture_tile_to_delete = Some(vec![texture_tile_index]);
+                            self.instances[instance_index]
+                                .to_delete
+                                .push(texture_tile_index);
+
                             ui.close_menu();
                         }
                     } else if ui
@@ -317,9 +347,10 @@ impl WaddyGui {
                         ))
                         .clicked()
                     {
-                        texture_tile_to_delete =
-                            Some(self.instances[instance_index].selected.clone());
-                        self.instances[instance_index].selected.clear();
+                        let mut to_deletes = self.instances[instance_index].selected.clone();
+                        self.instances[instance_index]
+                            .to_delete
+                            .append(&mut to_deletes);
 
                         ui.close_menu()
                     }
@@ -328,13 +359,13 @@ impl WaddyGui {
                 // if left clicked, add to the list of selected
                 if clickable_image.clicked() {
                     if is_selected {
-                        let to_delete = self.instances[instance_index]
+                        let unselect_idx = self.instances[instance_index]
                             .selected
                             .iter()
                             .position(|&idx| idx == texture_tile_index)
                             .unwrap();
 
-                        self.instances[instance_index].selected.remove(to_delete);
+                        self.instances[instance_index].selected.remove(unselect_idx);
                     } else {
                         self.instances[instance_index]
                             .selected
@@ -424,8 +455,6 @@ impl WaddyGui {
                         .1
                 )));
             });
-
-        texture_tile_to_delete
     }
 
     fn display_image_viewports(&mut self, ctx: &Context) {
@@ -454,22 +483,7 @@ impl WaddyGui {
                             ui.end_row()
                         }
 
-                        if let Some(mut to_delete) = self.texture_tile(
-                            ui,
-                            instance_index,
-                            texture_tile_index,
-                            image_tile_size,
-                        ) {
-                            to_delete.sort();
-
-                            to_delete.iter().rev().for_each(|&delete| {
-                                self.instances[instance_index].texture_tiles.remove(delete);
-                                self.instances[instance_index].waddy.remove_texture(delete);
-                            });
-
-                            self.instances[instance_index].is_changed = true;
-                            break;
-                        }
+                        self.texture_tile(ui, instance_index, texture_tile_index, image_tile_size);
                     }
                 });
         });
@@ -567,6 +581,47 @@ impl WaddyGui {
                     }
                 }
             }
+        }
+
+        // ESC to clear selected and close menu
+        let is_escape_pressed = ui.input(|i| {
+            if i.key_released(egui::Key::Escape) {
+                true
+            } else {
+                false
+            }
+        });
+
+        if is_escape_pressed {
+            ui.close_menu();
+            self.instances[instance_index].selected.clear();
+        }
+
+        // DEL to delete texture(s)
+        // This only works when there's selected texture so...
+        ui.input(|i| {
+            if i.key_released(egui::Key::Delete) {
+                let mut to_delete = self.instances[instance_index].selected.clone();
+
+                self.instances[instance_index]
+                    .to_delete
+                    .append(&mut to_delete)
+            }
+        });
+
+        // Delete textures if there's any
+        if !self.instances[instance_index].to_delete.is_empty() {
+            let mut to_delete = self.instances[instance_index].to_delete.clone();
+            to_delete.sort();
+
+            to_delete.iter().rev().for_each(|&delete| {
+                self.instances[instance_index].texture_tiles.remove(delete);
+                self.instances[instance_index].waddy.remove_texture(delete);
+            });
+
+            self.instances[instance_index].to_delete.clear();
+            self.instances[instance_index].selected.clear();
+            self.instances[instance_index].is_changed = true;
         }
 
         let ctx = ui.ctx();
@@ -691,6 +746,7 @@ impl WaddyGui {
             texture_tiles,
             is_changed: false,
             selected: vec![],
+            to_delete: vec![],
         });
 
         Ok(())
