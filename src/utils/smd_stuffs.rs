@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use glam::DVec3;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use smd::{Smd, Triangle};
@@ -176,4 +178,14 @@ pub fn find_mins_maxs(triangles: &[Triangle]) -> [[f64; 3]; 2] {
     });
 
     [[minx, miny, minz], [maxx, maxy, maxz]]
+}
+
+pub fn textures_used_in_triangles(triangles: &[Triangle]) -> HashSet<String> {
+    triangles.iter().fold(HashSet::new(), |mut acc, e| {
+        if !acc.contains(&e.material) {
+            acc.insert(e.material.clone());
+        }
+
+        acc
+    })
 }

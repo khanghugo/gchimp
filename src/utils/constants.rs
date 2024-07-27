@@ -13,6 +13,8 @@ pub static PALETTE_TRANSPARENT_COLOR: [u8; 3] = [0, 255, 0];
 
 pub static ORIGIN_TEXTURE: &str = "ORIGIN";
 pub static CLIP_TEXTURE: &str = "CLIP";
+pub static CONTENTWATER_TEXTURE: &str = "CONTENTWATER";
+
 pub static NO_RENDER_TEXTURE: &[&str] = &[
     "NULL",
     "HINT",
@@ -21,6 +23,7 @@ pub static NO_RENDER_TEXTURE: &[&str] = &[
     "sky",
     ORIGIN_TEXTURE,
     CLIP_TEXTURE,
+    CONTENTWATER_TEXTURE,
 ];
 pub static TRENCHBROOM_EMPTY_TEXTURE: &str = "__TB_empty";
 

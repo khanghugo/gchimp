@@ -16,8 +16,8 @@ use crate::{
     err,
     utils::{
         constants::{
-            CLIP_TEXTURE, GCHIMP_INFO_ENTITY, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE,
-            ORIGIN_TEXTURE,
+            CLIP_TEXTURE, CONTENTWATER_TEXTURE, GCHIMP_INFO_ENTITY,
+            MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE, ORIGIN_TEXTURE,
         },
         map_stuffs::{
             brush_from_mins_maxs, check_gchimp_info_entity, entity_to_triangulated_smd,
@@ -26,13 +26,32 @@ use crate::{
         run_bin::run_studiomdl,
         smd_stuffs::{
             add_bitmap_extension_to_texture, find_centroid, find_centroid_from_triangles,
-            find_mins_maxs, maybe_split_smd, move_by, with_selected_textures,
+            find_mins_maxs, maybe_split_smd, move_by, textures_used_in_triangles,
+            with_selected_textures,
         },
         wad_stuffs::{export_texture, SimpleWad},
     },
 };
 
 pub static GCHIMP_MAP2MDL_ENTITY_NAME: &str = "gchimp_map2mdl";
+
+struct ConvertFromTrianglesOptions<'a> {
+    // output path would be where the model ends up with
+    // output path should be the .mdl file
+    output_path: &'a Path,
+    // resource path is where qc smd and textures file are stored
+    // usually it should be the .map file
+    resource_path: &'a Path,
+    move_to_origin: bool,
+    export_resource: bool,
+    // contentwater and such
+    // when converting a whole map, maybe don't enable it but smaller one should
+    // the reason why is that a whole map would have all triangles included in ONE smd
+    // then that one smd is split. One CONTENTWATER would make the entire smd contentwater
+    // could be something fixed with planning the steps going differently
+    // TODO: maybe add triangles to smd one brush by one brush
+    use_special_texture: bool,
+}
 
 #[derive(Debug)]
 pub struct Map2MdlOptions {
@@ -181,15 +200,16 @@ impl Map2Mdl {
         &self,
         smd_triangles: &[Triangle],
         textures_used: &HashSet<String>,
-        // output path would be where the model ends up with
-        // output path should be the .mdl file
-        output_path: &Path,
-        // resource path is where qc smd and textures file are stored
-        // usually it should be the .map file
-        resource_path: &Path,
-        move_to_origin: bool,
-        export_resource: bool,
+        options: ConvertFromTrianglesOptions,
     ) -> eyre::Result<usize> {
+        let ConvertFromTrianglesOptions {
+            output_path,
+            resource_path,
+            move_to_origin,
+            export_resource,
+            use_special_texture,
+        } = options;
+
         // before splitting smd, we need to check if we want to split model
         let model_count = textures_used.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
         let textures_used_vec = textures_used.iter().collect::<Vec<&String>>();
@@ -210,6 +230,10 @@ impl Map2Mdl {
             .cloned()
             .collect::<Vec<Triangle>>();
 
+        // special textures
+        let is_content_water = textures_used.contains(CONTENTWATER_TEXTURE);
+
+        // exclude triangles
         smd_triangles
             .iter()
             .filter(|tri| {
@@ -220,7 +244,21 @@ impl Map2Mdl {
                 }
             })
             .for_each(|tri| {
-                main_smd.add_triangle(tri.clone());
+                let new_tri = tri.clone();
+
+                main_smd.add_triangle(new_tri);
+
+                if is_content_water && use_special_texture {
+                    let mut new_tri = tri.clone();
+
+                    // flip the normal because it appears from the other side
+                    new_tri.vertices.iter_mut().for_each(|vertex| {
+                        vertex.norm *= -1.;
+                    });
+
+                    new_tri.vertices.swap(0, 1);
+                    main_smd.add_triangle(new_tri);
+                }
             });
 
         let brush_centroid = if origin_brush_triangles.is_empty() {
@@ -545,7 +583,7 @@ impl Map2Mdl {
         let simple_wads: SimpleWad = wads.as_slice().into();
 
         // check for missing textures
-        let textures_used = if let Some(map) = &map_file {
+        let textures_used_in_map = if let Some(map) = &map_file {
             if self.options.marked_entity {
                 map.entities
                     .iter()
@@ -564,12 +602,14 @@ impl Map2Mdl {
                 textures_used_in_map(map)
             }
         } else if let Some(entity) = &entity_entity {
+            // even though the variable is textures used in map
+            // an entity pasted is just a map but with just 1 entity
             textures_used_in_entity(entity)
         } else {
             unreachable!()
         };
 
-        let textures_missing = textures_used
+        let textures_missing = textures_used_in_map
             .iter()
             .filter_map(|tex| {
                 if simple_wads.get(tex).is_some() {
@@ -630,7 +670,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
 
                     println!("Skipped creating textures")
                 } else {
-                    self.maybe_export_texture(&textures_used, &wads, &simple_wads)?;
+                    self.maybe_export_texture(&textures_used_in_map, &wads, &simple_wads)?;
                 }
 
                 let output_base_path =
@@ -755,16 +795,21 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                             output_base_path.join(entity.attributes.get("output").unwrap());
                         let resource_path = self.map.as_ref().unwrap();
 
+                        let textures_used_in_smd = textures_used_in_triangles(smd_triangles);
+
                         self.convert_from_triangles(
                             smd_triangles,
-                            &textures_used,
-                            output_path.as_path(),
-                            resource_path,
-                            // always move to origin
-                            // this makes the centroid more consistent when we move it back with entity
-                            true,
-                            // if no export then the function returns right away
-                            map2mdl_export_resource,
+                            &textures_used_in_smd,
+                            ConvertFromTrianglesOptions {
+                                output_path: output_path.as_path(),
+                                resource_path,
+                                // always move to origin
+                                // this makes the centroid more consistent when we move it back with entity
+                                move_to_origin: true,
+                                // if no export then the function returns right away
+                                export_resource: map2mdl_export_resource,
+                                use_special_texture: true,
+                            },
                         )
                     })
                     .partition(|res| res.is_ok());
@@ -931,7 +976,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
             } else {
                 self.log("Converting whole map file");
 
-                self.maybe_export_texture(&textures_used, &wads, &simple_wads)?;
+                self.maybe_export_texture(&textures_used_in_map, &wads, &simple_wads)?;
 
                 // just convert the whole map, very simple
                 self.log("Running convex hull clipping algorithm");
@@ -942,17 +987,22 @@ However, it will still turn {} into model displaying entities such as cycler_spr
 
                 self.convert_from_triangles(
                     &smd_triangles,
-                    &textures_used,
-                    output_path,
-                    output_path,
-                    self.options.move_to_origin,
-                    true,
+                    &textures_used_in_map,
+                    ConvertFromTrianglesOptions {
+                        output_path,
+                        resource_path: output_path,
+                        move_to_origin: self.options.move_to_origin,
+                        export_resource: true,
+                        // when converting a whole map file, if one texture has CONTENTWATER, whole smd would duplicate triangle
+                        // TODO: do the steps in a way that we dont' need this, might be unnecessary but something to keep in mind
+                        use_special_texture: false,
+                    },
                 )?;
             }
         } else if let Some(entity) = &entity_entity {
             self.log("Converting entity");
 
-            self.maybe_export_texture(&textures_used, &wads, &simple_wads)?;
+            self.maybe_export_texture(&textures_used_in_map, &wads, &simple_wads)?;
 
             self.log("Running convex hull clipping algorithm");
             let smd_triangles = entity_to_triangulated_smd(entity, &simple_wads, false)?;
@@ -968,11 +1018,14 @@ However, it will still turn {} into model displaying entities such as cycler_spr
             self.log("Creating model");
             self.convert_from_triangles(
                 &smd_triangles,
-                &textures_used,
-                output_path.as_path(),
-                output_path.as_path(),
-                self.options.move_to_origin,
-                true,
+                &textures_used_in_map,
+                ConvertFromTrianglesOptions {
+                    output_path: output_path.as_path(),
+                    resource_path: output_path.as_path(),
+                    move_to_origin: self.options.move_to_origin,
+                    export_resource: true,
+                    use_special_texture: true,
+                },
             )?;
         } else {
             unreachable!()
