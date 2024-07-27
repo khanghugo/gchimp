@@ -240,6 +240,13 @@ impl WaddyGui {
                             let image = &self.instances[instance_index].waddy.wad().entries
                                 [texture_tile_index];
 
+                            let is_transparent = self.instances[instance_index].waddy.wad().entries
+                                [texture_tile_index]
+                                .directory_entry
+                                .texture_name
+                                .get_string()
+                                .starts_with("{");
+
                             if let Ok(mut clipboard) = Clipboard::new() {
                                 clipboard
                                     .set_image(arboard::ImageData {
@@ -249,10 +256,15 @@ impl WaddyGui {
                                             .file_entry
                                             .image()
                                             .iter()
-                                            .flat_map(|color_idx| {
+                                            .flat_map(|&color_idx| {
                                                 let [r, g, b] =
-                                                    image.file_entry.palette()[*color_idx as usize];
-                                                [r, g, b, 255]
+                                                    image.file_entry.palette()[color_idx as usize];
+
+                                                if color_idx == 255 && is_transparent {
+                                                    [r, g, b, 0]
+                                                } else {
+                                                    [r, g, b, 255]
+                                                }
                                             })
                                             .collect::<Vec<u8>>()
                                             .into(),
