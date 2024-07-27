@@ -86,6 +86,7 @@ impl Cli for S2G {
             no_vtf,
             #[cfg(target_os = "linux")]
                 wineprefix: config_wineprefix,
+            ..
         } = config.unwrap();
 
         s2g.decompile(!decompile)

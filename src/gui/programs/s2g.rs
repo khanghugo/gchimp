@@ -61,6 +61,7 @@ impl S2GGui {
             no_vtf,
             #[cfg(target_os = "linux")]
             wineprefix,
+            ..
         } = self.app_config.clone();
 
         let sync = self.s2g_sync.clone();

@@ -2,6 +2,9 @@ studiomdl = "./dist/studiomdl.exe"
 crowbar = "./dist/CrowbarCommandLineDecomp.exe"
 no_vtf = "./dist/no_vtf/no_vtf"
 
+# Theme: "dark", "light", "default"
+theme = "default"
+
 # For Linux users:
 # You need to set the WINEPREFIX here to run Crowbar and studiomdl binaries.
 # By default Wine prefix path is usually located in your home directory

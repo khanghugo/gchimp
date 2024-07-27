@@ -1,10 +1,13 @@
 use std::path::Path;
 
-use eframe::egui;
+use eframe::{egui, Theme};
 use egui_tiles::Tree;
 use utils::preview_file_being_dropped;
 
-use crate::config::{parse_config, parse_config_from_file};
+use crate::{
+    config::{parse_config, parse_config_from_file, Config},
+    err,
+};
 
 use self::{
     constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
@@ -29,51 +32,50 @@ trait TabProgram {
     }
 }
 
-pub fn gui() -> Result<(), eframe::Error> {
-    // let icon = egui::IconData::from("../.././media/logo.png");
+pub fn gui() -> eyre::Result<()> {
+    let config_res = parse_config();
+
     let icon = eframe::icon_data::from_png_bytes(include_bytes!("../.././media/logo.png")).unwrap();
 
-    let options = eframe::NativeOptions {
+    let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             // This is OKAY for now.
             .with_inner_size([PROGRAM_WIDTH, PROGRAM_HEIGHT])
             .with_drag_and_drop(true)
-            .with_icon(icon),
-
+            .with_icon(icon)
+            .with_maximize_button(false)
+            .with_minimize_button(false),
         ..Default::default()
     };
 
-    eframe::run_native(
+    if let Ok(config) = &config_res {
+        if config.theme.contains("light") {
+            options.default_theme = Theme::Light
+        } else if config.theme.contains("dark") {
+            options.default_theme = Theme::Dark
+        } else {
+            options.follow_system_theme = true;
+        }
+    }
+
+    let gui_res = eframe::run_native(
         "gchimp",
         options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::<MyApp>::default())
+            Ok(Box::new(MyApp::new(config_res)))
         }),
-    )
+    );
+
+    match gui_res {
+        Ok(_) => Ok(()),
+        Err(err) => err!("Error with running gchimp GUI: {}", err),
+    }
 }
 
 struct MyApp {
     tree: Option<Tree<Pane>>,
     _no_config_status: String,
-}
-
-impl Default for MyApp {
-    fn default() -> Self {
-        let config = parse_config();
-
-        if let Err(err) = config {
-            return Self {
-                tree: None,
-                _no_config_status: format!("Error with parsing config.toml: {}", err),
-            };
-        }
-
-        Self {
-            tree: Some(create_tree(config.unwrap())),
-            _no_config_status: "".to_string(),
-        }
-    }
 }
 
 impl eframe::App for MyApp {
@@ -111,6 +113,20 @@ impl eframe::App for MyApp {
 }
 
 impl MyApp {
+    pub fn new(config_res: eyre::Result<Config>) -> Self {
+        if let Err(err) = config_res {
+            return Self {
+                tree: None,
+                _no_config_status: format!("Error with parsing config.toml: {}", err),
+            };
+        }
+
+        Self {
+            tree: Some(create_tree(config_res.unwrap())),
+            _no_config_status: "".to_string(),
+        }
+    }
+
     fn parse_config(&mut self, path: &Path) {
         let config = parse_config_from_file(path);
 

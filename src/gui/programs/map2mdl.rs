@@ -42,6 +42,7 @@ impl Map2MdlGui {
             no_vtf: _,
             #[cfg(target_os = "linux")]
             wineprefix,
+            ..
         } = self.app_config.clone();
 
         let Map2MdlOptions {

@@ -19,6 +19,7 @@ pub struct Config {
     pub no_vtf: String,
     #[cfg(target_os = "linux")]
     pub wineprefix: Option<String>,
+    pub theme: String,
 }
 
 pub static CONFIG_FILE_NAME: &str = "config.toml";
@@ -105,5 +106,6 @@ pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
         no_vtf,
         #[cfg(target_os = "linux")]
         wineprefix: config.wineprefix,
+        theme: config.theme,
     })
 }

@@ -35,6 +35,7 @@ impl Cli for Map2MdlCli {
             no_vtf: _,
             #[cfg(target_os = "linux")]
                 wineprefix: config_wineprefix,
+            ..
         } = config.unwrap();
 
         #[cfg(target_os = "linux")]
