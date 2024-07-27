@@ -232,102 +232,100 @@ impl WaddyGui {
                         }
                     }
 
-                    if ui.button("Clipboard").clicked() {
-                        let image =
-                            &self.instances[instance_index].waddy.wad().entries[texture_tile_index];
+                    // "copy to" would copy the textures(s) to other instances
+                    // or texture (singular) to the clipboard
+                    ui.separator();
+                    ui.menu_button("Copy to", |ui| {
+                        if ui.button("Clipboard").clicked() {
+                            let image = &self.instances[instance_index].waddy.wad().entries
+                                [texture_tile_index];
 
-                        if let Ok(mut clipboard) = Clipboard::new() {
-                            clipboard
-                                .set_image(arboard::ImageData {
-                                    width: image.file_entry.dimensions().0 as usize,
-                                    height: image.file_entry.dimensions().1 as usize,
-                                    bytes: image
-                                        .file_entry
-                                        .image()
-                                        .iter()
-                                        .flat_map(|color_idx| {
-                                            let [r, g, b] =
-                                                image.file_entry.palette()[*color_idx as usize];
-                                            [r, g, b, 255]
-                                        })
-                                        .collect::<Vec<u8>>()
-                                        .into(),
-                                })
-                                .unwrap();
+                            if let Ok(mut clipboard) = Clipboard::new() {
+                                clipboard
+                                    .set_image(arboard::ImageData {
+                                        width: image.file_entry.dimensions().0 as usize,
+                                        height: image.file_entry.dimensions().1 as usize,
+                                        bytes: image
+                                            .file_entry
+                                            .image()
+                                            .iter()
+                                            .flat_map(|color_idx| {
+                                                let [r, g, b] =
+                                                    image.file_entry.palette()[*color_idx as usize];
+                                                [r, g, b, 255]
+                                            })
+                                            .collect::<Vec<u8>>()
+                                            .into(),
+                                    })
+                                    .unwrap();
+                            }
+
+                            ui.close_menu();
                         }
 
-                        ui.close_menu();
-                    }
-
-                    if self.instances.len() > 1 {
-                        ui.separator();
-
-                        ui.menu_button("Copy to", |ui| {
-                            // very fucky rust borrow checker shit so it is like this way
-                            let instance_to_add_idx = self
-                                .instances
-                                .iter()
-                                .enumerate()
-                                .filter(|(idx, _)| *idx != instance_index)
-                                .fold(None, |acc, (idx, instance)| {
-                                    if ui
-                                        .button(
-                                            instance
-                                                .path
-                                                .as_ref()
-                                                .unwrap()
-                                                .file_name()
-                                                .unwrap()
-                                                .to_str()
-                                                .unwrap(),
-                                        )
-                                        .clicked()
-                                    {
-                                        ui.close_menu();
-                                        Some(idx)
-                                    } else {
-                                        acc
-                                    }
-                                });
-
-                            if let Some(instance_to_add_idx) = instance_to_add_idx {
-                                let to_add = if self.instances[instance_index].selected.is_empty() {
-                                    vec![self.instances[instance_index].waddy.wad().entries
-                                        [texture_tile_index]
-                                        .clone()]
+                        // very fucky rust borrow checker shit so it is like this way
+                        let instance_to_add_idx = self
+                            .instances
+                            .iter()
+                            .enumerate()
+                            .filter(|(idx, _)| *idx != instance_index)
+                            .fold(None, |acc, (idx, instance)| {
+                                if ui
+                                    .button(
+                                        instance
+                                            .path
+                                            .as_ref()
+                                            .unwrap()
+                                            .file_name()
+                                            .unwrap()
+                                            .to_str()
+                                            .unwrap(),
+                                    )
+                                    .clicked()
+                                {
+                                    ui.close_menu();
+                                    Some(idx)
                                 } else {
-                                    self.instances[instance_index]
-                                        .selected
-                                        .iter()
-                                        .map(|&tile_idx| {
-                                            self.instances[instance_index].waddy.wad().entries
-                                                [tile_idx]
-                                                .clone()
-                                        })
-                                        .collect()
-                                };
+                                    acc
+                                }
+                            });
 
-                                // manually add seems very sad
-                                to_add.into_iter().for_each(|new_entry| {
-                                    self.instances[instance_to_add_idx]
-                                        .waddy
-                                        .wad_mut()
-                                        .entries
-                                        .push(new_entry);
+                        if let Some(instance_to_add_idx) = instance_to_add_idx {
+                            let to_add = if self.instances[instance_index].selected.is_empty() {
+                                vec![self.instances[instance_index].waddy.wad().entries
+                                    [texture_tile_index]
+                                    .clone()]
+                            } else {
+                                self.instances[instance_index]
+                                    .selected
+                                    .iter()
+                                    .map(|&tile_idx| {
+                                        self.instances[instance_index].waddy.wad().entries[tile_idx]
+                                            .clone()
+                                    })
+                                    .collect()
+                            };
 
-                                    // update num_dirs
-                                    // TODO don't do this and have the writer write the numbers for us
-                                    self.instances[instance_to_add_idx]
-                                        .waddy
-                                        .wad_mut()
-                                        .header
-                                        .num_dirs += 1;
+                            // manually add seems very sad
+                            to_add.into_iter().for_each(|new_entry| {
+                                self.instances[instance_to_add_idx]
+                                    .waddy
+                                    .wad_mut()
+                                    .entries
+                                    .push(new_entry);
 
-                                    self.update_after_add_image(ui, instance_to_add_idx);
-                                });
-                            }
-                        });
-                    }
+                                // update num_dirs
+                                // TODO don't do this and have the writer write the numbers for us
+                                self.instances[instance_to_add_idx]
+                                    .waddy
+                                    .wad_mut()
+                                    .header
+                                    .num_dirs += 1;
+
+                                self.update_after_add_image(ui, instance_to_add_idx);
+                            });
+                        }
+                    });
 
                     ui.separator();
 
