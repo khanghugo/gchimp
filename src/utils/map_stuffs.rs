@@ -1,13 +1,12 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::collections::HashSet;
 
 use glam::{DVec2, DVec3, DVec4, Vec4Swizzles};
 use map::{Brush, BrushPlane, Entity, Map};
 use smd::{Triangle, Vertex};
 
-use crate::{err, utils::simple_calculs::Solid3D};
+use crate::utils::simple_calculs::Solid3D;
 
 use super::{
-    constants::GCHIMP_INFO_ENTITY,
     simple_calculs::{ConvexPolytope, Plane3D, Triangle3D},
     wad_stuffs::SimpleWad,
 };
@@ -300,61 +299,6 @@ pub fn textures_used_in_entity(entity: &Entity) -> HashSet<String> {
     }
 
     acc
-}
-
-/// Returns the index of [`GCHIMP_INFO_ENTITY`]
-pub fn check_gchimp_info_entity(map: &Map) -> eyre::Result<usize> {
-    let entity_index = map.entities.iter().position(|entity| {
-        entity
-            .attributes
-            .get("classname")
-            .is_some_and(|classname| classname == GCHIMP_INFO_ENTITY)
-    });
-
-    if entity_index.is_none() {
-        return err!("gchimp_info: Cannot find {}", GCHIMP_INFO_ENTITY);
-    }
-
-    let entity_index = entity_index.unwrap();
-    let entity = &map.entities[entity_index];
-
-    // check path
-    if let Some(hl_path) = entity.attributes.get("hl_path") {
-        let game_path = PathBuf::from(hl_path);
-
-        if !game_path.exists() {
-            return err!("gchimp_info: Path to Half-Life does not exist: {}", hl_path);
-        }
-
-        if let Some(gamedir) = entity.attributes.get("gamedir") {
-            let mod_path = game_path.join(gamedir);
-
-            if !mod_path.exists() {
-                return err!(
-                    "gchimp_info: Path to game mod does not exist: {}",
-                    mod_path.to_str().unwrap()
-                );
-            }
-        } else {
-            return err!("gchimp_info: No game mod provided");
-        }
-    } else {
-        return err!("gchimp_info: No path to Half-Life provided");
-    }
-
-    // check options
-    if let Some(options) = entity.attributes.get("options") {
-        if let Err(err) = options.parse::<usize>() {
-            return err!(
-                "gchimp_info: Value for \"options\" is not a number: {}",
-                err
-            );
-        }
-    } else {
-        return err!("gchimp_info: Cannot find \"options\" key");
-    };
-
-    Ok(entity_index)
 }
 
 /// Creates a .map rectangular prism brush from two lists of mins and maxs

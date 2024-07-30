@@ -17,15 +17,16 @@ use wad::Wad;
 use rayon::{iter::Either, prelude::*};
 
 use crate::{
+    entity::{GchimpInfo, GCHIMP_INFO_ENTITY},
     err,
     utils::{
         constants::{
-            CLIP_TEXTURE, CONTENTWATER_TEXTURE, GCHIMP_INFO_ENTITY,
-            MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE, ORIGIN_TEXTURE,
+            CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE,
+            ORIGIN_TEXTURE,
         },
         map_stuffs::{
-            brush_from_mins_maxs, check_gchimp_info_entity, entity_to_triangulated_smd,
-            map_to_triangulated_smd, textures_used_in_entity, textures_used_in_map,
+            brush_from_mins_maxs, entity_to_triangulated_smd, map_to_triangulated_smd,
+            textures_used_in_entity, textures_used_in_map,
         },
         misc::parse_triplet,
         run_bin::run_studiomdl,
@@ -643,17 +644,9 @@ impl Map2Mdl {
                 self.log(format!("Converting {} only", MAP2MDL_ENTITY_NAME).as_str());
 
                 // check if the the info entity is there
-                let gchimp_info_entity = &map.entities[check_gchimp_info_entity(map)?];
+                let gchimp_info = GchimpInfo::from_map(map)?;
 
-                if gchimp_info_entity
-                    .attributes
-                    .get("options")
-                    .unwrap()
-                    .parse::<usize>()
-                    .unwrap()
-                    & 1
-                    == 0
-                {
+                if gchimp_info.options() & 1 == 0 {
                     println!(
                         "map2mdl is not enabled as specified in {}",
                         GCHIMP_INFO_ENTITY
@@ -661,14 +654,7 @@ impl Map2Mdl {
                     return Ok(());
                 }
 
-                let map2mdl_export_resource = gchimp_info_entity
-                    .attributes
-                    .get("options")
-                    .unwrap()
-                    .parse::<usize>()
-                    .unwrap()
-                    & 2
-                    != 0;
+                let map2mdl_export_resource = gchimp_info.options() & 2 != 0;
 
                 if !map2mdl_export_resource {
                     println!(
@@ -685,8 +671,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                 }
 
                 let output_base_path =
-                    PathBuf::from(gchimp_info_entity.attributes.get("hl_path").unwrap())
-                        .join(gchimp_info_entity.attributes.get("gamedir").unwrap());
+                    PathBuf::from(gchimp_info.hl_path()).join(gchimp_info.gamedir());
 
                 // saddest story ever told
                 let map_entities_attributes_clone = map

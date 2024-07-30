@@ -1,5 +1,6 @@
 mod cli;
 mod config;
+mod entity;
 mod gui;
 pub mod modules;
 pub mod utils;

@@ -30,6 +30,3 @@ pub static TRENCHBROOM_EMPTY_TEXTURE: &str = "__TB_empty";
 pub static TEXTURE_PREFIXES: &[&str] = &["{", "!", "+", "-", "~"];
 
 pub static EPSILON: f64 = 0.000001;
-
-pub static GCHIMP_INFO_ENTITY: &str = "gchimp_info";
-pub static GCHIMP_MAP_EXTENSION: &str = "gchimp.map";
