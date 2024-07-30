@@ -5,6 +5,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use entity::{
+    MAP2MDL_ATTR_CLIPTYPE, MAP2MDL_ATTR_MODEL_ENTITY, MAP2MDL_ATTR_OUTPUT,
+    MAP2MDL_ATTR_TARGET_ORIGIN, MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY, MAP2MDL_ENTITY_NAME,
+};
 use map::{Attributes, Entity, Map};
 use qc::Qc;
 use smd::{Smd, Triangle};
@@ -23,6 +27,7 @@ use crate::{
             brush_from_mins_maxs, check_gchimp_info_entity, entity_to_triangulated_smd,
             map_to_triangulated_smd, textures_used_in_entity, textures_used_in_map,
         },
+        misc::parse_triplet,
         run_bin::run_studiomdl,
         smd_stuffs::{
             add_bitmap_extension_to_texture, find_centroid, find_centroid_from_triangles,
@@ -33,7 +38,7 @@ use crate::{
     },
 };
 
-pub static GCHIMP_MAP2MDL_ENTITY_NAME: &str = "gchimp_map2mdl";
+pub mod entity;
 
 struct ConvertFromTrianglesOptions<'a> {
     // output path would be where the model ends up with
@@ -51,6 +56,9 @@ struct ConvertFromTrianglesOptions<'a> {
     // could be something fixed with planning the steps going differently
     // TODO: maybe add triangles to smd one brush by one brush
     use_special_texture: bool,
+    // this will be the origin of the model relatively from where it is
+    // it means that this will be the centroid of the model
+    maybe_target_origin: Option<[f64; 3]>,
 }
 
 #[derive(Debug)]
@@ -208,6 +216,7 @@ impl Map2Mdl {
             move_to_origin,
             export_resource,
             use_special_texture,
+            maybe_target_origin,
         } = options;
 
         // before splitting smd, we need to check if we want to split model
@@ -261,10 +270,12 @@ impl Map2Mdl {
                 }
             });
 
-        let brush_centroid = if origin_brush_triangles.is_empty() {
-            find_centroid(&main_smd).unwrap()
-        } else {
+        let brush_centroid = if !origin_brush_triangles.is_empty() {
             find_centroid_from_triangles(&origin_brush_triangles).unwrap()
+        } else if let Some(target_origin) = maybe_target_origin {
+            target_origin.into()
+        } else {
+            find_centroid(&main_smd).unwrap()
         };
 
         if move_to_origin {
@@ -591,7 +602,7 @@ impl Map2Mdl {
                         entity
                             .attributes
                             .get("classname")
-                            .is_some_and(|classname| classname == GCHIMP_MAP2MDL_ENTITY_NAME)
+                            .is_some_and(|classname| classname == MAP2MDL_ENTITY_NAME)
                     })
                     .map(textures_used_in_entity)
                     .fold(HashSet::<String>::new(), |mut acc, e| {
@@ -629,7 +640,7 @@ impl Map2Mdl {
         // if we don't have a map, we might have an entity pasted in the GUI part
         if let Some(map) = &mut map_file {
             if self.options.marked_entity {
-                self.log(format!("Converting {} only", GCHIMP_MAP2MDL_ENTITY_NAME).as_str());
+                self.log(format!("Converting {} only", MAP2MDL_ENTITY_NAME).as_str());
 
                 // check if the the info entity is there
                 let gchimp_info_entity = &map.entities[check_gchimp_info_entity(map)?];
@@ -665,7 +676,7 @@ impl Map2Mdl {
 map2mdl model export is not enabled as specified in {}. \
 This means gchimp will not export textures and convert entities into models. \
 However, it will still turn {} into model displaying entities such as cycler_sprite.",
-                        GCHIMP_INFO_ENTITY, GCHIMP_MAP2MDL_ENTITY_NAME
+                        GCHIMP_INFO_ENTITY, MAP2MDL_ENTITY_NAME
                     );
 
                     println!("Skipped creating textures")
@@ -677,6 +688,13 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     PathBuf::from(gchimp_info_entity.attributes.get("hl_path").unwrap())
                         .join(gchimp_info_entity.attributes.get("gamedir").unwrap());
 
+                // saddest story ever told
+                let map_entities_attributes_clone = map
+                    .entities
+                    .iter()
+                    .map(|entity| entity.attributes.clone())
+                    .collect::<Vec<Attributes>>();
+
                 let mut marked_entities = map
                     .entities
                     .par_iter_mut()
@@ -685,14 +703,14 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                         entity
                             .attributes
                             .get("classname")
-                            .is_some_and(|classname| classname == GCHIMP_MAP2MDL_ENTITY_NAME)
+                            .is_some_and(|classname| classname == MAP2MDL_ENTITY_NAME)
                     })
                     .collect::<Vec<(usize, &mut Entity)>>();
 
                 // check if all entities have "output" key
                 let missing_output_name = marked_entities
                     .iter()
-                    .filter(|(_, entity)| !entity.attributes.contains_key("output"))
+                    .filter(|(_, entity)| !entity.attributes.contains_key(MAP2MDL_ATTR_OUTPUT))
                     .map(|(index, _)| index)
                     .collect::<Vec<&usize>>();
 
@@ -706,7 +724,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                 // check if the output path exists
                 let nonexistent_output = marked_entities
                     .iter()
-                    .filter_map(|(_, entity)| entity.attributes.get("output"))
+                    .filter_map(|(_, entity)| entity.attributes.get(MAP2MDL_ATTR_OUTPUT))
                     .filter_map(|output| PathBuf::from(output).parent().map(|what| what.to_owned()))
                     .map(|output| output_base_path.join(output))
                     .filter(|output| !output.exists())
@@ -786,33 +804,84 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                 // due to some rust stuff, this cannot be done in parallel (first)
                 self.log(format!("Creating {} models", marked_entities.len()).as_str());
 
-                let (map2mdl_ok, map2mdl_err): (Vec<eyre::Result<usize>>, _) = marked_entities
-                    .iter()
-                    .zip(ok.iter()) // safe to assume this is all in order?
-                    .map(|((_, entity), smd_triangles)| {
-                        // this output path will contain the .mdl extension
-                        let output_path =
-                            output_base_path.join(entity.attributes.get("output").unwrap());
-                        let resource_path = self.map.as_ref().unwrap();
+                let (map2mdl_ok, map2mdl_err): (Vec<eyre::Result<(usize, Option<_>)>>, _) =
+                    marked_entities
+                        .iter()
+                        .zip(ok.iter()) // safe to assume this is all in order?
+                        .map(|((_, entity), smd_triangles)| {
+                            // this output path will contain the .mdl extension
+                            let output_path = output_base_path
+                                .join(entity.attributes.get(MAP2MDL_ATTR_OUTPUT).unwrap());
+                            let resource_path = self.map.as_ref().unwrap();
 
-                        let textures_used_in_smd = textures_used_in_triangles(smd_triangles);
+                            let textures_used_in_smd = textures_used_in_triangles(smd_triangles);
 
-                        self.convert_from_triangles(
-                            smd_triangles,
-                            &textures_used_in_smd,
-                            ConvertFromTrianglesOptions {
-                                output_path: output_path.as_path(),
-                                resource_path,
-                                // always move to origin
-                                // this makes the centroid more consistent when we move it back with entity
-                                move_to_origin: true,
-                                // if no export then the function returns right away
-                                export_resource: map2mdl_export_resource,
-                                use_special_texture: true,
-                            },
-                        )
-                    })
-                    .partition(|res| res.is_ok());
+                            let mut maybe_target_origin: Option<[f64; 3]> = None;
+
+                            if let Some(target_origin) =
+                                entity.attributes.get(MAP2MDL_ATTR_TARGET_ORIGIN)
+                            {
+                                // is_empty just to be nice i guess?
+                                if !target_origin.is_empty() {
+                                    if let Some(entity_attributes) =
+                                        map_entities_attributes_clone.iter().find(|attributes| {
+                                            attributes.get("classname").is_some_and(|classname| {
+                                                classname == MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY
+                                            }) && attributes.get("targetname").is_some_and(
+                                                |targetname| targetname == target_origin,
+                                            )
+                                        })
+                                    {
+                                        if let Ok(triplet) =
+                                            parse_triplet(entity_attributes.get("origin").unwrap())
+                                        {
+                                            maybe_target_origin = triplet.into();
+                                        } else {
+                                            return err!(
+                                                "Cannot parse origin for {} with targetname {}",
+                                                MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY,
+                                                target_origin
+                                            );
+                                        }
+                                    } else {
+                                        return err!(
+                                        "Cannot find entity specified in {} for {} with output {} ",
+                                        MAP2MDL_ATTR_TARGET_ORIGIN,
+                                        MAP2MDL_ENTITY_NAME,
+                                        entity.attributes.get(MAP2MDL_ATTR_OUTPUT).unwrap()
+                                    );
+                                    }
+                                }
+                            }
+
+                            let num_model = self.convert_from_triangles(
+                                smd_triangles,
+                                &textures_used_in_smd,
+                                ConvertFromTrianglesOptions {
+                                    output_path: output_path.as_path(),
+                                    resource_path,
+                                    // always move to origin
+                                    // this makes the centroid more consistent when we move it back with entity
+                                    move_to_origin: true,
+                                    // if no export then the function returns right away
+                                    export_resource: map2mdl_export_resource,
+                                    use_special_texture: true,
+                                    maybe_target_origin,
+                                },
+                            );
+
+                            // way to pass more data... for now
+                            match num_model {
+                                Ok(num_model) => Ok((num_model, maybe_target_origin)),
+                                Err(err) => err!(
+                                    "Cannot convert from triangles for {} with output {}: {}",
+                                    MAP2MDL_ENTITY_NAME,
+                                    entity.attributes.get(MAP2MDL_ATTR_OUTPUT).unwrap(),
+                                    err
+                                ),
+                            }
+                        })
+                        .partition(|res| res.is_ok());
 
                 if !map2mdl_err.is_empty() {
                     return err!(
@@ -825,7 +894,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                 let map2mdl_ok = map2mdl_ok
                     .into_iter()
                     .map(|what| what.unwrap())
-                    .collect::<Vec<usize>>();
+                    .collect::<Vec<(usize, Option<_>)>>();
 
                 // change entity and maybe create clip brush
                 // TODO verify TB's layer stuffs
@@ -835,128 +904,142 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     .iter_mut()
                     .zip(ok.iter()) // safe to assume this is all in order?
                     .zip(map2mdl_ok)
-                    .filter_map(|(((entity_index, entity), smd_triangles), model_count)| {
-                        // two cases for to change
-                        // if there is clip brush, then the original brush will be chagned into func_detail and clip texture
-                        // then entity is inserted
-                        // if not clip brush, will delete the brush of the entity and replace the entity in place
-                        // doing that won't change the map too much ,especially tb layer
-                        // the result of this iterator will be the model entity to be inserted in case we have clip option chosen
+                    .filter_map(
+                        |(
+                            ((entity_index, entity), smd_triangles),
+                            (model_count, maybe_target_origin),
+                        )| {
+                            // two cases for to change
+                            // if there is clip brush, then the original brush will be chagned into func_detail and clip texture
+                            // then entity is inserted
+                            // if not clip brush, will delete the brush of the entity and replace the entity in place
+                            // doing that won't change the map too much ,especially tb layer
+                            // the result of this iterator will be the model entity to be inserted in case we have clip option chosen
 
-                        // 0: noclip
-                        // 1: precise
-                        // 2: box
-                        let clip_type = entity
-                            .attributes
-                            .get("cliptype")
-                            .map(|s| s.parse::<usize>().unwrap_or(0))
-                            .unwrap_or(0)
-                            .clamp(0, 2);
-
-                        // cycler_sprite
-                        // env_sprite
-                        // cycler
-                        let model_classname = entity
-                            .attributes
-                            .get("model_entity")
-                            .unwrap_or(&model_entity_default)
-                            .to_owned();
-                        // some more info
-                        let model_origin = find_centroid_from_triangles(smd_triangles).unwrap();
-                        let model_origin =
-                            format!("{} {} {}", model_origin.x, model_origin.y, model_origin.z);
-
-                        // "0" suffix is only added when there are more than 1 model count
-                        let model_modelname0 = if model_count == 1 {
-                            entity.attributes.get("output").unwrap().to_owned()
-                        } else {
-                            entity
+                            // 0: noclip
+                            // 1: precise
+                            // 2: box
+                            let clip_type = entity
                                 .attributes
-                                .get("output")
-                                .unwrap()
-                                .replace(".mdl", "0.mdl")
-                        };
-                        let model_angles = "0 0 0".to_string();
+                                .get(MAP2MDL_ATTR_CLIPTYPE)
+                                .map(|s| s.parse::<usize>().unwrap_or(0))
+                                .unwrap_or(0)
+                                .clamp(0, 2);
 
-                        let mut entities_to_insert: Vec<Entity> = vec![];
+                            // cycler_sprite
+                            // env_sprite
+                            // cycler
+                            let model_classname = entity
+                                .attributes
+                                .get(MAP2MDL_ATTR_MODEL_ENTITY)
+                                .unwrap_or(&model_entity_default)
+                                .to_owned();
+                            // some more info
+                            let model_origin =
+                                if let Some(maybe_target_origin) = maybe_target_origin {
+                                    maybe_target_origin.into()
+                                } else {
+                                    find_centroid_from_triangles(smd_triangles).unwrap()
+                                };
+                            let model_origin =
+                                format!("{} {} {}", model_origin.x, model_origin.y, model_origin.z);
 
-                        // "0" suffix is only added when there are more than 1 model count
-                        (1..(model_count)).for_each(|model_index| {
-                            let curr_model_name = model_modelname0
-                                .replace("0.mdl", format!("{}.mdl", model_index).as_str());
-
-                            let new_entity = Entity {
-                                attributes: Attributes::from([
-                                    ("classname".to_string(), model_classname.to_owned()),
-                                    ("origin".to_owned(), model_origin.to_owned()),
-                                    ("angles".to_owned(), model_angles.to_owned()),
-                                    ("model".to_owned(), curr_model_name),
-                                ]),
-                                brushes: None,
+                            // "0" suffix is only added when there are more than 1 model count
+                            let model_modelname0 = if model_count == 1 {
+                                entity
+                                    .attributes
+                                    .get(MAP2MDL_ATTR_OUTPUT)
+                                    .unwrap()
+                                    .to_owned()
+                            } else {
+                                entity
+                                    .attributes
+                                    .get(MAP2MDL_ATTR_OUTPUT)
+                                    .unwrap()
+                                    .replace(".mdl", "0.mdl")
                             };
+                            let model_angles = "0 0 0".to_string();
 
-                            entities_to_insert.push(new_entity);
-                        });
+                            let mut entities_to_insert: Vec<Entity> = vec![];
 
-                        if clip_type == 1 {
-                            let mut clip_brush_entity = entity.clone();
+                            // "0" suffix is only added when there are more than 1 model count
+                            (1..(model_count)).for_each(|model_index| {
+                                let curr_model_name = model_modelname0
+                                    .replace("0.mdl", format!("{}.mdl", model_index).as_str());
 
-                            if let Some(brushes) = &mut clip_brush_entity.brushes {
-                                brushes.iter_mut().for_each(|brush| {
-                                    brush.planes.iter_mut().for_each(|plane| {
-                                        plane.texture_name = CLIP_TEXTURE.to_string();
+                                let new_entity = Entity {
+                                    attributes: Attributes::from([
+                                        ("classname".to_string(), model_classname.to_owned()),
+                                        ("origin".to_owned(), model_origin.to_owned()),
+                                        ("angles".to_owned(), model_angles.to_owned()),
+                                        ("model".to_owned(), curr_model_name),
+                                    ]),
+                                    brushes: None,
+                                };
+
+                                entities_to_insert.push(new_entity);
+                            });
+
+                            if clip_type == 1 {
+                                let mut clip_brush_entity = entity.clone();
+
+                                if let Some(brushes) = &mut clip_brush_entity.brushes {
+                                    brushes.iter_mut().for_each(|brush| {
+                                        brush.planes.iter_mut().for_each(|plane| {
+                                            plane.texture_name = CLIP_TEXTURE.to_string();
+                                        })
                                     })
-                                })
+                                }
+
+                                clip_brush_entity.attributes.clear();
+
+                                clip_brush_entity
+                                    .attributes
+                                    .insert("classname".to_string(), "func_detail".to_string());
+
+                                // remove origin because brush entity
+                                // otherwise the editor would confuse
+                                // maybe need to remove more in the future if there's problems
+                                clip_brush_entity.attributes.remove("origin");
+
+                                entities_to_insert.push(clip_brush_entity);
                             }
 
-                            clip_brush_entity.attributes.clear();
-
-                            clip_brush_entity
+                            // for all cliptype, the original brush would turn into the model entity
+                            // doing this will make the model entity inherit original passed in values
+                            entity.brushes = None;
+                            entity
                                 .attributes
-                                .insert("classname".to_string(), "func_detail".to_string());
+                                .insert("classname".to_owned(), model_classname);
+                            entity.attributes.insert("origin".to_owned(), model_origin);
+                            entity.attributes.insert("angles".to_owned(), model_angles);
+                            entity
+                                .attributes
+                                .insert("model".to_owned(), model_modelname0);
 
-                            // remove origin because brush entity
-                            // otherwise the editor would confuse
-                            // maybe need to remove more in the future if there's problems
-                            clip_brush_entity.attributes.remove("origin");
+                            // now specific to clip_type = 2
+                            // we need to insert a brush later
+                            if clip_type == 2 {
+                                let [mins, maxs] = find_mins_maxs(smd_triangles);
+                                let new_brush = brush_from_mins_maxs(&mins, &maxs, "CLIP");
+                                let new_brush_entity = Entity {
+                                    attributes: Attributes::from([(
+                                        "classname".to_string(),
+                                        "func_detail".to_owned(),
+                                    )]),
+                                    brushes: vec![new_brush].into(),
+                                };
 
-                            entities_to_insert.push(clip_brush_entity);
-                        }
+                                entities_to_insert.push(new_brush_entity);
+                            }
 
-                        // for all cliptype, the original brush would turn into the model entity
-                        // doing this will make the model entity inherit original passed in values
-                        entity.brushes = None;
-                        entity
-                            .attributes
-                            .insert("classname".to_owned(), model_classname);
-                        entity.attributes.insert("origin".to_owned(), model_origin);
-                        entity.attributes.insert("angles".to_owned(), model_angles);
-                        entity
-                            .attributes
-                            .insert("model".to_owned(), model_modelname0);
-
-                        // now specific to clip_type = 2
-                        // we need to insert a brush later
-                        if clip_type == 2 {
-                            let [mins, maxs] = find_mins_maxs(smd_triangles);
-                            let new_brush = brush_from_mins_maxs(&mins, &maxs, "CLIP");
-                            let new_brush_entity = Entity {
-                                attributes: Attributes::from([(
-                                    "classname".to_string(),
-                                    "func_detail".to_owned(),
-                                )]),
-                                brushes: vec![new_brush].into(),
-                            };
-
-                            entities_to_insert.push(new_brush_entity);
-                        }
-
-                        if entities_to_insert.is_empty() {
-                            None
-                        } else {
-                            Some((*entity_index, entities_to_insert))
-                        }
-                    })
+                            if entities_to_insert.is_empty() {
+                                None
+                            } else {
+                                Some((*entity_index, entities_to_insert))
+                            }
+                        },
+                    )
                     .collect::<Vec<(usize, Vec<Entity>)>>();
 
                 // lastly, insert entities
@@ -996,6 +1079,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                         // when converting a whole map file, if one texture has CONTENTWATER, whole smd would duplicate triangle
                         // TODO: do the steps in a way that we dont' need this, might be unnecessary but something to keep in mind
                         use_special_texture: false,
+                        maybe_target_origin: None,
                     },
                 )?;
             }
@@ -1025,6 +1109,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     move_to_origin: self.options.move_to_origin,
                     export_resource: true,
                     use_special_texture: true,
+                    maybe_target_origin: None,
                 },
             )?;
         } else {

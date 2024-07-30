@@ -5,6 +5,8 @@ use std::{
 
 use super::constants::TEXTURE_PREFIXES;
 
+use crate::err;
+
 pub fn maybe_add_extension_to_string(s: &str, ext: &str) -> String {
     let ext_with_dot = format!(".{}", ext);
 
@@ -38,6 +40,19 @@ pub fn remove_texture_prefix(i: &str) -> String {
     TEXTURE_PREFIXES
         .iter()
         .fold(i.to_owned(), |acc, e| acc.replace(e, ""))
+}
+
+pub fn parse_triplet(i: &str) -> eyre::Result<[f64; 3]> {
+    let res = i
+        .split_ascii_whitespace()
+        .filter_map(|i| i.parse::<f64>().ok())
+        .collect::<Vec<f64>>();
+
+    if res.len() < 3 {
+        return err!("Cannot parse triplet of number: {}", i);
+    }
+
+    Ok([res[0], res[1], res[2]])
 }
 
 #[macro_export]

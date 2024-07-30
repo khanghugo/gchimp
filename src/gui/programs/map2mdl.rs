@@ -9,7 +9,7 @@ use crate::{
         utils::preview_file_being_dropped,
         TabProgram,
     },
-    modules::map2mdl::{Map2Mdl, Map2MdlOptions, Map2MdlSync, GCHIMP_MAP2MDL_ENTITY_NAME},
+    modules::map2mdl::{entity::MAP2MDL_ENTITY_NAME, Map2Mdl, Map2MdlOptions, Map2MdlSync},
 };
 
 pub struct Map2MdlGui {
@@ -152,7 +152,7 @@ impl TabProgram for Map2MdlGui {
             )
             .on_hover_text(format!(
                 "Only convert brush entities {} and this would modify the original map file",
-                GCHIMP_MAP2MDL_ENTITY_NAME
+                MAP2MDL_ENTITY_NAME
             ));
             ui.checkbox(&mut self.options.move_to_origin, "Center the model")
                 .on_hover_text("The center of the model is the origin");

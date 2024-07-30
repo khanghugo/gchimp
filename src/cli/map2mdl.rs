@@ -4,7 +4,7 @@ use super::*;
 
 use crate::{
     config::{parse_config, Config},
-    modules::map2mdl::{Map2Mdl, GCHIMP_MAP2MDL_ENTITY_NAME},
+    modules::map2mdl::{entity::MAP2MDL_ENTITY_NAME, Map2Mdl},
 };
 
 pub struct Map2MdlCli;
@@ -67,11 +67,12 @@ impl Cli for Map2MdlCli {
     fn cli_help(&self) {
         println!(
             "\
-Converts {GCHIMP_MAP2MDL_ENTITY_NAME} into model. 
+Converts {} into model. 
 Better read the documentation before you do what you do.
 
 ./gchimp map2mdl <.map>
-"
+",
+            MAP2MDL_ENTITY_NAME
         )
     }
 }

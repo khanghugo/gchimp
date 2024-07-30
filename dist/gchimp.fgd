@@ -19,4 +19,5 @@
 		1 : "Precise (matching original brush)"
 		2 : "Box (biggest bounding box covering brush)"
 	]
+	target_origin(string) : "Sets the model origin based on origin of info_target"
 ]
