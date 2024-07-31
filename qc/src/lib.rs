@@ -314,6 +314,34 @@ pub struct SequenceIntermediate {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum LoDOption {
+    ReplaceModel {
+        reference: String,
+        lod: String,
+        reverse: Option<bool>,
+    },
+    RemoveModel {
+        reference: String,
+    },
+    ReplaceMaterial {
+        reference: String,
+        lod: String,
+    },
+    RemoveMesh {
+        reference: String,
+    },
+    NoFacial,
+    BoneTreeCollapse {
+        reference: String,
+    },
+    ReplaceBone {
+        reference: String,
+        lod: String,
+    },
+    UseShadowLoDMaterials,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum QcCommand {
     ModelName(String),
     Body(Body),
@@ -367,6 +395,12 @@ pub enum QcCommand {
         options: Vec<CollisionModelOption>,
     },
     MostlyOpaque,
+    LoD {
+        threshold: f64,
+        options: Vec<LoDOption>,
+    },
+    HBoxSet(String),
+    CastTextureShadows,
 }
 
 impl QcCommand {
@@ -402,6 +436,9 @@ impl QcCommand {
             QcCommand::CollisionModel { .. } => "$collisionmodel",
             QcCommand::CdMaterials(_) => "$cdmaterials",
             QcCommand::MostlyOpaque => "$mostlyopaque",
+            QcCommand::LoD { .. } => "$lod",
+            QcCommand::HBoxSet(_) => "$hboxset",
+            QcCommand::CastTextureShadows => "$casttextureshadows",
         }
         .to_string()
     }
@@ -512,13 +549,16 @@ impl fmt::Display for QcCommand {
 
                 Ok(())
             }
-            QcCommand::StaticProp => todo!(),
+            QcCommand::StaticProp => Ok(()),
             QcCommand::SurfaceProp(_) => todo!(),
             QcCommand::Content(_) => todo!(),
             QcCommand::IllumPosition { .. } => todo!(),
             QcCommand::DefineBone { .. } => todo!(),
             QcCommand::CollisionModel { .. } => todo!(),
             QcCommand::MostlyOpaque => todo!(),
+            QcCommand::LoD { .. } => todo!(),
+            QcCommand::HBoxSet(_) => todo!(),
+            QcCommand::CastTextureShadows => Ok(()),
         }
     }
 }
@@ -1197,6 +1237,59 @@ fn parse_mostly_opaque(i: &str) -> CResult {
     qc_command("$mostlyopaque", take(0usize), |_| QcCommand::MostlyOpaque)(i)
 }
 
+fn parse_lod(i: &str) -> CResult {
+    qc_command(
+        "$lod",
+        tuple((name_string, between_braces(rest))),
+        |(threshold, _)| {
+            // threshold might be in quotation mark so we parse it here
+            let threshold = threshold.parse::<f64>().unwrap();
+
+            // TODO: parse option
+            QcCommand::LoD {
+                threshold,
+                options: vec![],
+            }
+        },
+    )(i)
+}
+
+fn parse_hbox_set(i: &str) -> CResult {
+    qc_command("$hboxset", name_string, |name| {
+        QcCommand::HBoxSet(name.to_owned())
+    })(i)
+}
+
+fn parse_hbox(i: &str) -> CResult {
+    qc_command(
+        "$hbox",
+        tuple((
+            number,
+            preceded(space0, name_string),
+            double,
+            double,
+            double,
+            double,
+            double,
+            double,
+        )),
+        |(group, bone_name, minx, miny, minz, maxx, maxy, maxz)| {
+            QcCommand::HBox(HBox {
+                group,
+                bone_name: bone_name.to_string(),
+                mins: DVec3::new(minx, miny, minz),
+                maxs: DVec3::new(maxx, maxy, maxz),
+            })
+        },
+    )(i)
+}
+
+fn parse_cast_texture_shadows(i: &str) -> CResult {
+    qc_command("$casttextureshadows", take(0usize), |_| {
+        QcCommand::CastTextureShadows
+    })(i)
+}
+
 // Main functions
 fn parse_qc_command(i: &str) -> CResult {
     context(
@@ -1207,27 +1300,27 @@ fn parse_qc_command(i: &str) -> CResult {
             // or have the tag taking the trailing space.
             // Otherwise, it would always fail.
             // I learnt it the hard way.
-            parse_bodygroup,
-            parse_bbox,
-            parse_cbox,
-            parse_cd_texture,
-            parse_cd_materials,
-            parse_cd,
+            alt((parse_bodygroup, parse_body)),
+            alt((parse_bbox, parse_cbox, parse_hbox_set, parse_hbox)),
+            alt((parse_cd_texture, parse_cd_materials, parse_cd)),
+            alt((
+                parse_cast_texture_shadows,
+                parse_mostly_opaque,
+                parse_clip_to_textures,
+                parse_static_prop,
+            )),
             parse_modelname,
             parse_scale,
             parse_sequence,
             parse_texrendermode,
-            parse_clip_to_textures,
             parse_eye_position,
-            parse_body,
-            parse_static_prop,
             parse_surface_prop,
             parse_contents,
             parse_illum_position,
             parse_texture_group,
             parse_define_bone,
             parse_collision_model,
-            parse_mostly_opaque,
+            parse_lod,
         )),
     )(i)
 }
@@ -1910,6 +2003,30 @@ $cdmaterials \"models\\props\\willbreakanyway_001\\\"";
         if let QcCommand::CdMaterials(path) = a {
             assert_eq!(path, "models\\props\\willbreakanyway_001\\")
         }
+    }
+
+    #[test]
+    fn lod_parse() {
+        let i = "\
+$lod 225
+{
+	replacemodel \"pacific_palm004.smd\" \"pacific_palm004_lod3.smd\"
+	nofacial
+}";
+
+        let (rest, _) = parse_lod(i).unwrap();
+
+        assert!(rest.is_empty());
+    }
+
+    #[test]
+    fn hbox_parse() {
+        let i = "\
+$hbox 0 \"static_prop\" 0 0 0 0 0 0";
+
+        let (rest, _) = parse_hbox(i).unwrap();
+
+        assert!(rest.is_empty());
     }
 
     #[test]
