@@ -264,7 +264,7 @@ impl S2G {
 
             // TODO make good
             #[cfg(target_os = "windows")]
-            let handle = run_crowbar(input_file, &self.settings.crowbar);
+            let handle = run_crowbar(input_file, &self.options.crowbar.as_ref().unwrap());
 
             #[cfg(target_os = "linux")]
             let handle = run_crowbar(
@@ -615,7 +615,7 @@ impl S2G {
 
         let res = compile_able_qcs.par_iter().map(|path| {
             #[cfg(target_os = "windows")]
-            let res = run_studiomdl(path, &self.settings.studiomdl);
+            let res = run_studiomdl(path, &self.options.studiomdl.as_ref().unwrap());
 
             #[cfg(target_os = "linux")]
             let res = run_studiomdl(
