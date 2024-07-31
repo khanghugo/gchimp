@@ -271,6 +271,9 @@ Recommended to have it on so textures will be uniformly lit",
             }
         });
 
+        // Force continuous mode
+        ctx.request_repaint();
+
         // Make it non drag-able
         egui_tiles::UiResponse::None
     }
