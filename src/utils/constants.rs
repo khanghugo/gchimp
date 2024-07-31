@@ -10,6 +10,7 @@ pub static MAX_GOLDSRC_MODEL_TEXTURE_COUNT: usize = 64;
 
 pub static PALETTE_PAD_COLOR: [u8; 3] = [0, 0, 0];
 pub static PALETTE_TRANSPARENT_COLOR: [u8; 3] = [0, 255, 0];
+pub static PALETTE_TRANSPARENT_COLOR2: [u8; 3] = [0, 0, 255];
 
 pub static ORIGIN_TEXTURE: &str = "ORIGIN";
 pub static CLIP_TEXTURE: &str = "CLIP";

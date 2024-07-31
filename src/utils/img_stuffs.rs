@@ -14,7 +14,7 @@ use rayon::prelude::*;
 
 use crate::utils::constants::MAX_GOLDSRC_TEXTURE_SIZE;
 
-use super::constants::{PALETTE_PAD_COLOR, PALETTE_TRANSPARENT_COLOR};
+use super::constants::{PALETTE_PAD_COLOR, PALETTE_TRANSPARENT_COLOR, PALETTE_TRANSPARENT_COLOR2};
 
 use crate::err;
 
@@ -68,9 +68,9 @@ fn rgba8_to_rgb8(img: RgbaImage) -> eyre::Result<RgbImage> {
 
             if should_replace {
                 [
-                    PALETTE_TRANSPARENT_COLOR[0],
-                    PALETTE_TRANSPARENT_COLOR[1],
-                    PALETTE_TRANSPARENT_COLOR[2],
+                    PALETTE_TRANSPARENT_COLOR2[0],
+                    PALETTE_TRANSPARENT_COLOR2[1],
+                    PALETTE_TRANSPARENT_COLOR2[2],
                 ]
             } else {
                 let opacity = p[3] as f32 / 255.;
