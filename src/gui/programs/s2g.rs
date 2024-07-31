@@ -12,7 +12,7 @@ use crate::{
         utils::preview_file_being_dropped,
         TabProgram,
     },
-    modules::s2g::{options::S2GOptions, S2GBuilder, S2GSteps, S2GSync},
+    modules::s2g::{S2GOptions, S2GSteps, S2GSync, S2G},
 };
 
 struct DragAndDrop {
@@ -70,7 +70,7 @@ impl S2GGui {
             *sync.is_done().lock().unwrap() = false;
 
             // TODO fix, this is not respecting config.toml
-            let mut s2g = S2GBuilder::new(path.as_str());
+            let mut s2g = S2G::new(path.as_str());
 
             let S2GSteps {
                 decompile,
@@ -85,15 +85,15 @@ impl S2GGui {
                 add_suffix,
                 ignore_converted,
                 flatshade,
+                ..
             } = options;
 
-            s2g.settings
-                .studiomdl(&studiomdl)
-                .crowbar(&crowbar)
-                .no_vtf(&no_vtf);
+            s2g.studiomdl(PathBuf::from(studiomdl).as_path())
+                .crowbar(PathBuf::from(crowbar).as_path())
+                .no_vtf(PathBuf::from(no_vtf).as_path());
 
             #[cfg(target_os = "linux")]
-            s2g.settings.wineprefix(wineprefix);
+            s2g.wineprefix(wineprefix.as_ref().unwrap());
 
             s2g.decompile(decompile)
                 .vtf(vtf)

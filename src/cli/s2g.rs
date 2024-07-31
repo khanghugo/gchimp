@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 
 use crate::{
     config::{parse_config, Config},
-    modules::s2g::S2GBuilder,
+    modules::s2g::S2G,
 };
 
 #[derive(Debug, Parser)]
@@ -50,8 +50,8 @@ enum Commands {
     },
 }
 
-pub struct S2G;
-impl Cli for S2G {
+pub struct S2GCli;
+impl Cli for S2GCli {
     fn name(&self) -> &'static str {
         "s2g"
     }
@@ -71,7 +71,7 @@ impl Cli for S2G {
             wineprefix,
         } = cli.command;
 
-        let mut s2g = S2GBuilder::new(path.display().to_string().as_str());
+        let mut s2g = S2G::new(path.display().to_string().as_str());
 
         let config = parse_config();
 
@@ -96,16 +96,15 @@ impl Cli for S2G {
             .compile(!compile)
             .force(force);
 
-        s2g.settings
-            .studiomdl(&studiomdl)
-            .crowbar(&crowbar)
-            .no_vtf(&no_vtf);
+        s2g.studiomdl(PathBuf::from(studiomdl).as_path())
+            .crowbar(PathBuf::from(crowbar).as_path())
+            .no_vtf(PathBuf::from(no_vtf).as_path());
 
         #[cfg(target_os = "linux")]
-        s2g.settings.wineprefix(if wineprefix.is_some() {
+        s2g.wineprefix(if let Some(wineprefix) = &wineprefix {
             wineprefix
         } else {
-            config_wineprefix
+            config_wineprefix.as_ref().unwrap()
         });
 
         if let Err(err) = s2g.work() {

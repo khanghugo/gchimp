@@ -54,7 +54,7 @@ pub fn cli() -> CliRes {
         &light_scale::LightScale,
         &rotate_prop_static::RotatePropStatic,
         &texture_scale::TextureScale,
-        &s2g::S2G,
+        &s2g::S2GCli,
         &check_missing_texture::CheckMissingTexture,
         &check_illegal_brush::CheckIllegalBrush,
         &map2mdl::Map2MdlCli,

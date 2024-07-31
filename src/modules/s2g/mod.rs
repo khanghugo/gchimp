@@ -5,121 +5,62 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use constants::{
-    CROWBAR_BINARY, GOLDSRC_SUFFIX, NO_VTF_BINARY, STUDIOMDL_BINARY, VTX_EXTENSION, VVD_EXTENSION,
-};
+use constants::{GOLDSRC_SUFFIX, VTX_EXTENSION, VVD_EXTENSION};
 use eyre::eyre;
-use options::S2GOptions;
 use qc::{BodyGroup, Qc, QcCommand};
 use smd::Smd;
 
 use rayon::prelude::*;
 
-use crate::utils::{
-    constants::STUDIOMDL_ERROR_PATTERN,
-    img_stuffs::png_to_bmp_folder,
-    misc::{
-        find_files_with_ext_in_folder, fix_backslash, maybe_add_extension_to_string,
-        relative_to_less_relative,
+use crate::{
+    err,
+    utils::{
+        constants::STUDIOMDL_ERROR_PATTERN,
+        img_stuffs::png_to_bmp_folder,
+        misc::{
+            find_files_with_ext_in_folder, fix_backslash, maybe_add_extension_to_string,
+            relative_to_less_relative,
+        },
+        qc_stuffs::create_goldsrc_base_qc_from_source,
+        run_bin::{run_crowbar, run_no_vtf, run_studiomdl},
+        smd_stuffs::source_smd_to_goldsrc_smd,
     },
-    qc_stuffs::create_goldsrc_base_qc_from_source,
-    run_bin::{run_crowbar, run_no_vtf, run_studiomdl},
-    smd_stuffs::source_smd_to_goldsrc_smd,
 };
 
 mod constants;
-pub mod options;
 
-pub struct S2GSettings {
-    studiomdl: PathBuf,
-    crowbar: PathBuf,
-    no_vtf: PathBuf,
-    wineprefix: Option<String>,
+#[derive(Clone)]
+pub struct S2GOptions {
+    /// Proceeds even when there is failure
+    pub force: bool,
+    /// Adds "_goldsrc" to the output model name
+    ///
+    /// This might overwrite original model
+    pub add_suffix: bool,
+    /// Ignores converted models that have "_goldsrc" suffix.
+    pub ignore_converted: bool,
+    /// Mark the texture with flat shade flag
+    pub flatshade: bool,
+    pub crowbar: Option<PathBuf>,
+    pub no_vtf: Option<PathBuf>,
+    pub studiomdl: Option<PathBuf>,
+    #[cfg(target_os = "linux")]
+    pub wineprefix: Option<String>,
 }
 
-impl Default for S2GSettings {
+impl Default for S2GOptions {
     fn default() -> Self {
-        let current_exe_path = std::env::current_exe().unwrap();
-        let path_to_dist = current_exe_path.parent().unwrap().join("dist");
-
-        Self::new(&path_to_dist)
-    }
-}
-
-// TODO: impl Default with included binaries.
-impl S2GSettings {
-    pub fn new(path_to_bin: &Path) -> Self {
-        if !path_to_bin.exists() {
-            panic!(
-                "{} containing binaries for S2G does not exist.",
-                path_to_bin.display()
-            );
-        }
-
-        let studiomdl = path_to_bin.join(STUDIOMDL_BINARY);
-        let crowbar = path_to_bin.join(CROWBAR_BINARY);
-        let no_vtf = path_to_bin.join("no_vtf");
-        let no_vtf = no_vtf.join(NO_VTF_BINARY);
-
-        if !studiomdl.exists() {
-            panic!(
-                "Cannot find {} in {}",
-                STUDIOMDL_BINARY,
-                path_to_bin.display()
-            );
-        }
-
-        if !crowbar.exists() {
-            panic!(
-                "Cannot find {} in {}",
-                CROWBAR_BINARY,
-                path_to_bin.display()
-            );
-        }
-
-        if !no_vtf.exists() {
-            panic!("Cannot find {} in {}", NO_VTF_BINARY, path_to_bin.display());
-        }
-
         Self {
-            studiomdl,
-            crowbar,
-            no_vtf,
+            force: false,
+            add_suffix: true,
+            ignore_converted: true,
+            flatshade: true,
+            crowbar: None,
+            no_vtf: None,
+            studiomdl: None,
+            #[cfg(target_os = "linux")]
             wineprefix: None,
         }
-    }
-
-    #[allow(dead_code)]
-    pub fn studiomdl(&mut self, path: &str) -> &mut Self {
-        self.studiomdl = path.into();
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn crowbar(&mut self, path: &str) -> &mut Self {
-        self.crowbar = path.into();
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn no_vtf(&mut self, path: &str) -> &mut Self {
-        self.no_vtf = path.into();
-        self
-    }
-
-    #[allow(dead_code)]
-    pub fn wineprefix(&mut self, path: Option<String>) -> &mut Self {
-        self.wineprefix = path;
-        self
-    }
-
-    #[cfg(target_os = "linux")]
-    fn check_wineprefix(&self) -> eyre::Result<()> {
-        if self.wineprefix.is_none() || self.wineprefix.as_ref().unwrap().is_empty() {
-            return Err(eyre!("No WINEPREFIX supplied"));
-        }
-
-        Ok(())
     }
 }
 
@@ -174,29 +115,17 @@ impl Default for S2GSteps {
     }
 }
 
-pub struct S2GBuilder {
-    pub settings: S2GSettings,
+pub struct S2G {
     path: PathBuf,
     steps: S2GSteps,
     options: S2GOptions,
     process_sync: Option<S2GSync>,
 }
 
-impl S2GBuilder {
+impl S2G {
     #[allow(dead_code)]
     pub fn new(path: &str) -> Self {
         Self {
-            settings: S2GSettings::default(),
-            path: PathBuf::from(path),
-            steps: S2GSteps::default(),
-            options: S2GOptions::default(),
-            process_sync: None,
-        }
-    }
-
-    pub fn new_with_path_to_bin(path: &str, path_to_bin: &str) -> Self {
-        Self {
-            settings: S2GSettings::new(PathBuf::from(path_to_bin).as_path()),
             path: PathBuf::from(path),
             steps: S2GSteps::default(),
             options: S2GOptions::default(),
@@ -206,6 +135,27 @@ impl S2GBuilder {
 
     pub fn sync(&mut self, sync: S2GSync) -> &mut Self {
         self.process_sync = Some(sync);
+        self
+    }
+
+    pub fn crowbar(&mut self, v: &Path) -> &mut Self {
+        self.options.crowbar = v.to_path_buf().into();
+        self
+    }
+
+    pub fn no_vtf(&mut self, v: &Path) -> &mut Self {
+        self.options.no_vtf = v.to_path_buf().into();
+        self
+    }
+
+    pub fn studiomdl(&mut self, v: &Path) -> &mut Self {
+        self.options.studiomdl = v.to_path_buf().into();
+        self
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn wineprefix(&mut self, v: &str) -> &mut Self {
+        self.options.wineprefix = v.to_owned().into();
         self
     }
 
@@ -319,8 +269,8 @@ impl S2GBuilder {
             #[cfg(target_os = "linux")]
             let handle = run_crowbar(
                 input_file,
-                &self.settings.crowbar,
-                self.settings.wineprefix.as_ref().unwrap(),
+                self.options.crowbar.as_ref().unwrap(),
+                self.options.wineprefix.as_ref().unwrap(),
             );
 
             let _ = handle.join();
@@ -345,10 +295,10 @@ impl S2GBuilder {
         self.log_info(format!("Running no_vtf over {}", folder_path.display()).as_str());
 
         #[cfg(target_os = "windows")]
-        let handle = run_no_vtf(folder_path, &self.settings.no_vtf);
+        let handle = run_no_vtf(folder_path, &self.options.no_vtf.as_ref().unwrap());
 
         #[cfg(target_os = "linux")]
-        let handle = run_no_vtf(folder_path, &self.settings.no_vtf);
+        let handle = run_no_vtf(folder_path, self.options.no_vtf.as_ref().unwrap());
 
         // usually it would just work
         // TODO: do somethign when it doesn't just work
@@ -670,8 +620,8 @@ impl S2GBuilder {
             #[cfg(target_os = "linux")]
             let res = run_studiomdl(
                 path,
-                &self.settings.studiomdl,
-                self.settings.wineprefix.as_ref().unwrap(),
+                self.options.studiomdl.as_ref().unwrap(),
+                self.options.wineprefix.as_ref().unwrap(),
             );
 
             match res.join() {
@@ -735,6 +685,20 @@ impl S2GBuilder {
     pub fn work(&mut self) -> eyre::Result<Vec<PathBuf>> {
         self.log_info("Starting..............");
 
+        self.log_info("Checking settings");
+
+        if self.options.crowbar.is_none() {
+            self.log_err("No provided crowbar");
+        }
+
+        if self.options.no_vtf.is_none() {
+            self.log_err("No provided no_vtf");
+        }
+
+        if self.options.studiomdl.is_none() {
+            self.log_err("No provided studiomdl");
+        }
+
         self.log_info("Validating input path");
         if self.path.display().to_string().is_empty() {
             let err_str = "Path is empty";
@@ -792,16 +756,15 @@ impl S2GBuilder {
         self.log_info(&input_files_log_str);
 
         #[cfg(target_os = "linux")]
-        match self.settings.check_wineprefix() {
-            Ok(_) => {
-                self.log_info(
-                    format!("WINEPREFIX={}", self.settings.wineprefix.as_ref().unwrap()).as_str(),
-                );
+        match &self.options.wineprefix {
+            Some(wineprefix) => {
+                self.log_info(format!("WINEPREFIX={}", wineprefix).as_str());
             }
-            Err(err) => {
-                self.log_err(err.to_string().as_str());
+            None => {
+                let err = "No wineprefix provided for Linux";
+                self.log_err(err);
 
-                return Err(err);
+                return err!(err);
             }
         };
 
