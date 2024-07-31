@@ -146,7 +146,10 @@ impl TabProgram for S2GGui {
                     );
                 });
                 if ui.button("+").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_file() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Model files", &["mdl"])
+                        .pick_file()
+                    {
                         self.drag_and_drop.file_path = path.display().to_string();
                         self.drag_and_drop.use_file = true;
                         self.drag_and_drop.use_folder = false;
