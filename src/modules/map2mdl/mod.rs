@@ -12,7 +12,7 @@ use entity::{
 use map::{Attributes, Entity, Map};
 use qc::Qc;
 use smd::{Smd, Triangle};
-use wad::Wad;
+use wad::types::Wad;
 
 use rayon::{iter::Either, prelude::*};
 

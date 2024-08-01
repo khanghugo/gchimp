@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use map::Map;
-use wad::Wad;
+use wad::types::Wad;
 
 use crate::utils::map_stuffs::textures_used_in_map;
 

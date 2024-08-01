@@ -8,7 +8,7 @@ use image::RgbaImage;
 use rayon::prelude::*;
 
 use eyre::eyre;
-use wad::{Entry, Wad};
+use wad::types::{Entry, FileEntry, Wad};
 
 use crate::utils::img_stuffs::{
     eight_bpp_bitmap_to_png_bytes, generate_mipmaps_from_path, generate_mipmaps_from_rgba_image,
@@ -141,8 +141,8 @@ impl Waddy {
             .entries
             .get(texture_index)
             .map(|entry| match &entry.file_entry {
-                wad::FileEntry::Qpic(_) => unimplemented!(),
-                wad::FileEntry::MipTex(miptex) => {
+                FileEntry::Qpic(_) => unimplemented!(),
+                FileEntry::MipTex(miptex) => {
                     let res = write_8bpp_to_file(
                         miptex.mip_images[0].data.get_bytes(),
                         miptex.palette.get_bytes(),
@@ -161,7 +161,7 @@ impl Waddy {
 
                     None
                 }
-                wad::FileEntry::Font(_) => unimplemented!(),
+                FileEntry::Font(_) => unimplemented!(),
             });
 
         if res.is_none() {
@@ -197,8 +197,8 @@ impl Waddy {
             .entries
             .par_iter()
             .filter_map(|entry| match &entry.file_entry {
-                wad::FileEntry::Qpic(_) => unimplemented!(),
-                wad::FileEntry::MipTex(miptex) => {
+                FileEntry::Qpic(_) => unimplemented!(),
+                FileEntry::MipTex(miptex) => {
                     let out_path = path
                         .as_ref()
                         .join(miptex.texture_name.get_string())
@@ -217,7 +217,7 @@ impl Waddy {
 
                     None
                 }
-                wad::FileEntry::Font(_) => unimplemented!(),
+                FileEntry::Font(_) => unimplemented!(),
             })
             .collect::<Vec<String>>();
 

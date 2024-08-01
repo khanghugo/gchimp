@@ -4,7 +4,7 @@ use std::{
 };
 
 use eyre::eyre;
-use wad::{FileEntry, Wad};
+use wad::types::{FileEntry, Wad};
 
 use super::img_stuffs::write_8bpp_to_file;
 
@@ -128,8 +128,8 @@ pub fn export_texture(
         .iter()
         .find(|entry| entry.texture_name() == texture_name)
         .map(|entry| match &entry.file_entry {
-            wad::FileEntry::Qpic(_) => unimplemented!(),
-            wad::FileEntry::MipTex(miptex) => {
+            FileEntry::Qpic(_) => unimplemented!(),
+            FileEntry::MipTex(miptex) => {
                 let res = write_8bpp_to_file(
                     miptex.mip_images[0].data.get_bytes(),
                     miptex.palette.get_bytes(),
@@ -148,7 +148,7 @@ pub fn export_texture(
 
                 None
             }
-            wad::FileEntry::Font(_) => unimplemented!(),
+            FileEntry::Font(_) => unimplemented!(),
         });
 
     if res.is_none() {

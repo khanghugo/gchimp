@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use arboard::Clipboard;
 use eframe::egui::{self, Context, Modifiers, RichText, ScrollArea, Sense, Ui};
 use image::{ImageBuffer, RgbaImage};
-use wad::FileEntry;
+use wad::types::FileEntry;
 
 use rayon::prelude::*;
 
