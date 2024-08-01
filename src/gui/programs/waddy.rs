@@ -796,6 +796,21 @@ impl WaddyGui {
                 ui.close_menu();
             }
 
+            ui.separator();
+
+            if ui.button("Import").clicked() {
+                if let Some(path) = rfd::FileDialog::new().pick_file() {
+                    if let Err(err) = self.instances[instance_index]
+                        .waddy
+                        .add_texture_from_path(path)
+                    {
+                        println!("{}", err);
+                    } else {
+                        self.update_after_add_image(ui, instance_index);
+                    }
+                }
+            }
+
             if ui.button("Export All").clicked() {
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     // TODO TOAST TOAST
