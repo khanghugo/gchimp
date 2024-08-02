@@ -7,9 +7,10 @@ use std::{
     str::from_utf8,
 };
 
+use byte_writer::ByteWriter;
 use eyre::eyre;
 
-use crate::{byte_writer::ByteWriter, constants::MAX_TEXTURE_NAME_LENGTH, parser::parse_wad};
+use crate::{constants::MAX_TEXTURE_NAME_LENGTH, parser::parse_wad};
 
 #[derive(Debug)]
 pub struct Header {
