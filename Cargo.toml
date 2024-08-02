@@ -34,4 +34,4 @@ rfd = "0.14.1"
 egui_extras = {version = "0.28.0", features = ["all_loaders"]}
 
 [workspace]
-members = [".", "map", "smd", "qc" , "wad"]
+members = [".", "map", "smd", "qc" , "wad", "bsp"]
