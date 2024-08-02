@@ -223,6 +223,33 @@ impl MipTex {
             palette: Palette::new(palette),
         }
     }
+
+    /// Returns RGB image and dimensions
+    pub fn to_rgb(&self) -> (Vec<u8>, (u32, u32)) {
+        let image = self.mip_images[0]
+            .data
+            .get_bytes()
+            .iter()
+            .flat_map(|&palette_idx| self.palette.get_bytes()[palette_idx as usize])
+            .collect::<Vec<u8>>();
+
+        (image, (self.width, self.height))
+    }
+
+    /// Returns RGBA image and dimensions
+    pub fn to_rgba(&self) -> (Vec<u8>, (u32, u32)) {
+        let image = self.mip_images[0]
+            .data
+            .get_bytes()
+            .iter()
+            .flat_map(|&palette_idx| {
+                let [r, g, b] = self.palette.get_bytes()[palette_idx as usize];
+                [r, g, b, 255]
+            })
+            .collect::<Vec<u8>>();
+
+        (image, (self.width, self.height))
+    }
 }
 
 #[derive(Debug, Clone)]

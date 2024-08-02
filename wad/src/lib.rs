@@ -6,6 +6,8 @@ mod constants;
 mod parser;
 pub mod types;
 
+pub use parser::{parse_miptex, parse_wad};
+
 #[cfg(test)]
 mod test {
     use types::{FileEntry, Wad};

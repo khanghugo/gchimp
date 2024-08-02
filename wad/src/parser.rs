@@ -72,7 +72,7 @@ fn parse_qpic(i: &[u8]) -> IResult<Qpic> {
     ))
 }
 
-fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
+pub fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
     let struct_start = i;
 
     let (i, texture_name) = count(le_u8, 16)(i)?;
@@ -80,15 +80,18 @@ fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
     let (i, mip_offsets) = count(le_u32, 4)(i)?;
 
     if mip_offsets[0] == 0 {
-        return Ok((i, MipTex {
-            texture_name: TextureName(texture_name),
-            width,
-            height,
-            mip_offsets,
-            mip_images: vec![],
-            colors_used: 0,
-            palette: Palette(vec![]),
-        }))
+        return Ok((
+            i,
+            MipTex {
+                texture_name: TextureName(texture_name),
+                width,
+                height,
+                mip_offsets,
+                mip_images: vec![],
+                colors_used: 0,
+                palette: Palette(vec![]),
+            },
+        ));
     }
 
     // offset relatively from where we start with the struct
