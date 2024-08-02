@@ -79,6 +79,18 @@ fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
     let (i, (width, height)) = tuple((le_u32, le_u32))(i)?;
     let (i, mip_offsets) = count(le_u32, 4)(i)?;
 
+    if mip_offsets[0] == 0 {
+        return Ok((i, MipTex {
+            texture_name: TextureName(texture_name),
+            width,
+            height,
+            mip_offsets,
+            mip_images: vec![],
+            colors_used: 0,
+            palette: Palette(vec![]),
+        }))
+    }
+
     // offset relatively from where we start with the struct
     let (_, miptex0) =
         count(le_u8, (width * height) as usize)(&struct_start[(mip_offsets[0] as usize)..])?;
