@@ -1,3 +1,7 @@
+use std::mem;
+
+use crate::types::LumpHeader;
+
 pub const BSP_VERSION: i32 = 30;
 
 // BSPLUMP
@@ -39,3 +43,5 @@ pub const MAX_MAP_HULLS: usize = 4;
 // pub const MAX_MAP_LIGHTING: usize = 0x200000;
 // pub const MAX_MAP_VISIBILITY: usize = 0x200000;
 // pub const MAX_MAP_PORTALS: usize = 65536;
+
+pub const HEADER_LUMP_SIZE: usize = mem::size_of::<LumpHeader>();

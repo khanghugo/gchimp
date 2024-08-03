@@ -769,6 +769,7 @@ dependencies = [
 name = "bsp"
 version = "0.1.0"
 dependencies = [
+ "byte_writer",
  "eyre",
  "glam 0.28.0",
  "nom",

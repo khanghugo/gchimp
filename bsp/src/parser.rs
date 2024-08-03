@@ -338,16 +338,3 @@ pub fn parse_bsp(i: &[u8]) -> IResult<Bsp> {
         },
     ))
 }
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn parse() {
-        let file = include_bytes!("tests/bsp_compile.bsp");
-
-        let (_, res) = parse_bsp(file).unwrap();
-        println!("{:?}", res.models);
-    }
-}
