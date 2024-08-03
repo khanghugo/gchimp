@@ -10,7 +10,10 @@ use std::{
 use byte_writer::ByteWriter;
 use eyre::eyre;
 
-use crate::{constants::MAX_TEXTURE_NAME_LENGTH, parser::parse_wad};
+use crate::{
+    constants::{MAX_TEXTURE_NAME_LENGTH, MIPTEX_HEADER_LENGTH},
+    parser::parse_wad,
+};
 
 #[derive(Debug)]
 pub struct Header {
@@ -251,6 +254,48 @@ impl MipTex {
 
         (image, (self.width, self.height))
     }
+
+    pub fn write(&self, writer: &mut ByteWriter) {
+        let texture_name_bytes = self.texture_name.get_bytes();
+        writer.append_u8_slice(texture_name_bytes);
+        writer.append_u8_slice(&vec![0u8; 16 - texture_name_bytes.len()]);
+
+        writer.append_u32(self.width);
+        writer.append_u32(self.height);
+
+        // mip_offsets
+        writer.append_u32(MIPTEX_HEADER_LENGTH);
+        writer.append_u32(MIPTEX_HEADER_LENGTH + self.width * self.height);
+        writer.append_u32(
+            MIPTEX_HEADER_LENGTH + self.width * self.height + (self.width * self.height) / 4,
+        );
+        writer.append_u32(
+            MIPTEX_HEADER_LENGTH
+                + self.width * self.height
+                + (self.width * self.height) / 4
+                + (self.width * self.height) / 4 / 4,
+        );
+
+        // if no mipimages then don't write anything more
+        if self.mip_images.is_empty() {
+            return;
+        }
+
+        // mip images
+        for image in &self.mip_images {
+            writer.append_u8_slice(image.data.get_bytes());
+        }
+
+        // colors_used
+        writer.append_i16(256);
+
+        for row in self.palette.get_bytes() {
+            writer.append_u8_slice(row);
+        }
+
+        // pad palette to correctly have 256 colors
+        writer.append_u8_slice(&vec![0u8; (256 - self.palette.get_bytes().len()) * 3]);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -425,55 +470,13 @@ impl Wad {
             .iter()
             .map(|entry| {
                 let file_entry = &entry.file_entry;
-                let miptex_header_length = 16 + 4 + 4 + 4 * 4;
                 let file_entry_offset = writer.get_offset();
 
                 // write file entry
                 match file_entry {
                     FileEntry::Qpic(_) => unimplemented!(),
-                    FileEntry::MipTex(MipTex {
-                        texture_name,
-                        width,
-                        height,
-                        mip_offsets: _,
-                        mip_images,
-                        colors_used: _,
-                        palette,
-                    }) => {
-                        let texture_name_bytes = texture_name.get_bytes();
-                        writer.append_u8_slice(texture_name_bytes);
-                        writer.append_u8_slice(&vec![0u8; 16 - texture_name_bytes.len()]);
-
-                        writer.append_u32(*width);
-                        writer.append_u32(*height);
-
-                        // mip_offsets
-                        writer.append_u32(miptex_header_length);
-                        writer.append_u32(miptex_header_length + width * height);
-                        writer.append_u32(
-                            miptex_header_length + width * height + (width * height) / 4,
-                        );
-                        writer.append_u32(
-                            miptex_header_length
-                                + width * height
-                                + (width * height) / 4
-                                + (width * height) / 4 / 4,
-                        );
-
-                        // mip images
-                        for image in mip_images {
-                            writer.append_u8_slice(image.data.get_bytes());
-                        }
-
-                        // colors_used
-                        writer.append_i16(256);
-
-                        for row in palette.get_bytes() {
-                            writer.append_u8_slice(row);
-                        }
-
-                        // pad palette to correctly have 256 colors
-                        writer.append_u8_slice(&vec![0u8; (256 - palette.get_bytes().len()) * 3]);
+                    FileEntry::MipTex(miptex) => {
+                        miptex.write(&mut writer);
                     }
                     FileEntry::Font(_) => todo!(),
                 }
