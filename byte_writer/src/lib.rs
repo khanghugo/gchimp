@@ -65,4 +65,25 @@ impl ByteWriter {
         let bytes = val.to_le_bytes();
         self.replace(start, 4, &bytes);
     }
+
+    pub fn replace_with_i32(&mut self, start: usize, val: i32) {
+        let bytes = val.to_le_bytes();
+        self.replace(start, 4, &bytes);
+    }
+
+    // hopefully ascii :DDDDDDDDD
+    pub fn append_string(&mut self, s: &str) {
+        self.data.extend(s.as_bytes());
+        self.offset(s.as_bytes().len())
+    }
+
+    pub fn append_f32(&mut self, i: f32) {
+        self.data.extend(i.to_le_bytes());
+        self.offset(4);
+    }
+
+    pub fn append_u16(&mut self, i: u16) {
+        self.data.extend(i.to_le_bytes());
+        self.offset(2);
+    }
 }
