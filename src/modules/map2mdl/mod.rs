@@ -943,6 +943,9 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                                     .unwrap()
                                     .replace(".mdl", "0.mdl")
                             };
+                            // fix slash because it is weird for some reasons
+                            let model_modelname0 = model_modelname0.replace("\\", "/");
+
                             let model_angles = "0 0 0".to_string();
 
                             let mut entities_to_insert: Vec<Entity> = vec![];
