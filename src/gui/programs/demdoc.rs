@@ -39,6 +39,8 @@ impl DemDoc {
         thread::spawn(move || {
             let mut status = status.lock().unwrap();
 
+            "Running".clone_into(&mut status);
+
             let bsp_path = PathBuf::from(bsp);
             let new_bsp_name = bsp_path.file_name().unwrap().to_str().unwrap().to_owned();
             let bsp = Bsp::from_file(&bsp_path);
