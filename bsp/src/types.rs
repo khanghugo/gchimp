@@ -49,7 +49,7 @@ impl TryFrom<i32> for PlaneType {
     type Error = &'static str;
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
-        if value > 5 || value < 0 {
+        if !(0..=5).contains(&value) {
             return Err("Not a valid plane type");
         }
 
@@ -243,10 +243,7 @@ impl Bsp {
 
     pub fn from_file(path: impl AsRef<Path> + AsRef<OsStr>) -> eyre::Result<Self> {
         let bytes = std::fs::read(path)?;
-
-        let res = Self::from_bytes(&bytes);
-
-        res
+        Self::from_bytes(&bytes)
     }
 
     pub fn write_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
