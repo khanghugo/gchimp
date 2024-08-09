@@ -11,7 +11,9 @@ edition = "2021"
 smd = { path = "smd" }
 map = { path = "map" }
 qc = { path = "qc" }
-wad = {path = "wad" }
+wad = { path = "wad" }
+bsp = { path = "bsp" }
+dem = { git = "https://github.com/khanghugo/dem.git" }
 
 # dependencies
 glam = "0.27.0"

@@ -4,7 +4,8 @@ use crate::config::Config;
 
 use super::{
     programs::{
-        map2mdl::Map2MdlGui, s2g::S2GGui, skymod::SkyModGui, textile::TexTileGui, waddy::WaddyGui,
+        demdoc::DemDoc, map2mdl::Map2MdlGui, s2g::S2GGui, skymod::SkyModGui, textile::TexTileGui,
+        waddy::WaddyGui,
     },
     TabProgram,
 };
@@ -15,6 +16,7 @@ pub enum Pane {
     SkyMod(SkyModGui),
     TexTile(TexTileGui),
     Waddy(WaddyGui),
+    DemDoc(DemDoc),
 }
 
 impl Pane {
@@ -25,6 +27,7 @@ impl Pane {
             Pane::SkyMod(skymod) => skymod.tab_title(),
             Pane::TexTile(textile) => textile.tab_title(),
             Pane::Waddy(a) => a.tab_title(),
+            Pane::DemDoc(a) => a.tab_title(),
         }
     }
 
@@ -35,6 +38,7 @@ impl Pane {
             Pane::SkyMod(skymod) => skymod.tab_ui(ui),
             Pane::TexTile(textile) => textile.tab_ui(ui),
             Pane::Waddy(a) => a.tab_ui(ui),
+            Pane::DemDoc(a) => a.tab_ui(ui),
         }
     }
 }
@@ -48,6 +52,7 @@ pub fn create_tree(app_config: Config) -> egui_tiles::Tree<Pane> {
         tiles.insert_pane(Pane::TexTile(TexTileGui::default())),
         tiles.insert_pane(Pane::Waddy(WaddyGui::default())),
         tiles.insert_pane(Pane::Map2Prop(Map2MdlGui::new(app_config.clone()))),
+        tiles.insert_pane(Pane::DemDoc(DemDoc::default())),
     ];
 
     let root = tiles.insert_tab_tile(tabs);
