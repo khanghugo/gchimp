@@ -10,13 +10,16 @@ use eframe::egui;
 
 use crate::{
     gui::{utils::preview_file_being_dropped, TabProgram},
-    modules::demdoc::change_map::change_map,
+    modules::demdoc::{change_map::change_map, kz_stats::add_kz_stats},
 };
 
 pub struct DemDoc {
     bsp: String,
     dem: String,
-    run_change_map_status: Arc<Mutex<String>>,
+    change_map_status: Arc<Mutex<String>>,
+    kz_stats_status: Arc<Mutex<String>>,
+    kz_stats_keys: bool,
+    kz_stats_speedometer: bool,
 }
 
 impl Default for DemDoc {
@@ -24,7 +27,10 @@ impl Default for DemDoc {
         Self {
             bsp: String::new(),
             dem: String::new(),
-            run_change_map_status: Arc::new(Mutex::new(String::from("Idle"))),
+            change_map_status: Arc::new(Mutex::new(String::from("Idle"))),
+            kz_stats_status: Arc::new(Mutex::new(String::from("Idle"))),
+            kz_stats_keys: true,
+            kz_stats_speedometer: true,
         }
     }
 }
@@ -33,8 +39,7 @@ impl DemDoc {
     fn run_change_map(&self) {
         let bsp = self.bsp.clone();
         let dem = self.dem.clone();
-
-        let status = self.run_change_map_status.clone();
+        let status = self.change_map_status.clone();
 
         thread::spawn(move || {
             let mut status = status.lock().unwrap();
@@ -65,6 +70,46 @@ impl DemDoc {
             format!(
                 "File written at ..{}",
                 &out_path[out_path.len().saturating_sub(32)..]
+            )
+            .clone_into(&mut status);
+        });
+    }
+
+    fn run_kz_stats(&self) {
+        let dem = self.dem.clone();
+        let status = self.kz_stats_status.clone();
+
+        let add_keys = self.kz_stats_keys;
+        let add_speedometer = self.kz_stats_speedometer;
+
+        thread::spawn(move || {
+            let mut status = status.lock().unwrap();
+
+            "Running".clone_into(&mut status);
+
+            let what = dem.clone();
+            let mut demo = open_demo!(what);
+
+            add_kz_stats(&mut demo, |addons| {
+                if add_keys {
+                    addons.add_keys();
+                }
+
+                if add_speedometer {
+                    addons.add_speedometer();
+                }
+            });
+
+            let out_path = format!("{}_demdoc.dem", dem.strip_suffix(".dem").unwrap());
+            let what = out_path.clone();
+
+            if let Err(err) = write_demo!(what, demo) {
+                *status = format!("Cannot write .dem: {}", err);
+            }
+
+            format!(
+                "File written at ..{}",
+                &out_path[out_path.len().saturating_sub(24)..]
             )
             .clone_into(&mut status);
         });
@@ -116,10 +161,45 @@ impl TabProgram for DemDoc {
                     self.run_change_map()
                 }
 
-                let binding = self.run_change_map_status.lock().unwrap();
+                let binding = self.change_map_status.lock().unwrap();
                 let mut status_text = binding.as_str();
                 ui.text_edit_singleline(&mut status_text)
             });
+        ui.separator();
+
+        ui.label("Add KZ stats")
+            .on_hover_text("Adds KZ stats to demo");
+
+        egui::Grid::new("Kz stats grid")
+            .num_columns(2)
+            .show(ui, |ui| {
+                ui.label("Demo:");
+                ui.add(egui::TextEdit::singleline(&mut self.dem).hint_text("Choose .dem file"));
+                if ui.button("Add").clicked() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Demo", &["dem"])
+                        .pick_file()
+                    {
+                        if path.extension().is_some_and(|ext| ext == "dem") {
+                            self.dem = path.display().to_string();
+                        }
+                    }
+                }
+                ui.end_row();
+            });
+
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.kz_stats_keys, "Keys");
+            ui.checkbox(&mut self.kz_stats_speedometer, "Speed");
+
+            if ui.button("Run").clicked() {
+                self.run_kz_stats();
+            }
+
+            let binding = self.kz_stats_status.lock().unwrap();
+            let mut status_text = binding.as_str();
+            ui.text_edit_singleline(&mut status_text);
+        });
 
         ui.separator();
 
