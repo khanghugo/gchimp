@@ -6,7 +6,7 @@ use std::{
 };
 
 use entity::{
-    MAP2MDL_ATTR_CLIPTYPE, MAP2MDL_ATTR_MODEL_ENTITY, MAP2MDL_ATTR_OUTPUT,
+    MAP2MDL_ATTR_CLIPTYPE, MAP2MDL_ATTR_MODEL_ENTITY, MAP2MDL_ATTR_OPTIONS, MAP2MDL_ATTR_OUTPUT,
     MAP2MDL_ATTR_TARGET_ORIGIN, MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY, MAP2MDL_ENTITY_NAME,
 };
 use map::{Attributes, Entity, Map};
@@ -60,6 +60,8 @@ struct ConvertFromTrianglesOptions<'a> {
     // this will be the origin of the model relatively from where it is
     // it means that this will be the centroid of the model
     maybe_target_origin: Option<[f64; 3]>,
+    // nested flatshade again because this is per model
+    flatshade: bool,
 }
 
 #[derive(Debug)]
@@ -72,8 +74,6 @@ pub struct Map2MdlOptions {
     ///
     /// ORIGIN brush will only work if this is enabled.
     pub move_to_origin: bool,
-    /// Ignores "no draw" textures like sky or NULL
-    pub ignore_nodraw: bool,
     studiomdl: Option<PathBuf>,
     #[cfg(target_os = "linux")]
     wineprefix: Option<String>,
@@ -81,6 +81,8 @@ pub struct Map2MdlOptions {
     ///
     /// Not only this will creates a new model but potentially a new .map file
     pub marked_entity: bool,
+    /// Model is flatshade
+    pub flatshade: bool,
 }
 
 impl Default for Map2MdlOptions {
@@ -93,7 +95,7 @@ impl Default for Map2MdlOptions {
             studiomdl: None,
             #[cfg(target_os = "linux")]
             wineprefix: None,
-            ignore_nodraw: true,
+            flatshade: true,
         }
     }
 }
@@ -148,11 +150,6 @@ impl Map2Mdl {
         self
     }
 
-    pub fn ignore_nodraw(&mut self, v: bool) -> &mut Self {
-        self.options.ignore_nodraw = v;
-        self
-    }
-
     pub fn add_wad(&mut self, v: &Path) -> &mut Self {
         self.wads.push(v.to_path_buf());
         self
@@ -190,6 +187,11 @@ impl Map2Mdl {
         self
     }
 
+    pub fn flatshade(&mut self, v: bool) -> &mut Self {
+        self.options.flatshade = v;
+        self
+    }
+
     pub fn sync(&mut self, v: Map2MdlSync) -> &mut Self {
         self.sync = v.into();
         self
@@ -218,6 +220,7 @@ impl Map2Mdl {
             export_resource,
             use_special_texture,
             maybe_target_origin,
+            flatshade,
         } = options;
 
         // before splitting smd, we need to check if we want to split model
@@ -246,13 +249,7 @@ impl Map2Mdl {
         // exclude triangles
         smd_triangles
             .iter()
-            .filter(|tri| {
-                if self.options.ignore_nodraw {
-                    !NO_RENDER_TEXTURE.contains(&tri.material.as_str())
-                } else {
-                    true
-                }
-            })
+            .filter(|tri| !NO_RENDER_TEXTURE.contains(&tri.material.as_str()))
             .for_each(|tri| {
                 let new_tri = tri.clone();
 
@@ -367,13 +364,19 @@ impl Map2Mdl {
                 new_qc.set_cd_texture(resource_path.parent().unwrap().to_str().unwrap());
 
                 current_model_textures.iter().for_each(|texture| {
+                    let curr_tex = format!("{}.bmp", texture);
+
                     // for the best results, TexTile does convert to compliant transparent texture
                     if texture.starts_with("{") {
                         new_qc.add_texrendermode(
                             // ".bmp" is required
-                            format!("{}.bmp", texture).as_str(),
+                            curr_tex.as_str(),
                             qc::RenderMode::Masked,
                         );
+                    }
+
+                    if flatshade && !NO_RENDER_TEXTURE.contains(&texture.as_str()) {
+                        new_qc.add_texrendermode(curr_tex.as_str(), qc::RenderMode::FlatShade);
                     }
                 });
 
@@ -432,13 +435,7 @@ impl Map2Mdl {
 
             if let Some(err) = textures_used
                 .par_iter()
-                .filter(|tex| {
-                    if self.options.ignore_nodraw {
-                        !NO_RENDER_TEXTURE.contains(&tex.as_str())
-                    } else {
-                        true
-                    }
-                })
+                .filter(|tex| !NO_RENDER_TEXTURE.contains(&tex.as_str()))
                 .map(|tex| {
                     // textures will be exported inside studiomdl folder if convert entity
                     let out_path_file = if let Some(map) = &self.map {
@@ -839,6 +836,13 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                                 }
                             }
 
+                            let map2mdl_entity_options = entity
+                                .attributes
+                                .get(MAP2MDL_ATTR_OPTIONS)
+                                .map(|v| v.parse::<u32>().unwrap_or(0))
+                                .unwrap_or(0);
+                            let flatshade = map2mdl_entity_options & 1 == 1;
+
                             let num_model = self.convert_from_triangles(
                                 smd_triangles,
                                 &textures_used_in_smd,
@@ -852,6 +856,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                                     export_resource: map2mdl_export_resource,
                                     use_special_texture: true,
                                     maybe_target_origin,
+                                    flatshade,
                                 },
                             );
 
@@ -1068,6 +1073,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                         // TODO: do the steps in a way that we dont' need this, might be unnecessary but something to keep in mind
                         use_special_texture: false,
                         maybe_target_origin: None,
+                        flatshade: self.options.flatshade,
                     },
                 )?;
             }
@@ -1098,6 +1104,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     export_resource: true,
                     use_special_texture: true,
                     maybe_target_origin: None,
+                    flatshade: self.options.flatshade,
                 },
             )?;
         } else {
@@ -1132,6 +1139,7 @@ mod test {
             .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
             .map("/home/khang/gchimp/examples/map2prop/map2.map")
+            .flatshade(false)
             .work()
             .unwrap();
     }

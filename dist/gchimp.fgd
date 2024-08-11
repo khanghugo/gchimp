@@ -20,4 +20,8 @@
 		2 : "Box (biggest bounding box covering brush)"
 	]
 	target_origin(string) : "Sets the model origin based on origin of info_target"
+	options(Flags) =
+	[
+		1: "Flat shade" : 1
+	]
 ]

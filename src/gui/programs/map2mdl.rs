@@ -49,8 +49,8 @@ impl Map2MdlGui {
             auto_pickup_wad,
             export_texture,
             move_to_origin,
-            ignore_nodraw,
             marked_entity,
+            flatshade,
             ..
         } = self.options;
         let entity = self.entity.clone();
@@ -65,9 +65,9 @@ impl Map2MdlGui {
                 .auto_pickup_wad(auto_pickup_wad)
                 .move_to_origin(move_to_origin)
                 .export_texture(export_texture)
-                .ignore_nodraw(ignore_nodraw)
                 .studiomdl(PathBuf::from(&studiomdl).as_path())
                 .marked_entity(marked_entity)
+                .flatshade(flatshade)
                 .sync(sync.clone());
 
             if use_entity {
@@ -142,7 +142,6 @@ impl TabProgram for Map2MdlGui {
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.options.auto_pickup_wad, "Auto pickup WADs").on_hover_text("Look for WAD files from \"wad\" key in the map file or worldbrush entity");
             ui.checkbox(&mut self.options.export_texture, "Export textures").on_hover_text("Export textures into the map file folder OR studiomdl.exe folder if converting entity");
-            ui.checkbox(&mut self.options.ignore_nodraw, "Skip nodraw textures").on_hover_text("NULL, CLIP, ...");
         });
 
         ui.horizontal(|ui| {
@@ -156,6 +155,8 @@ impl TabProgram for Map2MdlGui {
             ));
             ui.checkbox(&mut self.options.move_to_origin, "Center the model")
                 .on_hover_text("The center of the model is the origin");
+            ui.checkbox(&mut self.options.flatshade, "Flatshade")
+                .on_hover_text("Model is flatshade");
         });
 
         ui.separator();
