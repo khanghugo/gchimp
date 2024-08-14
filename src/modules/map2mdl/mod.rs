@@ -2,7 +2,9 @@ use std::{
     collections::HashSet,
     fs,
     path::{Path, PathBuf},
+    process::Output,
     sync::{Arc, Mutex},
+    thread::JoinHandle,
 };
 
 use entity::{
@@ -212,7 +214,7 @@ impl Map2Mdl {
         smd_triangles: &[Triangle],
         textures_used: &HashSet<String>,
         options: ConvertFromTrianglesOptions,
-    ) -> eyre::Result<usize> {
+    ) -> eyre::Result<Option<Vec<JoinHandle<eyre::Result<Output>>>>> {
         let ConvertFromTrianglesOptions {
             output_path,
             resource_path,
@@ -231,7 +233,7 @@ impl Map2Mdl {
         if !export_resource {
             self.log("Skipped creating qc, smd, and model files");
 
-            return Ok(model_count);
+            return Ok(None);
         }
 
         let mut main_smd = Smd::new_basic();
@@ -409,18 +411,19 @@ impl Map2Mdl {
             return err!(err_str);
         }
 
-        smd_and_qc_res.into_par_iter().for_each(|res| {
-            let handle = run_studiomdl(
-                res.unwrap().as_path(),
-                self.options.studiomdl.as_ref().unwrap(),
-                #[cfg(target_os = "linux")]
-                self.options.wineprefix.as_ref().unwrap(),
-            );
+        let res: Vec<JoinHandle<eyre::Result<Output>>> = smd_and_qc_res
+            .into_par_iter()
+            .map(|res| {
+                run_studiomdl(
+                    res.unwrap().as_path(),
+                    self.options.studiomdl.as_ref().unwrap(),
+                    #[cfg(target_os = "linux")]
+                    self.options.wineprefix.as_ref().unwrap(),
+                )
+            })
+            .collect();
 
-            let _ = handle.join().unwrap();
-        });
-
-        Ok(model_count)
+        Ok(Some(res))
     }
 
     fn maybe_export_texture(
@@ -843,7 +846,11 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                                 .unwrap_or(0);
                             let flatshade = map2mdl_entity_options & 1 == 1;
 
-                            let num_model = self.convert_from_triangles(
+                            let model_count =
+                                textures_used_in_smd.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
+
+                            // TODO: join thread
+                            let res = self.convert_from_triangles(
                                 smd_triangles,
                                 &textures_used_in_smd,
                                 ConvertFromTrianglesOptions {
@@ -861,8 +868,8 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                             );
 
                             // way to pass more data... for now
-                            match num_model {
-                                Ok(num_model) => Ok((num_model, maybe_target_origin)),
+                            match res {
+                                Ok(_) => Ok((model_count, maybe_target_origin)),
                                 Err(err) => err!(
                                     "Cannot convert from triangles for {} with output {}: {}",
                                     MAP2MDL_ENTITY_NAME,
