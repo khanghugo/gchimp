@@ -13,7 +13,7 @@ map = { path = "map" }
 qc = { path = "qc" }
 wad = { path = "wad" }
 bsp = { path = "bsp" }
-dem = { git = "https://github.com/khanghugo/dem.git" }
+dem = { git = "https://github.com/khanghugo/dem.git", rev = "39433a1bbae9c762b31504b7df5b68a532434716" }
 
 # dependencies
 glam = "0.27.0"

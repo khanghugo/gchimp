@@ -1220,6 +1220,7 @@ checksum = "5c297a1c74b71ae29df00c3e22dd9534821d60eb9af5a0192823fa2acea70c2a"
 [[package]]
 name = "dem"
 version = "0.1.0"
+source = "git+https://github.com/khanghugo/dem.git?rev=39433a1bbae9c762b31504b7df5b68a532434716#39433a1bbae9c762b31504b7df5b68a532434716"
 dependencies = [
  "bitvec",
  "hldemo",
