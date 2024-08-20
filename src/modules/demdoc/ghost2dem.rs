@@ -9,7 +9,9 @@ use dem::hldemo::{
 };
 use dem::parse_netmsg;
 use dem::types::{
-    Delta, EntityS, EntityState, EntityStateDelta, OriginCoord, Resource, SvcDeltaPacketEntities, SvcNewMovevars, SvcPacketEntities, SvcResourceList, SvcServerInfo, SvcSetView, SvcSignOnNum, SvcSound, SvcSpawnBaseline
+    Delta, EntityS, EntityState, EntityStateDelta, OriginCoord, Resource, SvcDeltaPacketEntities,
+    SvcNewMovevars, SvcPacketEntities, SvcResourceList, SvcServerInfo, SvcSetView, SvcSignOnNum,
+    SvcSound, SvcSpawnBaseline,
 };
 use dem::{
     bitvec::{bitvec, order::Lsb0},
@@ -254,10 +256,9 @@ fn insert_base_netmsg(
         .iter()
         .flat_map(|dd| dd.write(&aux))
         .collect();
-    
+
     // parse delta again just so that we mutate our Aux
     parse_netmsg(dds.as_slice(), aux).unwrap();
-
 
     let set_view = SvcSetView { entity_index: 1 }; // always 1
     let set_view = set_view.write(&aux);
@@ -303,15 +304,17 @@ fn insert_base_netmsg(
 
     let bsp_entities_resource: Vec<Resource> = baseline_entities
         .iter()
-        .map(|ent| Resource {
-            type_: nbit_num!(ResourceType::Model, 4), // blocks and .mdl are all type 2
-            name: nbit_str!(format!("{}\0", ent.properties.get("model").unwrap())),
-            index: nbit_num!(ent.modelindex, 12), // this is modelindex
-            size: nbit_num!(0, 3 * 8),
-            flags: nbit_num!(1, 3), // this could be interpolation flag?
-            md5_hash: None,
-            has_extra_info: false,
-            extra_info: None,
+        .map(|ent| {
+            Resource {
+                type_: nbit_num!(ResourceType::Model, 4), // blocks and .mdl are all type 2
+                name: nbit_str!(format!("{}\0", ent.properties.get("model").unwrap())),
+                index: nbit_num!(ent.modelindex, 12), // this is modelindex
+                size: nbit_num!(0, 3 * 8),
+                flags: nbit_num!(1, 3), // this could be interpolation flag?
+                md5_hash: None,
+                has_extra_info: false,
+                extra_info: None,
+            }
         })
         .collect();
 
