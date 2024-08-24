@@ -1,0 +1,9 @@
+[package]
+name = "vtf"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eyre = "0.6.12"
+image = "0.25.2"
+nom = "7.1.3"

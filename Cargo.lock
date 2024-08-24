@@ -4422,6 +4422,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "49874b5167b65d7193b8aba1567f5c7d93d001cafc34600cee003eda787e483f"
 
 [[package]]
+name = "vtf"
+version = "0.1.0"
+dependencies = [
+ "eyre",
+ "image",
+ "nom 7.1.3",
+]
+
+[[package]]
 name = "wad"
 version = "0.1.0"
 dependencies = [
