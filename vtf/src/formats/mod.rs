@@ -1,9 +1,9 @@
-use dxt1::Dxt1;
+use dxt::{Dxt1, Dxt5};
 use image::DynamicImage;
 
 use crate::{IResult, ImageData};
 
-pub mod dxt1;
+pub mod dxt;
 
 mod utils;
 
@@ -113,7 +113,7 @@ impl VtfImage {
             VtfImageFormat::Bgra8888 => todo!(),
             VtfImageFormat::Dxt1 => Dxt1::parse(i, dimensions),
             VtfImageFormat::Dxt3 => todo!(),
-            VtfImageFormat::Dxt5 => todo!(),
+            VtfImageFormat::Dxt5 => Dxt5::parse(i, dimensions),
             VtfImageFormat::Bgrx8888 => todo!(),
             VtfImageFormat::Bgr565 => todo!(),
             VtfImageFormat::Bgrx5551 => todo!(),
@@ -155,7 +155,7 @@ impl VtfImage {
             VtfImageFormat::Bgra8888 => todo!(),
             VtfImageFormat::Dxt1 => Dxt1::to_image(&self.bytes, self.dimensions),
             VtfImageFormat::Dxt3 => todo!(),
-            VtfImageFormat::Dxt5 => todo!(),
+            VtfImageFormat::Dxt5 => Dxt5::to_image(&self.bytes, self.dimensions),
             VtfImageFormat::Bgrx8888 => todo!(),
             VtfImageFormat::Bgr565 => todo!(),
             VtfImageFormat::Bgrx5551 => todo!(),

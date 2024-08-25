@@ -195,14 +195,14 @@ pub struct Face {
 pub type Vtf73Data = Vec<Resource>;
 
 #[derive(Debug, Clone)]
-pub struct Vtf72Data {
+pub struct Vtf70Data {
     pub low_res: VtfImage,
     pub high_res: VtfHighResImage,
 }
 
 #[derive(Debug, Clone)]
 pub enum VtfData {
-    Vtf72(Vtf72Data),
+    Vtf70(Vtf70Data),
     Vtf73(Vtf73Data),
 }
 

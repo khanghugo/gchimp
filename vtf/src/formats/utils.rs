@@ -33,3 +33,18 @@ pub fn rgb8_buffer_to_image(buf: &[[u8; 3]], width: u32, height: u32) -> Dynamic
 
     res
 }
+
+pub fn rgba8_buffer_to_image(buf: &[[u8; 4]], width: u32, height: u32) -> DynamicImage {
+    let mut res = DynamicImage::new_rgba8(width, height);
+
+    for x in 0..width {
+        for y in 0..height {
+            let curr_pixel = buf[(y * width + x) as usize];
+            let converted = [curr_pixel[0], curr_pixel[1], curr_pixel[2], curr_pixel[3]];
+
+            res.put_pixel(x, y, Rgba(converted));
+        }
+    }
+
+    res
+}

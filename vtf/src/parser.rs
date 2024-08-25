@@ -10,7 +10,7 @@ use nom::{
 use crate::{
     formats::{VtfImage, VtfImageFormat},
     Face, Frame, Header, Header72, Header73, IResult, MipMap, Resource, ResourceEntry,
-    ResourceEntryTag, Vtf, Vtf72Data, Vtf73Data, VtfData, VtfFlag, VtfHighResImage,
+    ResourceEntryTag, Vtf, Vtf70Data, Vtf73Data, VtfData, VtfFlag, VtfHighResImage,
 };
 
 fn parse_header(i: &[u8]) -> IResult<Header> {
@@ -88,8 +88,18 @@ fn parse_header(i: &[u8]) -> IResult<Header> {
     ))
 }
 
-fn parse_vtf72_data(i: &[u8]) -> IResult<Vtf72Data> {
-    todo!()
+fn parse_vtf70_data<'a, 'b>(header_end: &'a [u8], header: &'b Header) -> IResult<'a, Vtf70Data> {
+    let i = header_end;
+    let (i, low_res) = parse_low_res_mipmap(i, header)?;
+    let (i, mipmaps) = parse_high_res_mipmaps(i, header)?;
+
+    Ok((
+        i,
+        Vtf70Data {
+            low_res,
+            high_res: VtfHighResImage { mipmaps },
+        },
+    ))
 }
 
 fn parse_vtf73_data<'a, 'b>(
@@ -111,22 +121,7 @@ fn parse_vtf73_data<'a, 'b>(
 
         match entry.tag {
             ResourceEntryTag::LowRes => {
-                let format = VtfImageFormat::try_from(header.low_res_image_format);
-
-                if let Err(err) = format {
-                    return context(err, fail)(i);
-                }
-
-                let format = format.unwrap();
-
-                let (_, image) = VtfImage::parse_from_format(
-                    i,
-                    format,
-                    (
-                        header.low_res_image_width as u32,
-                        header.low_res_image_height as u32,
-                    ),
-                )?;
+                let (_, image) = parse_low_res_mipmap(i, header)?;
 
                 res.push(Resource::LowRes(image));
             }
@@ -144,6 +139,25 @@ fn parse_vtf73_data<'a, 'b>(
     }
 
     Ok((i, res))
+}
+
+fn parse_low_res_mipmap<'a, 'b>(i: &'a [u8], header: &'b Header) -> IResult<'a, VtfImage> {
+    let format = VtfImageFormat::try_from(header.low_res_image_format);
+
+    if let Err(err) = format {
+        return context(err, fail)(i);
+    }
+
+    let format = format.unwrap();
+
+    VtfImage::parse_from_format(
+        i,
+        format,
+        (
+            header.low_res_image_width as u32,
+            header.low_res_image_height as u32,
+        ),
+    )
 }
 
 // TODO: refactor this to just map(count, x)
@@ -181,6 +195,9 @@ fn parse_high_res_mipmaps<'a, 'b>(i: &'a [u8], header: &'b Header) -> IResult<'a
             for _face_idx in 0..(face_count as usize) {
                 let (new_i, image) =
                     VtfImage::parse_from_format(i, format, (width as u32, height as u32))?;
+
+                let what = image.to_image();
+                what.save(format!("/home/khang/gchimp/vtf/src/tests/nuke_metalgrate_01_{width}x{height}.png")).unwrap();
 
                 i = new_i;
                 faces.push(Face { image });
@@ -225,9 +242,9 @@ pub fn parse_vtf(i: &[u8]) -> IResult<Vtf> {
     let data = if header.version[1] >= 3 {
         let (_, data) = parse_vtf73_data(i, header_end, &header)?;
         VtfData::Vtf73(data)
-    } else if header.version[1] == 2 {
-        let (_, data) = parse_vtf72_data(i)?;
-        VtfData::Vtf72(data)
+    } else if header.version[1] < 3 {
+        let (_, data) = parse_vtf70_data(header_end, &header)?;
+        VtfData::Vtf70(data)
     } else {
         unreachable!("VTF minor version {} is not supported", header.version[1])
     };
@@ -251,6 +268,15 @@ mod test {
     fn vtf() {
         let vtf = include_bytes!("tests/tilefloor01.vtf");
         let (_, vtf) = parse_vtf(vtf).unwrap();
-        println!("vtf {:?}", vtf);
+
+        // println!("vtf {:?}", vtf);
+    }
+
+    #[test]
+    fn vtf2() {
+        let vtf = include_bytes!("tests/dev_green_a.vtf");
+        let (_, vtf) = parse_vtf(vtf).unwrap();
+
+        println!("vtf {:?}", vtf.header);
     }
 }
