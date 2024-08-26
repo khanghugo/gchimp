@@ -34,6 +34,4 @@ Usually it would just work out of the box. If there is any problem, try starting
 
 ## Building
 
-After building the project, put `config.toml` from `dist` folder into the same folder as the binary `gchimp`
-
-Then, download [no_vtf](https://sr.ht/~b5327157/no_vtf/) and put the `no_vtf` folder inside `dist`
+`cargo build`
