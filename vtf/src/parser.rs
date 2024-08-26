@@ -88,10 +88,10 @@ fn parse_header(i: &[u8]) -> IResult<Header> {
     ))
 }
 
-fn parse_vtf70_data<'a, 'b>(
+fn parse_vtf70_data<'a>(
     i: &'a [u8],
-    _header_end: &'a [u8],
-    header: &'b Header,
+    _header_end: &[u8],
+    header: &Header,
 ) -> IResult<'a, Vtf70Data> {
     // for some reasons, it uses the header size to offset rather than the next available bytes.
     let i = &i[header.header_size as usize..];
@@ -108,10 +108,10 @@ fn parse_vtf70_data<'a, 'b>(
     ))
 }
 
-fn parse_vtf73_data<'a, 'b>(
+fn parse_vtf73_data<'a>(
     i: &'a [u8],
     header_end: &'a [u8],
-    header: &'b Header,
+    header: &Header,
 ) -> IResult<'a, Vtf73Data> {
     // i is the beginning of the file
     // for some reasons this continues from header end instead of header size offset
@@ -148,7 +148,7 @@ fn parse_vtf73_data<'a, 'b>(
     Ok((i, res))
 }
 
-fn parse_low_res_mipmap<'a, 'b>(i: &'a [u8], header: &'b Header) -> IResult<'a, VtfImage> {
+fn parse_low_res_mipmap<'a>(i: &'a [u8], header: &Header) -> IResult<'a, VtfImage> {
     let format = VtfImageFormat::try_from(header.low_res_image_format);
 
     if let Err(err) = format {
@@ -168,7 +168,7 @@ fn parse_low_res_mipmap<'a, 'b>(i: &'a [u8], header: &'b Header) -> IResult<'a, 
 }
 
 // TODO: refactor this to just map(count, x)
-fn parse_high_res_mipmaps<'a, 'b>(i: &'a [u8], header: &'b Header) -> IResult<'a, Vec<MipMap>> {
+fn parse_high_res_mipmaps<'a>(i: &'a [u8], header: &Header) -> IResult<'a, Vec<MipMap>> {
     let format = VtfImageFormat::try_from(header.high_res_image_format);
 
     if let Err(err) = format {
@@ -226,14 +226,14 @@ fn parse_resource_entry(i: &[u8]) -> IResult<ResourceEntry> {
         return context(err, fail)(i);
     }
 
-    return Ok((
+    Ok((
         i,
         ResourceEntry {
             tag: tag_res.unwrap(),
             flags,
             offset,
         },
-    ));
+    ))
 }
 
 pub fn parse_vtf(i: &[u8]) -> IResult<Vtf> {

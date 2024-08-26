@@ -78,11 +78,11 @@ impl TryFrom<&[u8]> for ResourceEntryTag {
 
         let conv = |i: [char; 3]| i.iter().map(|&e| e as u8).collect::<Vec<u8>>();
 
-        if value == &[0x01, 0, 0] {
+        if value == [0x01, 0, 0] {
             Ok(Self::LowRes)
-        } else if value == &[0x30, 0, 0] {
+        } else if value == [0x30, 0, 0] {
             Ok(Self::HighRes)
-        } else if value == &[0x10, 0, 0] {
+        } else if value == [0x10, 0, 0] {
             Ok(Self::AnimatedParticleSheet)
         } else if value == conv(['C', 'R', 'C']).as_slice() {
             Ok(Self::CRC)
