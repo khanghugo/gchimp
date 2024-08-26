@@ -39,7 +39,6 @@ impl Map2MdlGui {
         let Config {
             studiomdl,
             crowbar: _,
-            no_vtf: _,
             #[cfg(target_os = "linux")]
             wineprefix,
             ..

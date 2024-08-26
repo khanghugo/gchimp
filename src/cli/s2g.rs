@@ -83,7 +83,6 @@ impl Cli for S2GCli {
         let Config {
             studiomdl,
             crowbar,
-            no_vtf,
             #[cfg(target_os = "linux")]
                 wineprefix: config_wineprefix,
             ..
@@ -97,8 +96,7 @@ impl Cli for S2GCli {
             .force(force);
 
         s2g.studiomdl(PathBuf::from(studiomdl).as_path())
-            .crowbar(PathBuf::from(crowbar).as_path())
-            .no_vtf(PathBuf::from(no_vtf).as_path());
+            .crowbar(PathBuf::from(crowbar).as_path());
 
         #[cfg(target_os = "linux")]
         s2g.wineprefix(if let Some(wineprefix) = &wineprefix {

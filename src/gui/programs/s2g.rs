@@ -58,7 +58,6 @@ impl S2GGui {
         let Config {
             studiomdl,
             crowbar,
-            no_vtf,
             #[cfg(target_os = "linux")]
             wineprefix,
             ..
@@ -89,8 +88,7 @@ impl S2GGui {
             } = options;
 
             s2g.studiomdl(PathBuf::from(studiomdl).as_path())
-                .crowbar(PathBuf::from(crowbar).as_path())
-                .no_vtf(PathBuf::from(no_vtf).as_path());
+                .crowbar(PathBuf::from(crowbar).as_path());
 
             #[cfg(target_os = "linux")]
             s2g.wineprefix(wineprefix.as_ref().unwrap());
@@ -184,7 +182,7 @@ impl TabProgram for S2GGui {
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.steps.decompile, "Decompile");
             ui.checkbox(&mut self.steps.vtf, "VTF")
-                .on_hover_text("Uses no_vtf to convert all .vtx files in the folder to .png");
+                .on_hover_text("Converts all .vtf files in the folder to .png");
             ui.checkbox(&mut self.steps.bmp, "BMP")
                 .on_hover_text("Converts all .png in the folder to compliant .bmp");
             ui.checkbox(&mut self.steps.smd_and_qc, "Smd/Qc")

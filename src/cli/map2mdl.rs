@@ -32,7 +32,6 @@ impl Cli for Map2MdlCli {
         let Config {
             studiomdl,
             crowbar: _,
-            no_vtf: _,
             #[cfg(target_os = "linux")]
                 wineprefix: config_wineprefix,
             ..

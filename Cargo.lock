@@ -1845,6 +1845,7 @@ dependencies = [
  "serde_json",
  "smd",
  "toml",
+ "vtf",
  "wad",
 ]
 

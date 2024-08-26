@@ -16,7 +16,6 @@ use serde::Deserialize;
 pub struct Config {
     pub studiomdl: String,
     pub crowbar: String,
-    pub no_vtf: String,
     #[cfg(target_os = "linux")]
     pub wineprefix: Option<String>,
     pub theme: String,
@@ -78,32 +77,9 @@ pub fn parse_config_from_file(path: &Path) -> eyre::Result<Config> {
 
     let crowbar = crowbar.unwrap().display().to_string();
 
-    let no_vtf = PathBuf::from(config.no_vtf);
-
-    #[cfg(target_os = "windows")]
-    let no_vtf = if no_vtf.extension().is_none() || no_vtf.extension().unwrap() != "exe" {
-        no_vtf.with_extension("exe")
-    } else {
-        no_vtf
-    };
-
-    let no_vtf = if no_vtf.is_relative() {
-        root.join(no_vtf)
-    } else {
-        no_vtf
-    }
-    .canonicalize();
-
-    if no_vtf.is_err() {
-        return Err(eyre!("Cannot find no_vtf binary"));
-    }
-
-    let no_vtf = no_vtf.unwrap().display().to_string();
-
     Ok(Config {
         studiomdl,
         crowbar,
-        no_vtf,
         #[cfg(target_os = "linux")]
         wineprefix: config.wineprefix,
         theme: config.theme,

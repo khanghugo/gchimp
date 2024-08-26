@@ -44,7 +44,6 @@ pub struct S2GOptions {
     /// Mark the texture with flat shade flag
     pub flatshade: bool,
     pub crowbar: Option<PathBuf>,
-    pub no_vtf: Option<PathBuf>,
     pub studiomdl: Option<PathBuf>,
     #[cfg(target_os = "linux")]
     pub wineprefix: Option<String>,
@@ -58,7 +57,6 @@ impl Default for S2GOptions {
             ignore_converted: true,
             flatshade: true,
             crowbar: None,
-            no_vtf: None,
             studiomdl: None,
             #[cfg(target_os = "linux")]
             wineprefix: None,
@@ -145,11 +143,6 @@ impl S2G {
         self
     }
 
-    pub fn no_vtf(&mut self, v: &Path) -> &mut Self {
-        self.options.no_vtf = v.to_path_buf().into();
-        self
-    }
-
     pub fn studiomdl(&mut self, v: &Path) -> &mut Self {
         self.options.studiomdl = v.to_path_buf().into();
         self
@@ -167,7 +160,7 @@ impl S2G {
         self
     }
 
-    /// Runs no_vtf to convert .vtf to .png.
+    /// Uses built-in VTF library to convert .vtf to .png.
     pub fn vtf(&mut self, vtf: bool) -> &mut Self {
         self.steps.vtf = vtf;
         self
@@ -729,10 +722,6 @@ impl S2G {
 
         if self.options.crowbar.is_none() {
             self.log_err("No provided crowbar");
-        }
-
-        if self.options.no_vtf.is_none() {
-            self.log_err("No provided no_vtf");
         }
 
         if self.options.studiomdl.is_none() {
