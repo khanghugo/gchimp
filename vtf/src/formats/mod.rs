@@ -98,7 +98,7 @@ impl VtfImage {
         dimensions: (u32, u32),
     ) -> IResult<VtfImage> {
         let mut not_supported = context("vtf image format not supported", fail);
-    
+
         let (i, bytes) = match format {
             VtfImageFormat::None => not_supported(i),
             VtfImageFormat::Rgba8888 => not_supported(i),
