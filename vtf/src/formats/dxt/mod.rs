@@ -61,8 +61,6 @@ fn dxt_alpha_block_to_alpha(block: &[u8]) -> [u8; 8] {
     let a0 = block[0] as u32;
     let a1 = block[1] as u32;
 
-    println!("a0 {a0} a1 {a1}");
-
     let [a2, a3, a4, a5, a6, a7] = if a0 > a1 {
         [
             (6 * a0 + a1) / 7,
@@ -100,8 +98,6 @@ fn dxt_alpha_block_to_alpha_pixels(block: &[u8]) -> Vec<u8> {
         .map(|idx| {
             let shift_value = 61 - idx * 3;
             let lookup_value = (look_up << shift_value) >> 61;
-
-            println!("alpha is {}", alphas[lookup_value as usize]);
 
             alphas[lookup_value as usize]
         })

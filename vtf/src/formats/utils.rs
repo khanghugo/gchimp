@@ -1,4 +1,4 @@
-use image::{DynamicImage, GenericImage, ImageBuffer, Rgba};
+use image::{DynamicImage, GenericImage, Rgba};
 
 #[inline]
 /// Unpacks 565 from a u16 into scaled 888 where each channel is u32

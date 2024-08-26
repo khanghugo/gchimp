@@ -1,6 +1,6 @@
 use nom::{
     bytes::complete::take,
-    combinator::{fail, map},
+    combinator::fail,
     error::context,
     multi::count,
     number::complete::{le_f32, le_i16, le_i32, le_u16, le_u32, le_u8},
@@ -88,8 +88,14 @@ fn parse_header(i: &[u8]) -> IResult<Header> {
     ))
 }
 
-fn parse_vtf70_data<'a, 'b>(header_end: &'a [u8], header: &'b Header) -> IResult<'a, Vtf70Data> {
-    let i = header_end;
+fn parse_vtf70_data<'a, 'b>(
+    i: &'a [u8],
+    _header_end: &'a [u8],
+    header: &'b Header,
+) -> IResult<'a, Vtf70Data> {
+    // for some reasons, it uses the header size to offset rather than the next available bytes.
+    let i = &i[header.header_size as usize..];
+
     let (i, low_res) = parse_low_res_mipmap(i, header)?;
     let (i, mipmaps) = parse_high_res_mipmaps(i, header)?;
 
@@ -108,6 +114,7 @@ fn parse_vtf73_data<'a, 'b>(
     header: &'b Header,
 ) -> IResult<'a, Vtf73Data> {
     // i is the beginning of the file
+    // for some reasons this continues from header end instead of header size offset
     let (_, entries) = count(
         parse_resource_entry,
         header.header73.as_ref().unwrap().num_resources as usize,
@@ -196,9 +203,6 @@ fn parse_high_res_mipmaps<'a, 'b>(i: &'a [u8], header: &'b Header) -> IResult<'a
                 let (new_i, image) =
                     VtfImage::parse_from_format(i, format, (width as u32, height as u32))?;
 
-                let what = image.to_image();
-                what.save(format!("/home/khang/gchimp/vtf/src/tests/nuke_metalgrate_01_{width}x{height}.png")).unwrap();
-
                 i = new_i;
                 faces.push(Face { image });
             }
@@ -243,7 +247,7 @@ pub fn parse_vtf(i: &[u8]) -> IResult<Vtf> {
         let (_, data) = parse_vtf73_data(i, header_end, &header)?;
         VtfData::Vtf73(data)
     } else if header.version[1] < 3 {
-        let (_, data) = parse_vtf70_data(header_end, &header)?;
+        let (_, data) = parse_vtf70_data(i, header_end, &header)?;
         VtfData::Vtf70(data)
     } else {
         unreachable!("VTF minor version {} is not supported", header.version[1])
@@ -257,26 +261,10 @@ mod test {
     use super::*;
 
     #[test]
-    fn header() {
-        let vtf = include_bytes!("tests/tilefloor01.vtf");
-        let (end_header, header) = parse_header(vtf).unwrap();
-
-        println!("{:?}", header);
-    }
-
-    #[test]
     fn vtf() {
-        let vtf = include_bytes!("tests/tilefloor01.vtf");
+        let vtf = include_bytes!("tests/prodcaution_green.vtf");
         let (_, vtf) = parse_vtf(vtf).unwrap();
 
-        // println!("vtf {:?}", vtf);
-    }
-
-    #[test]
-    fn vtf2() {
-        let vtf = include_bytes!("tests/dev_green_a.vtf");
-        let (_, vtf) = parse_vtf(vtf).unwrap();
-
-        println!("vtf {:?}", vtf.header);
+        println!("{:?}", vtf.header);
     }
 }

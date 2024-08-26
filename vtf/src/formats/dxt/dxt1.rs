@@ -1,5 +1,5 @@
 use nom::bytes::complete::take;
-use utils::{pack_rgb888, rgb8_buffer_to_image, unpack_rgb565};
+use utils::rgb8_buffer_to_image;
 
 use super::*;
 
