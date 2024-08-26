@@ -1,5 +1,6 @@
 use dxt::{Dxt1, Dxt5};
 use image::DynamicImage;
+use nom::{combinator::fail, error::context};
 
 use crate::{IResult, ImageData};
 
@@ -96,35 +97,37 @@ impl VtfImage {
         format: VtfImageFormat,
         dimensions: (u32, u32),
     ) -> IResult<VtfImage> {
+        let mut not_supported = context("vtf image format not supported", fail);
+    
         let (i, bytes) = match format {
-            VtfImageFormat::None => todo!(),
-            VtfImageFormat::Rgba8888 => todo!(),
-            VtfImageFormat::Abgr8888 => todo!(),
-            VtfImageFormat::Rgb888 => todo!(),
-            VtfImageFormat::Bgr888 => todo!(),
-            VtfImageFormat::Rgb565 => todo!(),
-            VtfImageFormat::I8 => todo!(),
-            VtfImageFormat::Ia88 => todo!(),
-            VtfImageFormat::P8 => todo!(),
-            VtfImageFormat::A8 => todo!(),
-            VtfImageFormat::Rgb888Bluescreen => todo!(),
-            VtfImageFormat::Bgr888Bluescreen => todo!(),
-            VtfImageFormat::Argb8888 => todo!(),
-            VtfImageFormat::Bgra8888 => todo!(),
+            VtfImageFormat::None => not_supported(i),
+            VtfImageFormat::Rgba8888 => not_supported(i),
+            VtfImageFormat::Abgr8888 => not_supported(i),
+            VtfImageFormat::Rgb888 => not_supported(i),
+            VtfImageFormat::Bgr888 => not_supported(i),
+            VtfImageFormat::Rgb565 => not_supported(i),
+            VtfImageFormat::I8 => not_supported(i),
+            VtfImageFormat::Ia88 => not_supported(i),
+            VtfImageFormat::P8 => not_supported(i),
+            VtfImageFormat::A8 => not_supported(i),
+            VtfImageFormat::Rgb888Bluescreen => not_supported(i),
+            VtfImageFormat::Bgr888Bluescreen => not_supported(i),
+            VtfImageFormat::Argb8888 => not_supported(i),
+            VtfImageFormat::Bgra8888 => not_supported(i),
             VtfImageFormat::Dxt1 => Dxt1::parse(i, dimensions),
-            VtfImageFormat::Dxt3 => todo!(),
+            VtfImageFormat::Dxt3 => not_supported(i),
             VtfImageFormat::Dxt5 => Dxt5::parse(i, dimensions),
-            VtfImageFormat::Bgrx8888 => todo!(),
-            VtfImageFormat::Bgr565 => todo!(),
-            VtfImageFormat::Bgrx5551 => todo!(),
-            VtfImageFormat::Bgra4444 => todo!(),
-            VtfImageFormat::Dxt1Onebitalpha => todo!(),
-            VtfImageFormat::Bgra5551 => todo!(),
-            VtfImageFormat::Uv88 => todo!(),
-            VtfImageFormat::Uvwq8888 => todo!(),
-            VtfImageFormat::Rgba16161616f => todo!(),
-            VtfImageFormat::Rgba16161616 => todo!(),
-            VtfImageFormat::Uvlx8888 => todo!(),
+            VtfImageFormat::Bgrx8888 => not_supported(i),
+            VtfImageFormat::Bgr565 => not_supported(i),
+            VtfImageFormat::Bgrx5551 => not_supported(i),
+            VtfImageFormat::Bgra4444 => not_supported(i),
+            VtfImageFormat::Dxt1Onebitalpha => not_supported(i),
+            VtfImageFormat::Bgra5551 => not_supported(i),
+            VtfImageFormat::Uv88 => not_supported(i),
+            VtfImageFormat::Uvwq8888 => not_supported(i),
+            VtfImageFormat::Rgba16161616f => not_supported(i),
+            VtfImageFormat::Rgba16161616 => not_supported(i),
+            VtfImageFormat::Uvlx8888 => not_supported(i),
         }?;
 
         Ok((
