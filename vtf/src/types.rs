@@ -1,7 +1,9 @@
+use std::{ffi::OsStr, path::Path};
+
 use image::DynamicImage;
 use nom::IResult as _IResult;
 
-use crate::formats::VtfImage;
+use crate::{formats::VtfImage, parser::parse_vtf};
 
 pub(crate) type IResult<'a, T> = _IResult<&'a [u8], T>;
 
@@ -50,6 +52,7 @@ pub struct Header73 {
 pub struct ResourceEntry {
     // [u8; 3]
     pub tag: ResourceEntryTag,
+    #[allow(dead_code)]
     pub flags: u8,
     pub offset: u32,
 }
@@ -95,6 +98,7 @@ impl TryFrom<&[u8]> for ResourceEntryTag {
     }
 }
 
+#[allow(unused)]
 #[repr(u32)]
 pub enum VtfFlag {
     // Flags from the *.txt config file
@@ -210,4 +214,54 @@ pub enum VtfData {
 pub struct Vtf {
     pub header: Header,
     pub data: VtfData,
+}
+
+impl Vtf {
+    pub fn from_bytes(bytes: &[u8]) -> eyre::Result<Self> {
+        match parse_vtf(bytes) {
+            Ok((_, res)) => Ok(res),
+            Err(err) => Err(eyre::eyre!("Cannot parse vtf: {}", err)),
+        }
+    }
+
+    pub fn from_file(path: impl AsRef<Path> + AsRef<OsStr>) -> eyre::Result<Self> {
+        let bytes = std::fs::read(path)?;
+        Self::from_bytes(&bytes)
+    }
+
+    pub fn get_major_version(&self) -> u32 {
+        self.header.version[0]
+    }
+
+    pub fn get_minor_version(&self) -> u32 {
+        self.header.version[1]
+    }
+
+    pub fn get_high_res_image(&self) -> eyre::Result<DynamicImage> {
+        if self.get_minor_version() >= 3 {
+            let VtfData::Vtf73(data) = &self.data else {
+                return Err(eyre::eyre!("Vtf does not have matching data"));
+            };
+
+            let res = data.iter().find_map(|resource| {
+                if let Resource::HighRes(hi_res) = resource {
+                    Some(hi_res)
+                } else {
+                    None
+                }
+            });
+
+            if res.is_none() {
+                return Err(eyre::eyre!("Vtf does not have high res image"));
+            }
+
+            res.unwrap().get_high_res_image()
+        } else {
+            let VtfData::Vtf70(data) = &self.data else {
+                return Err(eyre::eyre!("Vtf does not have matching data"));
+            };
+
+            data.high_res.get_high_res_image()
+        }
+    }
 }
