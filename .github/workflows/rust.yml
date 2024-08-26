@@ -67,20 +67,6 @@ jobs:
         cp target/${{ matrix.target }}/${{ matrix.configuration }}/${{ matrix.filename }} gchimp/${{ matrix.filename }}
         cp -r dist gchimp/
         mv gchimp/dist/config.toml gchimp/config.toml
-
-    - name: Download no_vtf Linux
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        wget https://b5327157.srht.site/no_vtf/release/no_vtf-linux_x64.tar.xz
-        tar -xf no_vtf-linux_x64.tar.xz
-        cp -r no_vtf gchimp/dist/
-
-    - name: Download no_vtf Windows
-      if: matrix.os == 'windows-2019'
-      run: |
-        curl -O https://b5327157.srht.site/no_vtf/release/no_vtf-windows_x64.zip
-        7z x no_vtf-windows_x64.zip
-        cp -r no_vtf gchimp/dist/
         
     - uses: actions/upload-artifact@v4.3.3
       if: matrix.rust == 'stable'
