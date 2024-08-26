@@ -452,7 +452,7 @@ fn insert_base_netmsg(
 
     let delta_packet_entities = SvcDeltaPacketEntities {
         entity_count: nbit_num!(entity_states_delta.len(), 16),
-        delta_sequence: nbit_num!(DEFAULT_IN_SEQ & 0xff - 1, 8), // otherwise entity flush happens
+        delta_sequence: nbit_num!((DEFAULT_IN_SEQ & 0xff) - 1, 8), // otherwise entity flush happens
         entity_states: entity_states_delta,
     };
     // let delta_packet_entities_byte =
