@@ -1,5 +1,6 @@
 use std::{
     collections::HashSet,
+    fs,
     path::{Path, PathBuf},
     str::from_utf8,
     sync::{Arc, Mutex},
@@ -10,7 +11,8 @@ use eyre::eyre;
 use qc::{BodyGroup, Qc, QcCommand};
 use smd::Smd;
 
-use rayon::prelude::*;
+use rayon::{iter::Either, prelude::*};
+use vtf::Vtf;
 
 use crate::{
     err,
@@ -22,7 +24,7 @@ use crate::{
             relative_to_less_relative,
         },
         qc_stuffs::create_goldsrc_base_qc_from_source,
-        run_bin::{run_crowbar, run_no_vtf, run_studiomdl},
+        run_bin::{run_crowbar, run_studiomdl},
         smd_stuffs::source_smd_to_goldsrc_smd,
     },
 };
@@ -285,6 +287,7 @@ impl S2G {
         Ok(())
     }
 
+    // TODO: make this one to bitmap directly so we dont have to run bmp step
     fn work_vtf(&mut self) -> eyre::Result<()> {
         let folder_path = if self.path.is_dir() {
             &self.path
@@ -292,17 +295,54 @@ impl S2G {
             self.path.parent().unwrap()
         };
 
-        self.log_info(format!("Running no_vtf over {}", folder_path.display()).as_str());
+        self.log_info(format!("Converting VTFs into PNGs from {}", folder_path.display()).as_str());
 
-        #[cfg(target_os = "windows")]
-        let handle = run_no_vtf(folder_path, &self.options.no_vtf.as_ref().unwrap());
+        let vtf_files = fs::read_dir(folder_path)?
+            .filter_map(|file| {
+                let file = file.unwrap().path();
 
-        #[cfg(target_os = "linux")]
-        let handle = run_no_vtf(folder_path, self.options.no_vtf.as_ref().unwrap());
+                if !file.is_file() {
+                    return None;
+                }
 
-        // usually it would just work
-        // TODO: do somethign when it doesn't just work
-        let _ = handle.join();
+                if file.extension().unwrap() == "vtf" {
+                    return Some(file);
+                }
+
+                None
+            })
+            .collect::<Vec<PathBuf>>();
+
+        let (vtfs, errs): (Vec<_>, Vec<_>) = vtf_files.into_par_iter().partition_map(|path| {
+            let vtf = Vtf::from_file(path.as_path());
+
+            if let Ok(vtf) = vtf {
+                Either::Left((path, vtf))
+            } else if let Err(err) = vtf {
+                Either::Right((path, err))
+            } else {
+                unreachable!()
+            }
+        });
+
+        if !errs.is_empty() {
+            for (path, err) in errs {
+                self.log_err(format!("Cannot open VTF file {}: {}", path.display(), err).as_str());
+            }
+
+            return Err(eyre!("Fail to process all VTF files. For this, the problem is usually that the VTF image format is not supported. Leave a note in gchimp's issue tracker please."));
+        }
+
+        // no vtf so it can return so we don't do something dumb
+        if vtfs.is_empty() {
+            return Ok(());
+        }
+
+        vtfs.par_iter().for_each(|(path, vtf)| {
+            let new_path = path.with_extension("png"); // png because there's already bmp step to take care of this and im tired
+            let new_image = vtf.get_high_res_image().unwrap(); // i doubt this will ever fail
+            new_image.save(new_path).unwrap(); // doubt
+        });
 
         Ok(())
     }
