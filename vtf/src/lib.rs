@@ -1,5 +1,8 @@
 mod formats;
 mod parser;
-mod types;
+pub mod types;
 
-pub use types::*;
+pub use parser::parse_vtf;
+pub use types::Vtf;
+
+use types::*;
