@@ -176,7 +176,7 @@ fn insert_base_netmsg(
                         .concat()
                         .contains(&classname.as_str())
                 })
-                .is_some_and(|x| x == true)
+                .is_some_and(|x| x)
         })
         // after this filtering, we know which order of resourcelist will go,
         // so we can just enumerate them again and we just need to go with that order
@@ -201,7 +201,7 @@ fn insert_base_netmsg(
             }
 
             if let Some(property) = ent.get("origin") {
-                let (_, (x, y, z)) = parse_3_f32(&property).unwrap();
+                let (_, (x, y, z)) = parse_3_f32(property).unwrap();
 
                 delta.insert("origin[0]\0".to_owned(), x.to_le_bytes().to_vec());
                 delta.insert("origin[1]\0".to_owned(), y.to_le_bytes().to_vec());
@@ -209,7 +209,7 @@ fn insert_base_netmsg(
             }
 
             if let Some(property) = ent.get("angles") {
-                let (_, (x, y, z)) = parse_3_f32(&property).unwrap();
+                let (_, (x, y, z)) = parse_3_f32(property).unwrap();
 
                 delta.insert("angles[0]\0".to_owned(), x.to_le_bytes().to_vec());
                 delta.insert("angles[1]\0".to_owned(), y.to_le_bytes().to_vec());
@@ -250,18 +250,18 @@ fn insert_base_netmsg(
         map_cycle: b"a\0".to_vec(), // must be null string
         unknown: 0u8,
     };
-    let server_info = server_info.write(&aux);
+    let server_info = server_info.write(aux);
 
     let dds: Vec<u8> = get_cs_delta_msg!()
         .iter()
-        .flat_map(|dd| dd.write(&aux))
+        .flat_map(|dd| dd.write(aux))
         .collect();
 
     // parse delta again just so that we mutate our Aux
     parse_netmsg(dds.as_slice(), aux).unwrap();
 
     let set_view = SvcSetView { entity_index: 1 }; // always 1
-    let set_view = set_view.write(&aux);
+    let set_view = set_view.write(aux);
 
     let new_movevars = SvcNewMovevars {
         gravity: 800.,
@@ -285,9 +285,9 @@ fn insert_base_netmsg(
         roll_speed: -1.9721523e-31, // have to use these magic numbers to work
         sky_color: vec![-1.972168e-31, -1.972168e-31, 9.4e-44],
         sky_vec: vec![-0.0, 2.68e-43, 2.7721908e20],
-        sky_name: (&[0]).to_vec(),
+        sky_name: [0].to_vec(),
     };
-    let new_movevars = new_movevars.write(&aux);
+    let new_movevars = new_movevars.write(aux);
 
     // bsp is always 1, then func_door and illusionary and whatever renders
     // maps resources first
@@ -355,7 +355,7 @@ fn insert_base_netmsg(
         resources,
         consistencies: vec![],
     };
-    let resource_list = resource_list.write(&aux);
+    let resource_list = resource_list.write(aux);
 
     let worldspawn = EntityS {
         entity_index: 0, // worldspawn is index 0
@@ -378,7 +378,7 @@ fn insert_base_netmsg(
         })
         .collect();
 
-    let spawn_baseline_entities = vec![vec![worldspawn], bsp_entities_baseline].concat();
+    let spawn_baseline_entities = [vec![worldspawn], bsp_entities_baseline].concat();
 
     // max_client should be 1 because we are playing demo and it is OK.
     let spawn_baseline = SvcSpawnBaseline {
@@ -386,10 +386,10 @@ fn insert_base_netmsg(
         total_extra_data: nbit_num!(0, 6),
         extra_data: vec![],
     };
-    let spawn_baseline = spawn_baseline.write(&aux);
+    let spawn_baseline = spawn_baseline.write(aux);
 
     let sign_on_num = SvcSignOnNum { sign: 1 };
-    let sign_on_num = sign_on_num.write(&aux);
+    let sign_on_num = sign_on_num.write(aux);
 
     // making entities appearing
     // packet entities is not enough
@@ -421,12 +421,12 @@ fn insert_base_netmsg(
         entity_count: nbit_num!(entity_states.len(), 16), // has to match the length, of EntityState
         entity_states,
     };
-    let packet_entities = packet_entities.write(&aux);
+    let packet_entities = packet_entities.write(aux);
 
     let player_entity_state_delta = EntityStateDelta {
         entity_index: 1,
         remove_entity: false,
-        is_absolute_entity_index: false.into(),
+        is_absolute_entity_index: false,
         absolute_entity_index: None,
         entity_index_difference: nbit_num!(1, 6).into(),
         has_custom_delta: false.into(),
@@ -492,6 +492,7 @@ fn insert_base_netmsg(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn insert_ghost(
     demo: &mut Demo,
     ghost_file_name: &str,
@@ -543,9 +544,9 @@ pub fn insert_ghost(
         // we dont know player's state so this is okay
         if let Some(buttons) = frame.buttons {
             if buttons & Buttons::Duck as u32 != 0 {
-                vieworigin[2] = vieworigin[2] + 12.;
+                vieworigin[2] += 12.;
             } else {
-                vieworigin[2] = vieworigin[2] + 17.;
+                vieworigin[2] += 17.;
             }
         }
 
@@ -601,11 +602,11 @@ pub fn insert_ghost(
         if let Some(buttons) = frame.buttons {
             if buttons & Buttons::Jump as u32 != 0 && curr_z_vel > last_z_vel && speed > 150. {
                 let svcsound = SvcSound {
-                    flags: bitvec![u8, Lsb0; 1, 1, 1, 0, 0, 0, 0, 0, 0].into(),
+                    flags: bitvec![u8, Lsb0; 1, 1, 1, 0, 0, 0, 0, 0, 0],
                     volume: nbit_num!(128, 8).into(),
                     attenuation: nbit_num!(204, 8).into(),
-                    channel: nbit_num!(5, 3).into(),
-                    entity_index: nbit_num!(1, 11).into(),
+                    channel: nbit_num!(5, 3),
+                    entity_index: nbit_num!(1, 11),
                     sound_index_long: nbit_num!(
                         rand_int_range!(footstep_sound_index_start, footstep_sound_index_start + 3),
                         16
@@ -636,10 +637,10 @@ pub fn insert_ghost(
                         int_value: nbit_num!(frame.origin[2].round().abs() as i32, 12).into(),
                         fraction_value: None,
                     }),
-                    pitch: bitvec![u8, Lsb0; 1, 0, 0, 0, 0, 0, 0, 0].into(),
+                    pitch: bitvec![u8, Lsb0; 1, 0, 0, 0, 0, 0, 0, 0],
                 };
 
-                let svcsound_msg = svcsound.write(&aux);
+                let svcsound_msg = svcsound.write(aux);
 
                 new_netmsg_data.msg = [new_netmsg_data.msg.to_owned(), svcsound_msg]
                     .concat()
@@ -652,11 +653,11 @@ pub fn insert_ghost(
 
             // TODO do all the steps randomly
             let svcsound = SvcSound {
-                flags: bitvec![u8, Lsb0; 1, 1, 1, 0, 0, 0, 0, 0, 0].into(),
+                flags: bitvec![u8, Lsb0; 1, 1, 1, 0, 0, 0, 0, 0, 0],
                 volume: nbit_num!(128, 8).into(),
                 attenuation: nbit_num!(204, 8).into(),
-                channel: nbit_num!(5, 3).into(),
-                entity_index: nbit_num!(1, 11).into(),
+                channel: nbit_num!(5, 3),
+                entity_index: nbit_num!(1, 11),
                 sound_index_long: nbit_num!(
                     rand_int_range!(footstep_sound_index_start, footstep_sound_index_start + 3),
                     16
@@ -687,10 +688,10 @@ pub fn insert_ghost(
                     int_value: nbit_num!(frame.origin[2].round().abs() as i32, 12).into(),
                     fraction_value: None,
                 }),
-                pitch: nbit_num!(1, 8).into(),
+                pitch: nbit_num!(1, 8),
             };
 
-            let svcsound_msg = svcsound.write(&aux);
+            let svcsound_msg = svcsound.write(aux);
 
             new_netmsg_data.msg = [new_netmsg_data.msg.to_owned(), svcsound_msg]
                 .concat()
@@ -715,7 +716,7 @@ pub fn insert_ghost(
             // delta_sequence: nbit_num!(DEFAULT_IN_SEQ & 0xff - 1, 8), // otherwise entity flush happens
             delta_packet_entities.delta_sequence =
                 nbit_num!((DEFAULT_IN_SEQ + frame_idx as i32 - 1) & 0xff, 8);
-            let delta_packet_entities_byte = delta_packet_entities.write(&aux);
+            let delta_packet_entities_byte = delta_packet_entities.write(aux);
 
             new_netmsg_data.msg = [
                 // packet_entities.to_owned(),
