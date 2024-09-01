@@ -19,7 +19,10 @@ pub fn change_map(demo: &mut Demo, bsp: &Bsp, new_name: &str) {
     };
 
     let mut header_new_name = vec![0u8; 260];
-    header_new_name[..new_name.len()].copy_from_slice(new_name.as_bytes());
+
+    // no .bsp in header
+    let new_header_name = new_name.replace(".bsp", "");
+    header_new_name[..new_header_name.len()].copy_from_slice(new_header_name.as_bytes());
 
     demo.header.map_name = header_new_name.leak();
 
@@ -73,15 +76,35 @@ pub fn change_map(demo: &mut Demo, bsp: &Bsp, new_name: &str) {
                                 if map_entity_last >= bsp_modelnum {
                                     let remove_count = map_entity_last - bsp_modelnum + 1;
 
-                                    for i in 0..remove_count {
-                                        // lazily remove and that works
-                                        // entity 1 is always player entity so we can count on that
-                                        // the problem right now is that there will be this error
-                                        // "Tried to link edict xxx without model"
-                                        // but at least demo works
-                                        resource.resources[map_entity_last_insert_idx - i].name =
-                                            nbit_str!("*1");
+                                    let mut i = 0;
+                                    let mut removed = 0;
+
+                                    loop {
+                                        let res_name = bitslice_to_string(
+                                            &resource.resources[map_entity_last_insert_idx - i]
+                                                .name,
+                                        );
+
+                                        if res_name.contains(
+                                            format!("*{}", map_entity_last - removed).as_str(),
+                                        ) {
+                                            removed += 1;
+                                            resource.resources[map_entity_last_insert_idx - i]
+                                                .name = nbit_str!("*1\0");
+                                        }
+
+                                        if removed >= remove_count {
+                                            break;
+                                        }
+
+                                        i += 1;
                                     }
+
+                                    // do not change resource count because we are not removing anything
+                                    // resource.resource_count = nbit_num!(
+                                    //     resource.resource_count.to_u16() - remove_count as u16,
+                                    //     12
+                                    // );
                                 }
 
                                 // otherwise, we pad entities so at least everything shows up
