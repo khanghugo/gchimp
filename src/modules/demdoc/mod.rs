@@ -1,6 +1,7 @@
 use dem::hldemo::{MoveVars, NetMsgData, NetMsgInfo, RefParams, UserCmd};
 
 pub mod change_map;
+pub mod check_doctored;
 pub mod get_ghost;
 pub mod ghost2dem;
 pub mod kz_stats;
