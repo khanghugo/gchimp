@@ -771,6 +771,6 @@ mod test {
             Path::new("/home/khang/gchimp/examples/ghost2dem/rvp_tundra-bhop.bsp"),
         );
 
-        write_demo!("/home/khang/gchimp/examples/ghost2dem/out.dem", demo).unwrap();
+        write_demo("/home/khang/gchimp/examples/ghost2dem/out.dem", demo).unwrap();
     }
 }

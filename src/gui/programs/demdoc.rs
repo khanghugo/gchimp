@@ -56,14 +56,14 @@ impl DemDoc {
 
             let bsp = bsp.unwrap();
             let what = dem.clone();
-            let mut demo = open_demo!(what);
+            let mut demo = open_demo(what).unwrap();
 
             change_map(&mut demo, &bsp, new_bsp_name.as_str());
 
             let out_path = format!("{}_demdoc.dem", dem.strip_suffix(".dem").unwrap());
             let what = out_path.clone();
 
-            if let Err(err) = write_demo!(what, demo) {
+            if let Err(err) = write_demo(what, demo) {
                 *status = format!("Cannot write .dem: {}", err);
             }
 
@@ -88,7 +88,7 @@ impl DemDoc {
             "Running".clone_into(&mut status);
 
             let what = dem.clone();
-            let mut demo = open_demo!(what);
+            let mut demo = open_demo(what).unwrap();
 
             add_kz_stats(&mut demo, |addons| {
                 if add_keys {
@@ -103,7 +103,7 @@ impl DemDoc {
             let out_path = format!("{}_demdoc.dem", dem.strip_suffix(".dem").unwrap());
             let what = out_path.clone();
 
-            if let Err(err) = write_demo!(what, demo) {
+            if let Err(err) = write_demo(what, demo) {
                 *status = format!("Cannot write .dem: {}", err);
             }
 
