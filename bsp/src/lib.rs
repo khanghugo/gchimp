@@ -6,6 +6,10 @@ mod utils;
 pub use parser::parse_bsp;
 pub use types::Bsp;
 
+pub use types::*;
+
+pub use glam::Vec3;
+
 #[cfg(test)]
 mod test {
     use super::*;

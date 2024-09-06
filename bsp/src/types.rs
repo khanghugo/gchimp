@@ -123,7 +123,7 @@ pub struct TexInfo {
 pub struct Face {
     pub plane: u16,
     pub side: u16,
-    pub first_edge: u32,
+    pub first_edge: i32,
     pub edge_count: u16,
     pub texinfo: u16,
     pub styles: [u8; 4],
@@ -468,7 +468,7 @@ impl Bsp {
                  }| {
                     writer.append_u16(*plane);
                     writer.append_u16(*side);
-                    writer.append_u32(*first_edge);
+                    writer.append_i32(*first_edge);
                     writer.append_u16(*edge_count);
                     writer.append_u16(*texinfo);
 

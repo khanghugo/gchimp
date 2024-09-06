@@ -158,7 +158,7 @@ fn parse_face(i: &[u8]) -> IResult<Face> {
         tuple((
             le_u16,
             le_u16,
-            le_u32,
+            le_i32,
             le_u16,
             le_u16,
             count(le_u8, 4),
