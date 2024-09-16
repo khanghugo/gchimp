@@ -98,23 +98,19 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
     let width_uv = MINIMUM_SIZE as f64 / width as f64;
     let height_uv = MINIMUM_SIZE as f64 / height as f64;
 
-    let round_decimal = |x: f64| {
-        return x;
-        (x * 10_000.).round() / 10_000. 
-    };
-
     let clamp_uv = |uv: DVec2, block: (u32, u32)| {
         let min_u = block.0 as f64 * width_uv;
         let min_v = block.1 as f64 * height_uv;
 
-        DVec2::new(uv.x.clamp(min_u + EPSILON, min_u + width_uv - EPSILON), uv.y.clamp(min_v + EPSILON, min_v + height_uv - EPSILON))
+        DVec2::new(
+            uv.x.clamp(min_u + EPSILON, min_u + width_uv - EPSILON),
+            uv.y.clamp(min_v + EPSILON, min_v + height_uv - EPSILON),
+        )
     };
 
     let wrap_uv = |uv: DVec2, block: (u32, u32)| {
-        return uv;
+        // return uv;
         let uv = clamp_uv(uv, block);
-        // let u = round_decimal(uv.x);
-        // let v = round_decimal(uv.y);
         let u = uv[0] % width_uv;
         let v = uv[1] % height_uv;
         let u = u / width_uv;
@@ -122,13 +118,27 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
         DVec2::new(u, v)
     };
 
-    let my_triangles = vec![smd.triangles[3].clone(), smd.triangles[9].clone()];
+    // each vertex needs to shrink inward by 2 pixels so there's no seam
+    // if not, the texture would repeat and that means texture filtering
+    // the shitty thing here would be that the color difference might just be a seam
+    // but at least it isn't scaled up to a pixel
+    const SHRINK_FACTOR: f64 = 1. - (1. / MINIMUM_SIZE as f64) * 2.;
+    let shrink_uvs = |uvs: Vec<DVec2>| {
+        let centroid = uvs.iter().fold(DVec2::ZERO, |acc, &e| acc + e) / 3.;
+
+        uvs.iter()
+            .map(|&uv| {
+                let vector = uv - centroid;
+                let vector = vector * SHRINK_FACTOR;
+                vector + centroid
+            })
+            .collect::<Vec<DVec2>>()
+    };
 
     // split all triangles inside `triangles` until it's empty
     // fairly simple algorithm, not very optimized
-    let new_triangles = 
-    smd.triangles
-    // my_triangles
+    let new_triangles = smd
+        .triangles
         .into_iter()
         .flat_map(|to_split| {
             // check if triangle fits
@@ -138,7 +148,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
             // if fits inside a texture, add it into the result and continue
             if v1.0 == v2.0 && v2.0 == v3.0 && v1.1 == v2.1 && v2.1 == v3.1 {
-                let material = format!("{}{}{}.bmp", texture_file_name, v1.0, v2.0);
+                let material = format!("{}{}{}.bmp", texture_file_name, v1.0, h_count - v1.1 - 1);
                 let mut new_triangle = to_split.clone();
                 new_triangle.material = material;
                 new_triangle.vertices.iter_mut().for_each(|vertex| {
@@ -224,7 +234,6 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
             // TODO: calculate cut count instead of cut 16 times every time
             let mut polygon_res = vec![polygon];
-            println!("before vertical {:?}", polygon_res);
 
             // cuts vertically
             // subtracts 1 because 2 blocks means 1 cut and so on
@@ -250,7 +259,6 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                     .map(|polygon| polygon.with_sorted_vertices().unwrap())
                     .collect();
             });
-            println!("before horizontal {:?}", polygon_res);
 
             // cuts horizontally
             (1..h_count).for_each(|h_block| {
@@ -274,10 +282,12 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                     .flat_map(|polygon| polygon.split(&plane))
                     .collect();
             });
-            println!("before triangulate {:?}\n", polygon_res);
 
             // clear shits because i dont want to fix the split function
-            polygon_res = polygon_res.into_iter().filter(|e| e.vertices().len() >= 3).collect();
+            polygon_res = polygon_res
+                .into_iter()
+                .filter(|e| e.vertices().len() >= 3)
+                .collect();
 
             // triangulates
             polygon_res = polygon_res
@@ -316,24 +326,33 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                     let centroid = polygon
                         .vertices()
                         .iter()
-                        .fold(DVec2::ZERO, |acc, e| world_to_uv(e.into()) + acc) / 3.;
+                        .fold(DVec2::ZERO, |acc, e| world_to_uv(e.into()) + acc)
+                        / 3.;
+
                     let (w, h) = find_w_h_block(centroid);
 
-                    // println!("{w} {h} {centroid} {:?}", polygon.vertices().iter().map(|vertex| world_to_uv(vertex.into())).collect::<Vec<_>>());
+                    let uvs = vec![
+                        wrap_uv(world_to_uv(polygon.vertices()[0].into()), (w, h)),
+                        wrap_uv(world_to_uv(polygon.vertices()[1].into()), (w, h)),
+                        wrap_uv(world_to_uv(polygon.vertices()[2].into()), (w, h)),
+                    ];
+
+                    // scale the triangle so there's no seam
+                    let uvs = shrink_uvs(uvs);
 
                     let v0 = Vertex {
                         parent: original_sin.parent,
                         pos: polygon.vertices()[0].into(),
                         norm: original_sin.norm,
-                        uv: wrap_uv(world_to_uv(polygon.vertices()[0].into()), (w, h)),
+                        uv: uvs[0],
                         source: None,
-                    };  
+                    };
 
                     let v1 = Vertex {
                         parent: original_sin.parent,
                         pos: polygon.vertices()[1].into(),
                         norm: original_sin.norm,
-                        uv: wrap_uv(world_to_uv(polygon.vertices()[1].into()), (w, h)),
+                        uv: uvs[1],
                         source: None,
                     };
 
@@ -341,7 +360,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                         parent: original_sin.parent,
                         pos: polygon.vertices()[2].into(),
                         norm: original_sin.norm,
-                        uv: wrap_uv(world_to_uv(polygon.vertices()[2].into()), (w, h)),
+                        uv: uvs[2],
                         source: None,
                     };
 
