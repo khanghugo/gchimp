@@ -1,3 +1,4 @@
+pub mod blender_lightmap_baker_helper;
 pub mod check_illegal_brush;
 pub mod check_missing_texture;
 pub mod custom_script;
