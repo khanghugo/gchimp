@@ -65,7 +65,7 @@ impl TryFrom<i32> for PlaneType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Plane {
     pub normal: Vec3,
     pub distance: f32,
@@ -92,6 +92,14 @@ impl Plane {
             self.normal.z.abs(),
             self.distance
         )
+    }
+
+    pub fn flip(&self) -> Self {
+        Self {
+            normal: -self.normal,
+            distance: -self.distance,
+            type_: self.type_,
+        }
     }
 }
 

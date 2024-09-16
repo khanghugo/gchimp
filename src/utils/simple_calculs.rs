@@ -1,6 +1,6 @@
 use std::ops::{self, Div, Mul, Neg};
 
-use glam::DVec3;
+use glam::{DVec3, Vec3};
 
 use eyre::eyre;
 
@@ -12,9 +12,9 @@ use crate::err;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point3D {
-    x: f64,
-    y: f64,
-    z: f64,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
 }
 
 impl Default for Point3D {
@@ -134,6 +134,18 @@ impl Point3D {
     pub fn to_dvec3(&self) -> DVec3 {
         self.into()
     }
+
+    pub fn length(&self) -> f64 {
+        DVec3::from(self).length()
+    }
+
+    pub fn origin() -> Self {
+        DVec3::ZERO.into()
+    }
+
+    pub fn biggest_element(&self) -> f64 {
+        self.x.max(self.y).max(self.z)
+    }
 }
 
 impl From<[f64; 3]> for Point3D {
@@ -152,6 +164,16 @@ impl From<DVec3> for Point3D {
             x: value.x,
             y: value.y,
             z: value.z,
+        }
+    }
+}
+
+impl From<Vec3> for Point3D {
+    fn from(value: Vec3) -> Self {
+        Self {
+            x: value.x as f64,
+            y: value.y as f64,
+            z: value.z as f64,
         }
     }
 }
@@ -348,13 +370,17 @@ pub enum SideOfPoint {
 #[derive(Debug, Clone, Copy)]
 /// Represented as an equation: i*x + j*y + k*z = w
 pub struct Plane3D {
-    x: f64,
-    y: f64,
-    z: f64,
-    w: f64,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub w: f64,
 }
 
 impl Plane3D {
+    pub fn new(x: f64, y: f64, z: f64, w: f64) -> Self {
+        Self { x, y, z, w }
+    }
+
     pub fn normal(&self) -> Point3D {
         Point3D::from([self.x, self.y, self.z])
     }
@@ -513,6 +539,15 @@ impl Plane3D {
             self.w
         )
     }
+
+    pub fn get_backplane(&self) -> Self {
+        Self {
+            x: -self.x,
+            y: -self.y,
+            z: -self.z,
+            w: -self.w,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -607,6 +642,8 @@ impl Polygon3D {
     }
 
     /// Fan triangulation from a list of sorted vertices
+    ///
+    /// There's no winding data so here's a hack for wheter you want to do it CCW (reverse = true)
     pub fn triangulate(&self, reverse: bool) -> eyre::Result<Vec<Triangle3D>> {
         if self.0.len() < 3 {
             return Err(eyre!("Polygon has less than 3 vertices."));
@@ -660,11 +697,155 @@ impl Polygon3D {
 
         Some((index, [self.0[index + 1], self.0[index - 1]]))
     }
+
+    pub fn get_bounds(&self) -> [Point3D; 2] {
+        let mins = self
+            .vertices()
+            .iter()
+            .fold(DVec3::MAX, |acc, e| acc.min(e.into()));
+        let maxs = self
+            .vertices()
+            .iter()
+            .fold(DVec3::MIN, |acc, e| acc.max(e.into()));
+
+        [mins.into(), maxs.into()]
+    }
+
+    /// Splits polygon into possibly two from a plane
+    ///
+    /// Vertices aren't sorted so sort them plesase. Must sort vertices first otherwise the result is very bad
+    ///
+    // TODO the function won't guaranteed sorted vertices atm so sort it
+    // 
+    // TODO it doesnt' work well, fix it
+    pub fn split(&self, plane: &Plane3D) -> Vec<Self> {
+        let (not_removed, removed_vertices): (Vec<(usize, Point3D)>, _) = self
+            .vertices()
+            .iter()
+            .cloned()
+            .enumerate()
+            // ~~slightly different from  cut function where this also takes side of point ON~~
+            // ill blame on the cutting plane that results in edge case, not sure why
+            // but right now, it works fine
+            // this is very dumb and shit
+            .partition(|(_, vertex)| {
+                matches!(
+                    plane.side_of_point(*vertex),
+                    SideOfPoint::In
+                )
+            });
+        // lemma: since we are doing convex polygon, only the firstmost and fartmost vertices are connected
+        // to the other cut
+        // therefore, we only need to check for newly created vertices/edges from two cuts involving those two vertices
+        // so, we will have two cases to handle, one vertex is cut and more than one vertex is cut
+
+        // no affected vertices
+        if removed_vertices.is_empty() {
+            return vec![self.clone()];
+        }
+
+        // the entire polygon is on the other side of plane
+        // cut miss still
+        if removed_vertices.len() == self.vertices().len() {
+            return vec![self.clone()];
+        }
+
+        let mut old_polygon = self.clone();
+        let mut new_polygon: Self = Self(vec![]);
+
+        let not_removed: Polygon3D = not_removed
+            .into_iter()
+            .map(|(_, v)| v)
+            .collect::<Vec<Point3D>>()
+            .into();
+
+        let left_vertex = removed_vertices.iter().find(|(_, vertex)| {
+            not_removed
+                .vertices()
+                .contains(&old_polygon.get_vertex_neighbors(vertex).unwrap().1[0])
+        });
+
+        let left_vertex = left_vertex.unwrap().1;
+
+        // cutting 1 vertex
+        if removed_vertices.len() == 1 {
+            // this means we only cut 1 vertex
+            let (idx, neighbors) = old_polygon.get_vertex_neighbors(&left_vertex).unwrap();
+            let line_left = Line3D::from_two_points(neighbors[0], left_vertex);
+            let line_right = Line3D::from_two_points(neighbors[1], left_vertex);
+
+            let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
+            let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
+
+            new_polygon.add_vertex(old_polygon.0.remove(idx));
+
+            old_polygon.insert_vertex(idx, new_left_vertex);
+            old_polygon.insert_vertex(idx, new_right_vertex);
+
+            // polygon.add_vertex(new_left_vertex);
+            // polygon.add_vertex(new_right_vertex);
+            // polygon.sort_vertices().unwrap();
+
+            new_polygon.add_vertex(new_left_vertex);
+            new_polygon.add_vertex(new_right_vertex);
+        } else {
+            let (_, left_neighbors) = old_polygon.get_vertex_neighbors(&left_vertex).unwrap();
+            let line_left = Line3D::from_two_points(left_neighbors[0], left_vertex);
+            let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
+
+            let right_vertex = removed_vertices
+                .iter()
+                .find(|(_, vertex)| {
+                    not_removed
+                        .vertices()
+                        .contains(&old_polygon.get_vertex_neighbors(vertex).unwrap().1[1])
+                })
+                .unwrap()
+                .1;
+
+            let (_, right_neighbors) = old_polygon.get_vertex_neighbors(&right_vertex).unwrap();
+            let line_right = Line3D::from_two_points(right_neighbors[1], right_vertex);
+            let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
+
+            // TODO this doesnt add vertices in sorted order
+            removed_vertices.iter().rev().for_each(|(idx, _)| {
+                new_polygon.add_vertex(old_polygon.0.remove(*idx));
+            });
+
+            let left_neighbor_left_idx = removed_vertices[0].0;
+
+            old_polygon.insert_vertex(left_neighbor_left_idx, new_left_vertex);
+            old_polygon.insert_vertex(left_neighbor_left_idx, new_right_vertex);
+
+            // polygon.add_vertex(new_left_vertex);
+            // polygon.add_vertex(new_right_vertex);
+            // polygon.sort_vertices().unwrap();
+
+            new_polygon.add_vertex(new_left_vertex);
+            new_polygon.add_vertex(new_right_vertex);
+        }
+
+        vec![old_polygon, new_polygon]
+    }
+
+    pub fn flip(&self) -> Self {
+        let mut res = self.0.clone();
+
+        res.reverse();
+
+        Self(res)
+    }
 }
 
 impl From<Vec<Point3D>> for Polygon3D {
     fn from(value: Vec<Point3D>) -> Self {
         Self(value)
+    }
+}
+
+impl From<Vec<DVec3>> for Polygon3D {
+    fn from(value: Vec<DVec3>) -> Self {
+        Self(vec![value[0].into(), value[1].into(), value[2].into()])
     }
 }
 
@@ -681,6 +862,10 @@ impl From<Polygon3D> for Plane3D {
 pub struct Triangle3D(Polygon3D);
 
 impl Triangle3D {
+    pub fn to_polygon(self) -> Polygon3D {
+        self.0
+    }
+
     pub fn get_triangle(&self) -> &Vec<Point3D> {
         return self.0.vertices();
     }
@@ -1177,10 +1362,10 @@ mod test {
     #[test]
     fn triangulate_polygon() {
         let a: Polygon3D = vec![
-            [1., 1., 0.].into(),
-            [-1., -1., 0.].into(),
-            [-1., 1., 0.].into(),
-            [1., -1., 0.].into(),
+            Point3D::from([1., 1., 0.]),
+            Point3D::from([-1., -1., 0.]),
+            Point3D::from([-1., 1., 0.]),
+            Point3D::from([1., -1., 0.]),
         ]
         .into();
 
@@ -1201,5 +1386,45 @@ mod test {
         );
 
         println!("{}", plane.get_equation());
+    }
+
+    #[test]
+    fn plane_split() {
+        let polygon = Polygon3D(vec![
+            Point3D {
+                x: 36.0,
+                y: 36.000004,
+                z: 39.999996,
+            },
+            Point3D {
+                x: -28.0,
+                y: 36.000004,
+                z: 39.999996,
+            },
+            Point3D {
+                x: 36.0,
+                y: 36.00000200000003,
+                z: 7.999997500000145,
+            },
+            Point3D {
+                x: 3.9999999999998437,
+                y: 36.000002,
+                z: 7.99999700000016,
+            },
+        ]);
+
+        let polygon = polygon.with_sorted_vertices().unwrap();
+
+        let splitting_plane = Plane3D {
+            x: 795871.0055498211,
+            y: -5.456968206553572e-18,
+            z: -8.731148864171701e-11,
+            w: 3183484.0221992866,
+        };
+        let res = polygon.split(&splitting_plane);
+
+        assert_eq!(res.len(), 2);
+        assert_eq!(res[0].vertices().len(), 4);
+        assert_eq!(res[1].vertices().len(), 3);
     }
 }
