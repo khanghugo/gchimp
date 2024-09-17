@@ -105,15 +105,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
     // find with (x, y) texture it is in
     // maybe there's a problem with UV is exactly 1 but let's hope not
 
-    let epsilon_round = |i: f64| {
-        // if i + EPSILON >= i.ceil() {
-        //     i.ceil()
-        // } else {
-        //     i.floor()
-        // }
-
-        return i.floor();
-    };
+    let epsilon_round = |i: f64| i.floor();
 
     let find_w_h_block = |uv: DVec2| {
         let w = epsilon_round(uv[0] * width as f64 / MINIMUM_SIZE as f64) as u32;
@@ -219,9 +211,9 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                     + normal.cross(anchor_vector) * angle.sin()
                     + normal * (normal.dot(anchor_vector) * (1. - angle.cos()));
                 let result_vector = result_vector * scale; // scale the vector to match
-                let result_vector = result_vector + anchor_vertex.pos; // translate back to where it starts
 
-                result_vector
+                // translate back to where it starts
+                result_vector + anchor_vertex.pos
             };
 
             // converts a world coordinate coplanar to a triangle into uv coordinate as used in the original triangle
@@ -245,9 +237,8 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                 let result_vector_uv_v = anchor_vector_uv.dot(rotation_matrix[1].into());
                 let result_vector_uv = DVec2::new(result_vector_uv_u, result_vector_uv_v);
                 let result_vector_uv = result_vector_uv * scale;
-                let result_vector_uv = result_vector_uv + anchor_vertex.uv;
 
-                result_vector_uv
+                result_vector_uv + anchor_vertex.uv
             };
 
             // now, to get a cutting plane, we have to find the plane normal and a point on the plane
@@ -311,26 +302,18 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
             });
 
             // clear shits because i dont want to fix the split function
-            polygon_res = polygon_res
-                .into_iter()
-                .filter(|e| e.vertices().len() >= 3)
-                .collect();
+            polygon_res.retain(|e| e.vertices().len() >= 3);
 
             // triangulates
             polygon_res = polygon_res
                 .into_iter()
                 .flat_map(|polygon| {
                     // huh
-                    let reverse = if polygon
+                    let reverse = polygon
                         .normal()
                         .unwrap()
                         .dot(triangle_normal.into())
-                        .is_sign_negative()
-                    {
-                        true
-                    } else {
-                        false
-                    };
+                        .is_sign_negative();
 
                     polygon
                         .triangulate(reverse)

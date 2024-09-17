@@ -17,7 +17,7 @@ pub enum Pane {
     TexTile(TexTileGui),
     Waddy(WaddyGui),
     DemDoc(DemDoc),
-    BLBH(BLBHGui),
+    Blbh(BLBHGui),
 }
 
 impl Pane {
@@ -29,7 +29,7 @@ impl Pane {
             Pane::TexTile(textile) => textile.tab_title(),
             Pane::Waddy(a) => a.tab_title(),
             Pane::DemDoc(a) => a.tab_title(),
-            Pane::BLBH(a) => a.tab_title(),
+            Pane::Blbh(a) => a.tab_title(),
         }
     }
 
@@ -41,7 +41,7 @@ impl Pane {
             Pane::TexTile(textile) => textile.tab_ui(ui),
             Pane::Waddy(a) => a.tab_ui(ui),
             Pane::DemDoc(a) => a.tab_ui(ui),
-            Pane::BLBH(a) => a.tab_ui(ui),
+            Pane::Blbh(a) => a.tab_ui(ui),
         }
     }
 }
@@ -56,7 +56,7 @@ pub fn create_tree(app_config: Config) -> egui_tiles::Tree<Pane> {
         tiles.insert_pane(Pane::Waddy(WaddyGui::default())),
         tiles.insert_pane(Pane::Map2Prop(Map2MdlGui::new(app_config.clone()))),
         tiles.insert_pane(Pane::DemDoc(DemDoc::default())),
-        tiles.insert_pane(Pane::BLBH(BLBHGui::new(app_config.clone()))),
+        tiles.insert_pane(Pane::Blbh(BLBHGui::new(app_config.clone()))),
     ];
 
     let root = tiles.insert_tab_tile(tabs);
