@@ -16,19 +16,20 @@ use crate::utils::{
 };
 
 pub struct BLBH {
-    smd_path: PathBuf,
-    texture_path: PathBuf,
-    options: BLBHOptions,
+    pub smd_path: PathBuf,
+    pub texture_path: PathBuf,
+    pub options: BLBHOptions,
 }
 
+#[derive(Debug, Clone)]
 pub struct BLBHOptions {
-    convert_texture: bool,
-    convert_smd: bool,
-    compile_model: bool,
-    flat_shade: bool,
-    studiomdl: String,
+    pub convert_texture: bool,
+    pub convert_smd: bool,
+    pub compile_model: bool,
+    pub flat_shade: bool,
+    pub studiomdl: String,
     #[cfg(target_os = "linux")]
-    wineprefix: String,
+    pub wineprefix: String,
 }
 
 impl Default for BLBHOptions {
