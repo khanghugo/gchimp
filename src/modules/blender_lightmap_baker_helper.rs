@@ -1,21 +1,48 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, str::from_utf8};
 
 use glam::{DVec2, DVec3};
 use image::GenericImageView;
+use qc::Qc;
 use rayon::prelude::*;
 use smd::{Smd, Triangle, Vertex};
 
+use eyre::eyre;
+
 use crate::utils::{
-    constants::EPSILON,
+    constants::{EPSILON, STUDIOMDL_ERROR_PATTERN},
     img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
+    run_bin::run_studiomdl,
     simple_calculs::{Plane3D, Polygon3D},
 };
 
 pub struct BLBH {
     smd_path: PathBuf,
     texture_path: PathBuf,
+    options: BLBHOptions,
+}
+
+pub struct BLBHOptions {
     convert_texture: bool,
     convert_smd: bool,
+    compile_model: bool,
+    flat_shade: bool,
+    studiomdl: String,
+    #[cfg(target_os = "linux")]
+    wineprefix: String,
+}
+
+impl Default for BLBHOptions {
+    fn default() -> Self {
+        Self {
+            convert_texture: true,
+            convert_smd: true,
+            compile_model: true,
+            flat_shade: true,
+            studiomdl: Default::default(),
+            #[cfg(target_os = "linux")]
+            wineprefix: Default::default(),
+        }
+    }
 }
 
 const MINIMUM_SIZE: u32 = 512;
@@ -24,8 +51,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
     let BLBH {
         smd_path,
         texture_path,
-        convert_texture,
-        convert_smd,
+        options,
     } = blbh;
 
     let mut smd = Smd::from_file(smd_path)?;
@@ -40,7 +66,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
     let smd_file_name = smd_path.file_stem().unwrap().to_str().unwrap();
 
     // split the images
-    if *convert_texture {
+    if options.convert_texture {
         (0..w_count).into_par_iter().for_each(|w_block| {
             (0..h_count).into_par_iter().for_each(|h_block| {
                 let start_width = w_block * MINIMUM_SIZE;
@@ -69,7 +95,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
         });
     }
 
-    if !*convert_smd {
+    if !options.convert_smd {
         return Ok(());
     }
 
@@ -380,12 +406,95 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
     smd.write(smd_path.with_file_name(format!("{}_blbh.smd", smd_file_name)))?;
 
+    if options.compile_model {
+        let idle_smd = Smd::new_basic();
+        let smd_root = smd_path.parent().unwrap();
+        let texture_file_root = smd_path.parent().unwrap();
+
+        idle_smd.write(smd_path.with_file_name("idle.smd"))?;
+
+        let mut qc = Qc::new_basic();
+        qc.set_model_name(
+            smd_path
+                .with_file_name(format!("{}_blbh.mdl", smd_file_name))
+                .to_str()
+                .unwrap(),
+        );
+        qc.set_cd(smd_root.to_str().unwrap());
+        qc.set_cd_texture(texture_file_root.to_str().unwrap());
+
+        if options.flat_shade {
+            (0..w_count).for_each(|w_block| {
+                (0..h_count).for_each(|h_block| {
+                    qc.add_texrendermode(
+                        format!("{}{}{}.bmp", texture_file_name, w_block, h_block).as_str(),
+                        qc::RenderMode::FlatShade,
+                    );
+                })
+            });
+        }
+
+        qc.add_body(
+            "studio0",
+            format!("{}_blbh", smd_file_name).as_str(),
+            false,
+            None,
+        );
+        qc.add_sequence("idle", "idle", vec![]);
+
+        let qc_path = smd_path.with_file_name(format!("{}_blbh.qc", smd_file_name));
+        qc.write(qc_path.as_path())?;
+
+        // run studiomdl
+        #[cfg(target_os = "windows")]
+        let handle = run_studiomdl(qc_path.as_path(), PathBuf::from(options.studiomdl.as_str()).as_path());
+
+        #[cfg(target_os = "linux")]
+        let handle = run_studiomdl(
+            qc_path.as_path(),
+            PathBuf::from(options.studiomdl.as_str()).as_path(),
+            options.wineprefix.as_str(),
+        );
+
+        match handle.join() {
+            Ok(res) => {
+                let output = res?;
+                let stdout = from_utf8(&output.stdout).unwrap();
+
+                let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
+
+                if let Some(err_index) = maybe_err {
+                    let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
+                    let err_str = format!("cannot compile: {}", err.trim());
+                    return Err(eyre!(err_str));
+                }
+            }
+            Err(_) => {
+                let err_str = "No idea what happens with running studiomdl. Probably just a dream.";
+
+                return Err(eyre!(err_str));
+            }
+        };
+    }
+
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+
+    fn options() -> BLBHOptions {
+        BLBHOptions {
+            convert_texture: false,
+            convert_smd: true,
+            compile_model: true,
+            flat_shade: true,
+            studiomdl: String::from("/home/khang/gchimp/dist/studiomdl.exe"),
+            #[cfg(target_os = "linux")]
+            wineprefix: String::from("/home/khang/.local/share/wineprefixes/wine32/"),
+        }
+    }
 
     #[test]
     fn convert_texture() {
@@ -395,8 +504,7 @@ mod test {
         let blbh = BLBH {
             smd_path: smd_path.into(),
             texture_path: texture_path.into(),
-            convert_smd: false,
-            convert_texture: true,
+            options: options(),
         };
         blender_lightmap_baker_helper(&blbh).unwrap();
     }
@@ -409,8 +517,7 @@ mod test {
         let blbh = BLBH {
             smd_path: smd_path.into(),
             texture_path: texture_path.into(),
-            convert_smd: true,
-            convert_texture: false,
+            options: options(),
         };
         blender_lightmap_baker_helper(&blbh).unwrap();
     }
@@ -423,8 +530,7 @@ mod test {
         let blbh = BLBH {
             smd_path: smd_path.into(),
             texture_path: texture_path.into(),
-            convert_smd: true,
-            convert_texture: false,
+            options: options(),
         };
         blender_lightmap_baker_helper(&blbh).unwrap();
     }
@@ -437,8 +543,7 @@ mod test {
         let blbh = BLBH {
             smd_path: smd_path.into(),
             texture_path: texture_path.into(),
-            convert_smd: true,
-            convert_texture: false,
+            options: options(),
         };
         blender_lightmap_baker_helper(&blbh).unwrap();
     }
@@ -451,70 +556,8 @@ mod test {
         let blbh = BLBH {
             smd_path: smd_path.into(),
             texture_path: texture_path.into(),
-            convert_smd: true,
-            convert_texture: false,
+            options: options(),
         };
         blender_lightmap_baker_helper(&blbh).unwrap();
     }
 }
-
-// {
-//     // // find the vector pointing at the top of the triangle
-//     // // do this from uv map
-//     // // since uv map nicely goes from 0 to 1 for all triangles already because 1 texture
-//     // // find the topmost and bottommost vertex and we have a vector that generically points up
-//     // // then, we find the angle of that vector
-//     // // now, we have rotation for cutting plane to be orthorgonal to triangle normal and vector that points straight up
-//     // // the goal is to rotate and translate the cutting plane so that cutting uv is mirroring cutting the triangle as well
-//     // // UV coordinate goes
-//     // // o--------- u+
-//     // // |
-//     // // |
-//     // // |    Or maybe the other way around
-//     // // v+
-//     // let topmost_vertex = to_split
-//     //     .vertices
-//     //     .iter()
-//     //     .enumerate()
-//     //     .fold(0, |acc, (idx, e)| {
-//     //         if to_split.vertices[acc].uv[1] < e.uv[1] {
-//     //             idx
-//     //         } else {
-//     //             acc
-//     //         }
-//     //     });
-
-//     // let bottommost_vertex = to_split
-//     //     .vertices
-//     //     .iter()
-//     //     .enumerate()
-//     //     .fold(0, |acc, (idx, e)| {
-//     //         if to_split.vertices[acc].uv[1] > e.uv[1] {
-//     //             idx
-//     //         } else {
-//     //             acc
-//     //         }
-//     //     });
-
-//     // let uv_pointup_vector =
-//     //     to_split.vertices[bottommost_vertex].uv - to_split.vertices[topmost_vertex].uv;
-//     // let world_pointup_vector =
-//     //     to_split.vertices[bottommost_vertex].pos - to_split.vertices[topmost_vertex].pos;
-
-//     // let uv_angle = uv_pointup_vector.angle_between(DVec2::new(0., 1.));
-
-//     // // we have the angle, now we rotate world_pointup_vector from triangle normal and uv_pointup_vector
-//     // // doing that will get us the actual "pointing up" vector so that pointing up vector and normal vector are orthogonal to
-//     // // the cutting plane normal vector
-//     // // let triangle_normal = DVec3::from(polygon.normal().unwrap()).normalize(); // more reliable
-//     // let triangle_normal = to_split.vertices[0].norm; // or this
-
-//     // // rodrigues' rotation
-//     // let up_vector = world_pointup_vector * uv_angle.cos()
-//     //     + (triangle_normal.cross(world_pointup_vector)) * uv_angle.sin()
-//     //     + triangle_normal * (triangle_normal.dot(world_pointup_vector) * (1. - uv_angle.cos()));
-
-//     // // up vector is also the normal of horizontal cutting plane
-//     // let horizontal_cutting_plane_normal = up_vector;
-//     // let vertical_cutting_plane_normal = up_vector.cross(triangle_normal);
-// }
