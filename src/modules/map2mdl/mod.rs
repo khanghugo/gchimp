@@ -1131,11 +1131,13 @@ mod test {
         let mut binding = Map2Mdl::default();
         binding
             .auto_pickup_wad(true)
-            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map("/home/khang/gchimp/examples/map2prop/map.map")
-            .work()
-            .unwrap();
+            .map("/home/khang/gchimp/examples/map2prop/map.map");
+
+        #[cfg(target_os = "linux")]
+        binding.wineprefix("/home/khang/.local/share/wineprefixes/wine32/");
+
+        binding.work().unwrap();
     }
 
     #[test]
@@ -1143,12 +1145,14 @@ mod test {
         let mut binding = Map2Mdl::default();
         binding
             .auto_pickup_wad(true)
-            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
             .map("/home/khang/gchimp/examples/map2prop/map2.map")
-            .flatshade(false)
-            .work()
-            .unwrap();
+            .flatshade(false);
+
+        #[cfg(target_os = "linux")]
+        binding.wineprefix("/home/khang/.local/share/wineprefixes/wine32/");
+
+        binding.work().unwrap();
     }
 
     #[test]
@@ -1157,11 +1161,13 @@ mod test {
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
-            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map("/home/khang/gchimp/examples/map2prop/arte_spin/arte_spin.map")
-            .work()
-            .unwrap();
+            .map("/home/khang/gchimp/examples/map2prop/arte_spin/arte_spin.map");
+
+        #[cfg(target_os = "linux")]
+        binding.wineprefix("/home/khang/.local/share/wineprefixes/wine32/");
+
+        binding.work().unwrap();
     }
 
     #[test]
@@ -1170,11 +1176,13 @@ mod test {
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
-            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map("/home/khang/gchimp/examples/map2prop/sphere.map")
-            .work()
-            .unwrap();
+            .map("/home/khang/gchimp/examples/map2prop/sphere.map");
+
+        #[cfg(target_os = "linux")]
+        binding.wineprefix("/home/khang/.local/share/wineprefixes/wine32/");
+
+        binding.work().unwrap();
     }
 
     #[test]
@@ -1183,11 +1191,13 @@ mod test {
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
-            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
-            .map("/home/khang/gchimp/examples/map2prop/sphere2.map")
-            .work()
-            .unwrap();
+            .map("/home/khang/gchimp/examples/map2prop/sphere2.map");
+
+        #[cfg(target_os = "linux")]
+        binding.wineprefix("/home/khang/.local/share/wineprefixes/wine32/");
+
+        binding.work().unwrap();
     }
 
     #[test]
@@ -1196,12 +1206,14 @@ mod test {
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
-            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
             .map("/home/khang/gchimp/examples/map2prop/marked/marked.map")
-            .marked_entity(true)
-            .work()
-            .unwrap();
+            .marked_entity(true);
+
+        #[cfg(target_os = "linux")]
+        binding.wineprefix("/home/khang/.local/share/wineprefixes/wine32/");
+
+        binding.work().unwrap();
     }
 
     #[test]
@@ -1210,7 +1222,6 @@ mod test {
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
-            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
             .entity("\
 // entity 0
@@ -1257,9 +1268,12 @@ mod test {
 ( -44.11774900609145 -64 105.37258300203048 ) ( -78.05887450304573 0 71.4314575050762 ) ( -89.3725830020305 0 60.117749006091444 ) devcrate64 [ 0 1 0 0 ] [ -0.7071067811865476 0 -0.7071067811865475 -4.686288 ] 0 1 1
 }
 }
-")
-            .work()
-            .unwrap();
+");
+
+        #[cfg(target_os = "linux")]
+        binding.wineprefix("/home/khang/.local/share/wineprefixes/wine32/");
+
+        binding.work().unwrap();
     }
 
     #[test]
@@ -1268,7 +1282,6 @@ mod test {
         binding
             .auto_pickup_wad(true)
             .move_to_origin(false)
-            .wineprefix("/home/khang/.local/share/wineprefixes/wine32/")
             .studiomdl(PathBuf::from("/home/khang/gchimp/dist/studiomdl.exe").as_path())
             .entity("\
 // Game: Half-Life
@@ -1290,8 +1303,11 @@ mod test {
 }
 }
 
-")
-            .work()
-            .unwrap();
+");
+
+        #[cfg(target_os = "linux")]
+        binding.wineprefix("/home/khang/.local/share/wineprefixes/wine32/");
+
+        binding.work().unwrap();
     }
 }
