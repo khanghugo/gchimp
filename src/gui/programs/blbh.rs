@@ -85,7 +85,10 @@ impl TabProgram for BLBHGui {
 
     fn tab_ui(&mut self, ui: &mut eframe::egui::Ui) -> egui_tiles::UiResponse {
         ui.separator();
-        ui.hyperlink_to("Youtube link on how to make use of this", "www.example.com");
+        ui.hyperlink_to(
+            "Youtube link on how to make use of this",
+            "https://www.youtube.com/watch?v=OFKPLioaS3I",
+        );
 
         ui.separator();
         egui::Grid::new("Input smd and texture grid")
