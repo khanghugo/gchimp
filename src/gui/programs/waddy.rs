@@ -31,6 +31,27 @@ struct WaddyInstance {
     is_changed: bool,
     selected: Vec<usize>,
     to_delete: Vec<usize>,
+    search: SearchBar,
+}
+
+struct SearchBar {
+    enable: bool,
+    text: String,
+    // dirty trick to focus on spawn
+    should_focus: bool,
+    // regain focus when ctrl+f again
+    has_focus: bool,
+}
+
+impl Default for SearchBar {
+    fn default() -> Self {
+        Self {
+            enable: false,
+            text: String::new(),
+            should_focus: false,
+            has_focus: false,
+        }
+    }
 }
 
 struct LoadedImage {
@@ -486,15 +507,37 @@ impl WaddyGui {
                 .num_columns(texture_per_row)
                 .spacing([2., 2.])
                 .show(ui, |ui| {
+                    // TODO cleverly avoid rendering all tiles with basic math
                     let count = self.instances[instance_index].texture_tiles.len();
+                    let is_search_enabled = self.instances[instance_index].search.enable;
 
-                    for texture_tile_index in 0..count {
-                        if texture_tile_index % texture_per_row == 0 && texture_tile_index != 0 {
-                            ui.end_row()
-                        }
+                    // split into two steps because of rust
+                    let filtered_tiles = (0..count)
+                        .filter(|&texture_tile| {
+                            if is_search_enabled {
+                                self.instances[instance_index].texture_tiles[texture_tile]
+                                    .name
+                                    .contains(self.instances[instance_index].search.text.as_str())
+                            } else {
+                                true
+                            }
+                        })
+                        .collect::<Vec<usize>>();
 
-                        self.texture_tile(ui, instance_index, texture_tile_index, image_tile_size);
-                    }
+                    filtered_tiles.into_iter().enumerate().for_each(
+                        |(filtered_index, texture_tile_index)| {
+                            if filtered_index % texture_per_row == 0 && filtered_index != 0 {
+                                ui.end_row()
+                            }
+
+                            self.texture_tile(
+                                ui,
+                                instance_index,
+                                texture_tile_index,
+                                image_tile_size,
+                            );
+                        },
+                    );
                 });
         });
     }
@@ -507,7 +550,7 @@ impl WaddyGui {
         ui.separator();
 
         ui.horizontal(|ui| {
-            if self.editor_menu(ui, instance_index) {
+            if self.instance_menu(ui, instance_index) {
                 should_close = true;
                 return;
             }
@@ -546,14 +589,36 @@ impl WaddyGui {
         ui.separator();
         self.texture_grid(ui, instance_index);
 
-        // Save WAD file with Ctrl + S
+        // search bar
+        if self.instances[instance_index].search.enable {
+            let size = ui.ctx().used_size();
+
+            egui::Area::new(egui::Id::new(format!("search_bar{}", instance_index)))
+                .fixed_pos(egui::pos2(8., size.y))
+                .show(ui.ctx(), |ui| {
+                    let text_edit =
+                        egui::TextEdit::singleline(&mut self.instances[instance_index].search.text)
+                            .hint_text("Search for texture");
+
+                    let text_edit = ui.add(text_edit).highlight();
+
+                    if self.instances[instance_index].search.should_focus {
+                        text_edit.request_focus();
+                        self.instances[instance_index].search.should_focus = false;
+                    }
+
+                    self.instances[instance_index].search.has_focus = text_edit.has_focus();
+                });
+        }
+
+        // Save WAD file with Ctrl+S
         ui.input(|i| {
             if i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::S) {
                 self.menu_save(instance_index);
             }
         });
 
-        // Pasting an image from clipboard with Ctrl + V
+        // Pasting an image from clipboard with Ctrl+V
         let should_add_pasted_image = ui
             .input(|i| i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::V));
 
@@ -588,12 +653,44 @@ impl WaddyGui {
             }
         }
 
-        // ESC to clear selected and close menu
+        // CTRL+F to enable search bar
+        // if search bar is enabled and not focused, CTRL+F will refocus search bar
+        // otherwise, disable search bar
+        ui.input(|i| {
+            if i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::F) {
+                if self.instances[instance_index].search.enable {
+                    // if search bar is enabled, refocus if not focus
+                    // if is focused then disable it
+                    if self.instances[instance_index].search.has_focus {
+                        self.instances[instance_index].search.enable = false;
+                        self.instances[instance_index].search.text.clear();
+                    } else {
+                        self.instances[instance_index].search.should_focus = true;
+                    }
+                } else {
+                    // if search bar is not enabled, just enable it
+                    self.instances[instance_index].search.enable = true;
+                    self.instances[instance_index].search.text.clear();
+                    self.instances[instance_index].search.should_focus = true;
+                }
+            }
+        });
+
         let is_escape_pressed = ui.input(|i| i.key_released(egui::Key::Escape));
 
-        if is_escape_pressed {
+        // ESC to clear selected and close menu
+        // if search bar is enabled, don't clear selected yet
+        if is_escape_pressed && !self.instances[instance_index].search.enable {
             ui.close_menu();
             self.instances[instance_index].selected.clear();
+        }
+
+        // ESC to close search bar
+        // search bar would be the first one to get closed if ESC is pressed
+        // if there's selected textures, it won't deselect them if there's seach bar enabled
+        if is_escape_pressed {
+            self.instances[instance_index].search.enable = false;
+            self.instances[instance_index].search.text.clear();
         }
 
         // DEL to delete texture(s)
@@ -746,6 +843,7 @@ impl WaddyGui {
             is_changed: false,
             selected: vec![],
             to_delete: vec![],
+            search: SearchBar::default(),
         });
 
         Ok(())
@@ -766,7 +864,7 @@ impl WaddyGui {
         false
     }
 
-    fn editor_menu(&mut self, ui: &mut Ui, instance_index: usize) -> bool {
+    fn instance_menu(&mut self, ui: &mut Ui, instance_index: usize) -> bool {
         let mut should_close = false;
 
         ui.menu_button("Menu", |ui| {
@@ -793,6 +891,20 @@ impl WaddyGui {
             if ui.button("Save As").clicked() {
                 self.menu_save_as_dialogue(instance_index);
 
+                ui.close_menu();
+            }
+
+            ui.separator();
+
+            if ui.button("Find (Ctrl+F)").clicked() {
+                if self.instances[instance_index].search.enable {
+                    self.instances[instance_index].search.enable = false;
+                } else {
+                    self.instances[instance_index].search.enable = true;
+                    self.instances[instance_index].search.should_focus = true;
+                }
+
+                self.instances[instance_index].search.text.clear();
                 ui.close_menu();
             }
 
