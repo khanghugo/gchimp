@@ -447,7 +447,10 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
         // run studiomdl
         #[cfg(target_os = "windows")]
-        let handle = run_studiomdl(qc_path.as_path(), PathBuf::from(options.studiomdl.as_str()).as_path());
+        let handle = run_studiomdl(
+            qc_path.as_path(),
+            PathBuf::from(options.studiomdl.as_str()).as_path(),
+        );
 
         #[cfg(target_os = "linux")]
         let handle = run_studiomdl(
