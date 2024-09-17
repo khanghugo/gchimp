@@ -169,6 +169,9 @@ impl TabProgram for BLBHGui {
             }
         });
 
+        // Force continuous mode
+        ctx.request_repaint();
+
         // Make it non drag-able
         egui_tiles::UiResponse::None
     }
