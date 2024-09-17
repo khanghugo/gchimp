@@ -716,7 +716,7 @@ impl Polygon3D {
     /// Vertices aren't sorted so sort them plesase. Must sort vertices first otherwise the result is very bad
     ///
     // TODO the function won't guaranteed sorted vertices atm so sort it
-    // 
+    //
     // TODO it doesnt' work well, fix it
     pub fn split(&self, plane: &Plane3D) -> Vec<Self> {
         let (not_removed, removed_vertices): (Vec<(usize, Point3D)>, _) = self
@@ -728,12 +728,7 @@ impl Polygon3D {
             // ill blame on the cutting plane that results in edge case, not sure why
             // but right now, it works fine
             // this is very dumb and shit
-            .partition(|(_, vertex)| {
-                matches!(
-                    plane.side_of_point(*vertex),
-                    SideOfPoint::In
-                )
-            });
+            .partition(|(_, vertex)| matches!(plane.side_of_point(*vertex), SideOfPoint::In));
         // lemma: since we are doing convex polygon, only the firstmost and fartmost vertices are connected
         // to the other cut
         // therefore, we only need to check for newly created vertices/edges from two cuts involving those two vertices
