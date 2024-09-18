@@ -12,7 +12,7 @@ use crate::utils::{
     constants::{EPSILON, STUDIOMDL_ERROR_PATTERN},
     img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
     run_bin::run_studiomdl,
-    simple_calculs::{Plane3D, Polygon3D},
+    simple_calculs::{Matrix2x2, Plane3D, Polygon3D},
     smd_stuffs::textures_used_in_triangles,
 };
 
@@ -28,6 +28,7 @@ pub struct BLBHOptions {
     pub convert_smd: bool,
     pub compile_model: bool,
     pub flat_shade: bool,
+    pub uv_shrink_factor: f32,
     pub studiomdl: String,
     #[cfg(target_os = "linux")]
     pub wineprefix: String,
@@ -40,12 +41,16 @@ impl Default for BLBHOptions {
             convert_smd: true,
             compile_model: true,
             flat_shade: true,
+            uv_shrink_factor: BLBH_DEFAULT_UV_SHRINK_FACTOR,
             studiomdl: Default::default(),
             #[cfg(target_os = "linux")]
             wineprefix: Default::default(),
         }
     }
 }
+
+// shrink by 2 pixels inward
+pub const BLBH_DEFAULT_UV_SHRINK_FACTOR: f32 = 0.99609375;
 
 const MINIMUM_SIZE: u32 = 512;
 
@@ -142,14 +147,13 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
     // if not, the texture would repeat and that means texture filtering
     // the shitty thing here would be that the color difference might just be a seam
     // but at least it isn't scaled up to a pixel
-    const SHRINK_FACTOR: f64 = 1. - (1. / MINIMUM_SIZE as f64) * 2.;
     let shrink_uvs = |uvs: Vec<DVec2>| {
         let centroid = uvs.iter().fold(DVec2::ZERO, |acc, &e| acc + e) / 3.;
 
         uvs.iter()
             .map(|&uv| {
                 let vector = uv - centroid;
-                let vector = vector * SHRINK_FACTOR;
+                let vector = vector * options.uv_shrink_factor as f64;
                 vector + centroid
             })
             .collect::<Vec<DVec2>>()
@@ -187,59 +191,77 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
             // dumb fuck this normal doesnt' do shit
             // let triangle_normal = to_split.vertices[0].norm;
-            let triangle_normal = polygon.normal().unwrap().into();
+            let triangle_normal: DVec3 = polygon.normal().unwrap().into();
+            let triangle_normal = triangle_normal.normalize();
 
             // converts a uv coordinate from a triangle to world coordinate
             // so world coordinate would be coplanar with the triangle
+            // represent the uv coordinate with the basis of two vectors
             let uv_to_world = |uv: DVec2| {
-                // choose an anchor vertex
-                // choose another vertex then we have a vector on uv plane
-                // from the chosen uv coordinate, we will have another vector with the anchor vertex
-                // now we have two vectors, the anchor vector and the uv vertex
-                // find that displacement in uv space then translate that to world space
                 let anchor_vertex = &to_split.vertices[0];
-                let anchor_vector = to_split.vertices[1].pos - anchor_vertex.pos;
-                let anchor_vector_uv = to_split.vertices[1].uv - anchor_vertex.uv;
+                let anchor_vector_uv0 = to_split.vertices[1].uv - anchor_vertex.uv;
+                let anchor_vector_uv1 = to_split.vertices[2].uv - anchor_vertex.uv;
+                let anchor_vector_pos0 = to_split.vertices[1].pos - anchor_vertex.pos;
+                let anchor_vector_pos1 = to_split.vertices[2].pos - anchor_vertex.pos;
 
                 let target_vector_uv = uv - anchor_vertex.uv;
-                let angle = anchor_vector_uv.angle_between(target_vector_uv);
-                let scale = target_vector_uv.length() / anchor_vector_uv.length();
 
-                let normal = anchor_vertex.norm;
-                // rotate the anchor_vector around triangle normal
-                // rodrigues' rotation
-                let result_vector = anchor_vector * angle.cos()
-                    + normal.cross(anchor_vector) * angle.sin()
-                    + normal * (normal.dot(anchor_vector) * (1. - angle.cos()));
-                let result_vector = result_vector * scale; // scale the vector to match
+                let coefficients: [f64; 2] = Matrix2x2::from([
+                    anchor_vector_uv0.x,
+                    anchor_vector_uv1.x,
+                    anchor_vector_uv0.y,
+                    anchor_vector_uv1.y,
+                ])
+                .solve_cramer([target_vector_uv.x, target_vector_uv.y])
+                .expect("cannot solve by cramer's rule");
 
-                // translate back to where it starts
-                result_vector + anchor_vertex.pos
+                (anchor_vector_pos0 * coefficients[0] + anchor_vector_pos1 * coefficients[1])
+                    + anchor_vertex.pos
             };
 
-            // converts a world coordinate coplanar to a triangle into uv coordinate as used in the original triangle
-            // this means the uv coordinate would be in the big texture
-            // so we have to convert that back to smaller triangle coordinate again
-            // the steps will mirror uv_to_world because we can select
             let world_to_uv = |p: DVec3| {
                 let anchor_vertex = &to_split.vertices[0];
-                let anchor_vector = to_split.vertices[1].pos - anchor_vertex.pos;
-                let anchor_vector_uv = to_split.vertices[1].uv - anchor_vertex.uv;
+                let anchor_vector_uv0 = to_split.vertices[1].uv - anchor_vertex.uv;
+                let anchor_vector_uv1 = to_split.vertices[2].uv - anchor_vertex.uv;
+                let anchor_vector_pos0 = to_split.vertices[1].pos - anchor_vertex.pos;
+                let anchor_vector_pos1 = to_split.vertices[2].pos - anchor_vertex.pos;
 
-                let target_vector = p - anchor_vertex.pos;
-                let angle = anchor_vector.angle_between(target_vector);
-                let scale = target_vector.length() / anchor_vector.length();
+                let target_vector_pos = p - anchor_vertex.pos;
 
-                // fucking dumb shit cannot do eigenvectors
-                let angle = if angle.is_nan() { 0. } else { angle };
+                // need to solve cramer's rule 3 times
+                let coefficients = if let Ok(res) = Matrix2x2::from([
+                    anchor_vector_pos0.y,
+                    anchor_vector_pos1.y,
+                    anchor_vector_pos0.z,
+                    anchor_vector_pos1.z,
+                ])
+                .solve_cramer([target_vector_pos.y, target_vector_pos.z])
+                {
+                    res
+                } else if let Ok(res) = Matrix2x2::from([
+                    anchor_vector_pos0.x,
+                    anchor_vector_pos1.x,
+                    anchor_vector_pos0.z,
+                    anchor_vector_pos1.z,
+                ])
+                .solve_cramer([target_vector_pos.x, target_vector_pos.z])
+                {
+                    res
+                } else if let Ok(res) = Matrix2x2::from([
+                    anchor_vector_pos0.x,
+                    anchor_vector_pos1.x,
+                    anchor_vector_pos0.y,
+                    anchor_vector_pos1.y,
+                ])
+                .solve_cramer([target_vector_pos.x, target_vector_pos.y])
+                {
+                    res
+                } else {
+                    unreachable!("cannot solve by cramer's rule")
+                };
 
-                let rotation_matrix = [[angle.cos(), -angle.sin()], [angle.sin(), angle.cos()]];
-                let result_vector_uv_u = anchor_vector_uv.dot(rotation_matrix[0].into());
-                let result_vector_uv_v = anchor_vector_uv.dot(rotation_matrix[1].into());
-                let result_vector_uv = DVec2::new(result_vector_uv_u, result_vector_uv_v);
-                let result_vector_uv = result_vector_uv * scale;
-
-                result_vector_uv + anchor_vertex.uv
+                (anchor_vector_uv0 * coefficients[0] + anchor_vector_uv1 * coefficients[1])
+                    + anchor_vertex.uv
             };
 
             // now, to get a cutting plane, we have to find the plane normal and a point on the plane
@@ -248,15 +270,18 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
             // so, we have to cross product of that horizontal plane with the triangle plane
             // and we will have normal of cutting plane
             // do dot product to find the distance of the plane
-            // let vertical_cut_count = v1.0.max(v2.0).max(v3.0) - 1;
-            // let horizontal_cut_count = v1.1.max(v2.1).max(v3.1) - 1;
+            let min_w = v1.0.min(v2.0).min(v3.0);
+            let max_w = v1.0.max(v2.0).max(v3.0);
+            let min_h = v1.1.min(v2.1).min(v3.1);
+            let max_h = v1.1.max(v2.1).max(v3.1);
 
-            // TODO: calculate cut count instead of cut 16 times every time
             let mut polygon_res = vec![polygon];
 
             // cuts vertically
             // subtracts 1 because 2 blocks means 1 cut and so on
-            (1..w_count).for_each(|w_block| {
+            (min_w..max_w).for_each(|w_block| {
+                // if we have triangle covering betwen 0 and 1, we only want the cut to start from 1
+                let w_block = w_block + 1;
                 let u = w_block as f64 * width_uv;
 
                 let v1 = uv_to_world((u, 0.).into());
@@ -280,7 +305,8 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
             });
 
             // cuts horizontally
-            (1..h_count).for_each(|h_block| {
+            (min_h..max_h).for_each(|h_block| {
+                let h_block = h_block + 1;
                 let v = h_block as f64 * height_uv;
 
                 let v1 = uv_to_world((0., v).into());
@@ -479,6 +505,7 @@ mod test {
             convert_smd: true,
             compile_model: true,
             flat_shade: true,
+            uv_shrink_factor: BLBH_DEFAULT_UV_SHRINK_FACTOR,
             studiomdl: String::from("/home/khang/gchimp/dist/studiomdl.exe"),
             #[cfg(target_os = "linux")]
             wineprefix: String::from("/home/khang/.local/share/wineprefixes/wine32/"),

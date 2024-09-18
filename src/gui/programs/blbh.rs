@@ -9,7 +9,9 @@ use eframe::egui;
 use crate::{
     config::Config,
     gui::{utils::preview_file_being_dropped, TabProgram},
-    modules::blender_lightmap_baker_helper::{blender_lightmap_baker_helper, BLBHOptions, BLBH},
+    modules::blender_lightmap_baker_helper::{
+        blender_lightmap_baker_helper, BLBHOptions, BLBH, BLBH_DEFAULT_UV_SHRINK_FACTOR,
+    },
 };
 
 #[derive(Debug)]
@@ -18,6 +20,8 @@ pub struct BLBHGui {
     smd_path: String,
     texture_path: String,
     options: BLBHOptions,
+    shrink_value: String,
+    check_shrink_value: bool,
     status: Arc<Mutex<String>>,
 }
 
@@ -28,6 +32,8 @@ impl BLBHGui {
             smd_path: Default::default(),
             texture_path: Default::default(),
             options: BLBHOptions::default(),
+            shrink_value: BLBH_DEFAULT_UV_SHRINK_FACTOR.to_string(),
+            check_shrink_value: false,
             status: Arc::new(Mutex::new("Idle".to_string())),
         }
     }
@@ -142,6 +148,37 @@ impl TabProgram for BLBHGui {
                 );
             ui.checkbox(&mut self.options.flat_shade, "Flat shade")
                 .on_hover_text("Flags every texture with flat shade");
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("UV Shrink");
+            // only check value if lost focus
+            let text_editor = egui::TextEdit::singleline(&mut self.shrink_value).desired_width(80.);
+
+            let text_editor_ui = ui.add(text_editor).on_hover_text(
+                "\
+UV coordinate from centroid will scale by this value. \n\
+If your texture has weird seams, consider lowering this number. \n\
+For best results, change this value by 1/512.",
+            );
+
+            if text_editor_ui.has_focus() {
+                self.check_shrink_value = true;
+            }
+
+            if text_editor_ui.lost_focus() && self.check_shrink_value {
+                let shrink_value = self
+                    .shrink_value
+                    .parse::<f32>()
+                    .unwrap_or(BLBH_DEFAULT_UV_SHRINK_FACTOR);
+                self.shrink_value = shrink_value.to_string();
+                self.options.uv_shrink_factor = shrink_value;
+                self.check_shrink_value = false;
+            }
+
+            if ui.button("Default").clicked() {
+                self.shrink_value = BLBH_DEFAULT_UV_SHRINK_FACTOR.to_string()
+            }
         });
 
         ui.separator();
