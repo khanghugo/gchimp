@@ -13,6 +13,7 @@ use crate::utils::{
     img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
     run_bin::run_studiomdl,
     simple_calculs::{Plane3D, Polygon3D},
+    smd_stuffs::textures_used_in_triangles,
 };
 
 pub struct BLBH {
@@ -408,13 +409,14 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
         qc.set_cd_texture(texture_file_root.to_str().unwrap());
 
         if options.flat_shade {
-            (0..w_count).for_each(|w_block| {
-                (0..h_count).for_each(|h_block| {
-                    qc.add_texrendermode(
-                        format!("{}{}{}.bmp", texture_file_name, w_block, h_block).as_str(),
-                        qc::RenderMode::FlatShade,
-                    );
-                })
+            // cannot just add texture indiscriminately
+            // it is possible that UV does not cover some texture
+            // if that happens and we still add texrendermode for that unused texture
+            // there will be "Texture too large!" error.
+            let used_textures = textures_used_in_triangles(smd.triangles.as_slice());
+
+            used_textures.iter().for_each(|tex| {
+                qc.add_texrendermode(tex, qc::RenderMode::FlatShade);
             });
         }
 
