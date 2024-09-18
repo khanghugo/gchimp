@@ -711,6 +711,109 @@ impl Polygon3D {
         [mins.into(), maxs.into()]
     }
 
+    pub fn cut(&self, plane: &Plane3D) -> Option<Self> {
+        let (not_removed, removed_vertices): (Vec<(usize, Point3D)>, _) = self
+            .vertices()
+            .iter()
+            .cloned()
+            .enumerate()
+            .partition(|(_, vertex)| matches!(plane.side_of_point(*vertex), SideOfPoint::In));
+
+        // no affected vertices
+        if removed_vertices.is_empty() {
+            return Some(self.clone());
+        }
+
+        // the entire polygon is removed
+        if removed_vertices.len() == self.0.len() {
+            return None;
+        }
+
+        let mut polygon = self.clone();
+
+        let not_removed: Polygon3D = not_removed
+            .into_iter()
+            .map(|(_, v)| v)
+            .collect::<Vec<Point3D>>()
+            .into();
+
+        let left_vertex = removed_vertices.iter().find(|(_, vertex)| {
+            not_removed
+                .vertices()
+                .contains(&self.get_vertex_neighbors(vertex).unwrap().1[0])
+        });
+
+        let left_vertex = left_vertex.unwrap().1;
+
+        // cutting 1 vertex
+        if removed_vertices.len() == 1 {
+            // this means we only cut 1 vertex
+            let (idx, neighbors) = polygon.get_vertex_neighbors(&left_vertex).unwrap();
+            let line_left = Line3D::from_two_points(neighbors[0], left_vertex);
+            let line_right = Line3D::from_two_points(neighbors[1], left_vertex);
+
+            let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
+            let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
+
+            polygon.0.remove(idx);
+
+            polygon.insert_vertex(idx, new_left_vertex);
+            polygon.insert_vertex(idx, new_right_vertex);
+
+            // polygon.add_vertex(new_left_vertex);
+            // polygon.add_vertex(new_right_vertex);
+            // polygon.sort_vertices().unwrap();
+        } else {
+            let (_, left_neighbors) = polygon.get_vertex_neighbors(&left_vertex).unwrap();
+            let line_left = Line3D::from_two_points(left_neighbors[0], left_vertex);
+            let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
+
+            let right_vertex = removed_vertices
+                .iter()
+                .find(|(_, vertex)| {
+                    not_removed
+                        .vertices()
+                        .contains(&polygon.get_vertex_neighbors(vertex).unwrap().1[1])
+                })
+                .unwrap()
+                .1;
+
+            let (_, right_neighbors) = polygon.get_vertex_neighbors(&right_vertex).unwrap();
+            let line_right = Line3D::from_two_points(right_neighbors[1], right_vertex);
+            let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
+
+            removed_vertices.iter().rev().for_each(|(idx, _)| {
+                polygon.0.remove(*idx);
+            });
+
+            let left_neighbor_left_idx = removed_vertices[0].0;
+
+            polygon.insert_vertex(left_neighbor_left_idx, new_left_vertex);
+            polygon.insert_vertex(left_neighbor_left_idx, new_right_vertex);
+
+            // polygon.add_vertex(new_left_vertex);
+            // polygon.add_vertex(new_right_vertex);
+            // polygon.sort_vertices().unwrap();
+        }
+
+        Some(polygon)
+    }
+
+    // cant be fucked version
+    pub fn split2(&self, plane: &Plane3D) -> Vec<Self> {
+        let p1 = self.clone();
+        let p2 = self.clone();
+
+        let p1 = p1.cut(plane);
+        let p2 = p2.cut(&plane.get_backplane());
+
+        if p1.is_some() && p2.is_some() {
+            vec![p1.unwrap(), p2.unwrap()]
+        } else {
+            vec![self.clone()]
+        }
+    }
+
     /// Splits polygon into possibly two from a plane
     ///
     /// Vertices aren't sorted so sort them plesase. Must sort vertices first otherwise the result is very bad
