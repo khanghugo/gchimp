@@ -457,7 +457,12 @@ impl Wad {
         let header = &self.header;
 
         writer.append_u8_slice(&header.magic);
-        writer.append_i32(header.num_dirs);
+
+        // write num_dirs with the count of entries
+        // doing this will help with forgetting to update num_dirs when new MipMap is added
+        writer.append_i32(self.entries.len() as i32);
+        // writer.append_i32(header.num_dirs);
+
         // just a dummy offset at this point.
         let dir_offset_index = writer.get_offset();
         writer.append_i32(header.dir_offset);
