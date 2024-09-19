@@ -737,7 +737,7 @@ impl WaddyGui {
 
                 if let Some(ext) = path.extension() {
                     // if new wad file is dropped, we open that wad file instead
-                    if ext == "wad" {
+                    if ext == "wad" || ext == "bsp" {
                         if let Err(err) = self.start_waddy_instance(ui, Some(path)) {
                             // TODO TOAST
                             println!("{}", err);
@@ -800,10 +800,19 @@ impl WaddyGui {
 
     // FIXME: it is ram guzzler
     fn start_waddy_instance(&mut self, ui: &mut Ui, path: Option<&Path>) -> eyre::Result<()> {
-        let waddy = if let Some(path) = path {
-            Waddy::from_file(path)?
+        // return is_changed here so that the user knows they need to save the file to have the file
+        let (waddy, is_changed) = if let Some(path) = path {
+            let ext = path.extension().unwrap();
+
+            if ext == "wad" {
+                (Waddy::from_wad_file(path)?, false)
+            } else if ext == "bsp" {
+                (Waddy::from_bsp_file(path)?, true)
+            } else {
+                unreachable!()
+            }
         } else {
-            Waddy::new()
+            (Waddy::new(), true)
         };
 
         let texture_tiles = waddy
@@ -837,10 +846,10 @@ impl WaddyGui {
             .collect::<Vec<TextureTile>>();
 
         self.instances.push(WaddyInstance {
-            path: path.map(|path| path.to_owned()),
+            path: path.map(|path| path.with_extension("wad")),
             waddy,
             texture_tiles,
-            is_changed: false,
+            is_changed,
             selected: vec![],
             to_delete: vec![],
             search: SearchBar::default(),
@@ -851,7 +860,9 @@ impl WaddyGui {
 
     fn menu_open(&mut self, ui: &mut Ui) -> bool {
         if let Some(path) = rfd::FileDialog::new().pick_file() {
-            if path.extension().unwrap().to_str().unwrap() == "wad" {
+            let ext = path.extension().unwrap();
+
+            if ext == "wad" || ext == "bsp" {
                 // todo toast
                 if let Err(err) = self.start_waddy_instance(ui, Some(path.as_path())) {
                     println!("{}", err);
@@ -1018,7 +1029,7 @@ impl WaddyGui {
         });
 
         ui.separator();
-        ui.label("Drag and drop a WAD file to start");
+        ui.label("Drag and drop a WAD file to start.\nYou can also drop a BSP file if you want.");
 
         let ctx = ui.ctx();
 
@@ -1034,7 +1045,7 @@ impl WaddyGui {
                 }
 
                 if let Some(ext) = path.extension() {
-                    if ext == "wad" {
+                    if ext == "wad" || ext == "bsp" {
                         if let Err(err) = self.start_waddy_instance(ui, Some(path)) {
                             // TODO TOAST
                             println!("{}", err);

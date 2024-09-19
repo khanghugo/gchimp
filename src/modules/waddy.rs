@@ -4,6 +4,7 @@ use std::{
     str::from_utf8,
 };
 
+use bsp::Bsp;
 use image::RgbaImage;
 use rayon::prelude::*;
 
@@ -30,16 +31,41 @@ impl Waddy {
         Self { wad: Wad::new() }
     }
 
-    pub fn from_file(path: impl AsRef<Path> + Into<PathBuf> + AsRef<OsStr>) -> eyre::Result<Self> {
+    pub fn from_wad_file(
+        path: impl AsRef<Path> + Into<PathBuf> + AsRef<OsStr>,
+    ) -> eyre::Result<Self> {
         let wad = Wad::from_file(path)?;
 
         Ok(Waddy { wad })
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> eyre::Result<Self> {
+    pub fn from_wad_bytes(bytes: &[u8]) -> eyre::Result<Self> {
         let wad = Wad::from_bytes(bytes)?;
 
         Ok(Waddy { wad })
+    }
+
+    pub fn from_bsp_file(
+        path: impl AsRef<Path> + Into<PathBuf> + AsRef<OsStr>,
+    ) -> eyre::Result<Self> {
+        let mut res = Self::new();
+
+        let bsp = Bsp::from_file(path)?;
+        let textures = bsp.textures;
+
+        res.wad.entries = textures
+            .into_iter()
+            .map(|texture| {
+                let texture_name = texture.texture_name.get_string();
+
+                wad::types::Entry {
+                    directory_entry: wad::types::DirectoryEntry::new(texture_name),
+                    file_entry: wad::types::FileEntry::MipTex(texture),
+                }
+            })
+            .collect::<Vec<wad::types::Entry>>();
+
+        Ok(res)
     }
 
     fn log(&self, i: impl std::fmt::Display + AsRef<str>) {
@@ -308,19 +334,19 @@ mod test {
 
     #[test]
     fn dump_info() {
-        let waddy = Waddy::from_file("/home/khang/gchimp/wad/test/surf_cyberwave.wad").unwrap();
+        let waddy = Waddy::from_wad_file("/home/khang/gchimp/wad/test/surf_cyberwave.wad").unwrap();
         println!("{}", waddy.dump_info());
     }
 
     #[test]
     fn dump_info2() {
-        let waddy = Waddy::from_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
+        let waddy = Waddy::from_wad_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
         println!("{}", waddy.dump_info());
     }
 
     #[test]
     fn dump_textures() {
-        let waddy = Waddy::from_file("/home/khang/gchimp/wad/test/surf_cyberwave.wad").unwrap();
+        let waddy = Waddy::from_wad_file("/home/khang/gchimp/wad/test/surf_cyberwave.wad").unwrap();
         waddy
             .dump_textures_to_files("/home/khang/gchimp/examples/waddy/")
             .unwrap();
@@ -329,7 +355,8 @@ mod test {
     #[test]
     fn dump_textures2() {
         {
-            let waddy = Waddy::from_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
+            let waddy =
+                Waddy::from_wad_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
 
             waddy
                 .dump_textures_to_files("/home/khang/gchimp/examples/waddy/cso")
@@ -342,7 +369,8 @@ mod test {
 
     #[test]
     fn add_wad() {
-        let mut waddy = Waddy::from_file("/home/khang/gchimp/examples/waddy/wad_test.wad").unwrap();
+        let mut waddy =
+            Waddy::from_wad_file("/home/khang/gchimp/examples/waddy/wad_test.wad").unwrap();
 
         // waddy
         //     .add_texture("/home/khang/map_compiler/my_textures/black.bmp")
@@ -359,5 +387,16 @@ mod test {
         waddy
             .save_to_file("/home/khang/gchimp/examples/waddy/wad_test_out.wad")
             .unwrap();
+    }
+
+    #[test]
+    fn open_bsp() {
+        let waddy = Waddy::from_bsp_file("/home/khang/map/bsp/bsp_compile.bsp").unwrap();
+        // println!("{}", waddy.wad.entries)
+        waddy
+            .wad
+            .entries
+            .iter()
+            .for_each(|what| println!("{}", what.texture_name()));
     }
 }
