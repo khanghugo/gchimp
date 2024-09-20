@@ -29,6 +29,7 @@ impl PersistentStorage {
             Err(_) => PathBuf::from(PERSISTENT_STORAGE_FILE_NAME),
         };
 
+        #[allow(clippy::suspicious_open_options)]
         let mut file = OpenOptions::new()
             .create(true)
             .write(true)

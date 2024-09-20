@@ -48,6 +48,7 @@ struct SearchBar {
     has_focus: bool,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for SearchBar {
     fn default() -> Self {
         Self {
