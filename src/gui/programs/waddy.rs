@@ -92,7 +92,7 @@ impl TextureTile {
 }
 
 const BASE_IMAGE_TILE_SIZE: f32 = 96.0;
-const SUPPORTED_TEXTURE_FORMATS: &[&str] = &["png", "jpeg", "jpg", "bmp"];
+const SUPPORTED_TEXTURE_FORMATS: &[&str] = &["png", "jpeg", "jpg", "bmp", "vtf"];
 
 const PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR: &str =
     "cannot update recently used wad for Waddy";
@@ -940,6 +940,8 @@ impl WaddyGui {
             ui.separator();
 
             if ui.button("Import").clicked() {
+                // TODO this is not consistent with drag and drop behavior
+                // this does not filter out file extension
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
                     if let Err(err) = self.instances[instance_index]
                         .waddy
@@ -950,6 +952,8 @@ impl WaddyGui {
                         self.update_after_add_image(ui, instance_index);
                     }
                 }
+
+                ui.close_menu();
             }
 
             if ui.button("Export All").clicked() {

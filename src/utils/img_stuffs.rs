@@ -11,6 +11,7 @@ use image::{
 };
 use quantette::{ColorSpace, ImagePipeline, QuantizeMethod};
 use rayon::prelude::*;
+use vtf::Vtf;
 
 use crate::utils::constants::MAX_GOLDSRC_TEXTURE_SIZE;
 
@@ -437,11 +438,13 @@ pub fn generate_mipmaps_from_rgba_image(img: RgbaImage) -> eyre::Result<Generate
 pub fn generate_mipmaps_from_path(
     img_path: impl AsRef<Path> + Into<PathBuf>,
 ) -> eyre::Result<GenerateMipmapsResult> {
+    let ext = img_path.as_ref().extension().unwrap();
+
     // if it is bitmap, then for now don't generate any bitmap
     // dont even do any thing really.
     // just return the original image and mipmaps are dummy
     // unless the bitmap is not indexed, then process normally
-    if img_path.as_ref().extension().unwrap() == "bmp" {
+    if ext == "bmp" {
         let res = _generate_mipmaps_indexed_bmp(img_path.as_ref());
 
         if let Ok(res) = res {
@@ -449,7 +452,13 @@ pub fn generate_mipmaps_from_path(
         }
     };
 
-    let img = image::open(img_path.as_ref())?.into_rgba8();
+    let img = if ext == "vtf" {
+        Vtf::from_file(img_path.as_ref())?
+            .get_high_res_image()?
+            .into_rgba8()
+    } else {
+        image::open(img_path.as_ref())?.into_rgba8()
+    };
 
     generate_mipmaps_from_rgba_image(img)
 }
