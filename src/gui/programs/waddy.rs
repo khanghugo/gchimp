@@ -405,6 +405,21 @@ impl WaddyGui {
                                 .selected
                                 .push(texture_tile_index);
                         }
+                    } else if input_modifiers.shift {
+                        if let Some(&last_index) = self.instances[instance_index].selected.last() {
+                            let range_start = last_index.min(texture_tile_index);
+                            let range_end = last_index.max(texture_tile_index);
+
+                            for idx in range_start..=range_end {
+                                if !self.instances[instance_index].selected.contains(&idx) {
+                                    self.instances[instance_index].selected.push(idx);
+                                }
+                            }
+                        } else {
+                            self.instances[instance_index]
+                                .selected
+                                .push(texture_tile_index);
+                        }
                     } else {
                         self.instances[instance_index].selected.clear();
                         self.instances[instance_index]
