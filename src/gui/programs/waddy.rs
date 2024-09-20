@@ -389,15 +389,24 @@ impl WaddyGui {
 
                 // if left clicked, add to the list of selected
                 if clickable_image.clicked() {
-                    if is_selected {
-                        let unselect_idx = self.instances[instance_index]
-                            .selected
-                            .iter()
-                            .position(|&idx| idx == texture_tile_index)
-                            .unwrap();
+                    let input_modifiers = ui.input(|i| i.modifiers);
 
-                        self.instances[instance_index].selected.remove(unselect_idx);
+                    if input_modifiers.ctrl {
+                        if is_selected {
+                            let unselect_idx = self.instances[instance_index]
+                                .selected
+                                .iter()
+                                .position(|&idx| idx == texture_tile_index)
+                                .unwrap();
+
+                            self.instances[instance_index].selected.remove(unselect_idx);
+                        } else {
+                            self.instances[instance_index]
+                                .selected
+                                .push(texture_tile_index);
+                        }
                     } else {
+                        self.instances[instance_index].selected.clear();
                         self.instances[instance_index]
                             .selected
                             .push(texture_tile_index);
