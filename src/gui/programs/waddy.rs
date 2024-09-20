@@ -622,24 +622,26 @@ impl WaddyGui {
 
         // search bar
         if self.instances[instance_index].search.enable {
-            let size = ui.ctx().used_size();
+            egui::TopBottomPanel::bottom(format!("search_bar{}", instance_index)).show(
+                ui.ctx(),
+                |ui| {
+                    ui.horizontal(|ui| {
+                        let text_edit = egui::TextEdit::singleline(
+                            &mut self.instances[instance_index].search.text,
+                        )
+                        .hint_text("Search for texture");
 
-            egui::Area::new(egui::Id::new(format!("search_bar{}", instance_index)))
-                .fixed_pos(egui::pos2(8., size.y))
-                .show(ui.ctx(), |ui| {
-                    let text_edit =
-                        egui::TextEdit::singleline(&mut self.instances[instance_index].search.text)
-                            .hint_text("Search for texture");
+                        let text_edit = ui.add(text_edit);
 
-                    let text_edit = ui.add(text_edit).highlight();
+                        if self.instances[instance_index].search.should_focus {
+                            text_edit.request_focus();
+                            self.instances[instance_index].search.should_focus = false;
+                        }
 
-                    if self.instances[instance_index].search.should_focus {
-                        text_edit.request_focus();
-                        self.instances[instance_index].search.should_focus = false;
-                    }
-
-                    self.instances[instance_index].search.has_focus = text_edit.has_focus();
-                });
+                        self.instances[instance_index].search.has_focus = text_edit.has_focus();
+                    });
+                },
+            );
         }
 
         // Save WAD file with Ctrl+S
