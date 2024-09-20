@@ -21,10 +21,12 @@ pub struct TexTileGui {
 impl Default for TexTileGui {
     fn default() -> Self {
         let options = TexTileOptions::default();
+        let extensions = options.extensions.join(" ");
+
         Self {
             items: vec![],
             options,
-            extensions: String::from("png jpeg jpg"),
+            extensions,
             sync: TexTileSync::default(),
         }
     }

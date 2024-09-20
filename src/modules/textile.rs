@@ -8,6 +8,7 @@ use eyre::eyre;
 use image::RgbaImage;
 
 use rayon::prelude::*;
+use vtf::Vtf;
 
 use crate::utils::img_stuffs::{
     eight_bpp_transparent_img, rgba8_to_8bpp, tile_and_resize, write_8bpp_to_file, GoldSrcBmp,
@@ -36,7 +37,12 @@ pub struct TexTileOptions {
 impl Default for TexTileOptions {
     fn default() -> Self {
         Self {
-            extensions: vec!["png".to_string(), "jpg".to_string(), "jpeg".to_string()],
+            extensions: vec![
+                "png".to_string(),
+                "jpg".to_string(),
+                "jpeg".to_string(),
+                "vtf".to_string(),
+            ],
             is_tiling: true,
             tiling_scalar: 2,
             is_transparent: false,
@@ -209,7 +215,13 @@ impl TexTileBuilder {
         let rgba_images: Vec<eyre::Result<(PathBuf, RgbaImage)>> = work_items
             .into_par_iter()
             .map(|work_item| {
-                let new_img = image::open(&work_item);
+                // items are already checked so they should have the extensions we want
+                let ext = work_item.extension().unwrap().to_str().unwrap();
+
+                let new_img = match ext {
+                    "vtf" => Vtf::from_file(&work_item)?.get_high_res_image(),
+                    _ => image::open(&work_item).map_err(|err| eyre!(err)),
+                };
 
                 if new_img.is_err() {
                     let log = format!(
