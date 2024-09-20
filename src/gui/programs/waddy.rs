@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 
 use arboard::Clipboard;
 use eframe::egui::{self, Context, Modifiers, RichText, ScrollArea, Sense, Ui};
@@ -14,6 +17,7 @@ use crate::{
         TabProgram,
     },
     modules::waddy::Waddy,
+    persistent_storage::PersistentStorage,
 };
 
 pub struct WaddyGui {
@@ -21,6 +25,7 @@ pub struct WaddyGui {
     extra_image_viewports: Vec<WadImage>,
     /// 32x32 texture on 512x512 grid is VERY TINY
     fit_texture: bool,
+    persistent_storage: Arc<Mutex<PersistentStorage>>,
 }
 
 struct WaddyInstance {
@@ -85,21 +90,22 @@ impl TextureTile {
     }
 }
 
-#[allow(clippy::derivable_impls)]
-impl Default for WaddyGui {
-    fn default() -> Self {
+const BASE_IMAGE_TILE_SIZE: f32 = 96.0;
+const SUPPORTED_TEXTURE_FORMATS: &[&str] = &["png", "jpeg", "jpg", "bmp"];
+
+const PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR: &str =
+    "cannot update recently used wad for Waddy";
+
+impl WaddyGui {
+    pub fn new(persistent_storage: Arc<Mutex<PersistentStorage>>) -> Self {
         Self {
             instances: vec![],
             extra_image_viewports: vec![],
             fit_texture: true,
+            persistent_storage,
         }
     }
-}
 
-static BASE_IMAGE_TILE_SIZE: f32 = 96.0;
-static SUPPORTED_TEXTURE_FORMATS: &[&str] = &["png", "jpeg", "jpg", "bmp"];
-
-impl WaddyGui {
     /// Returns index of texture to delete
     fn texture_tile(
         &mut self,
@@ -815,6 +821,15 @@ impl WaddyGui {
             (Waddy::new(), true)
         };
 
+        if !is_changed {
+            // this only happens when we open a wad on disk rather than a new wad or bsp
+            self.persistent_storage
+                .lock()
+                .unwrap()
+                .push_waddy_recent_wads(path.unwrap().to_str().unwrap())
+                .expect(PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR);
+        }
+
         let texture_tiles = waddy
             .wad()
             .entries
@@ -890,6 +905,8 @@ impl WaddyGui {
 
                 ui.close_menu();
             }
+
+            self.open_recent_menu_button(ui);
 
             ui.separator();
 
@@ -972,6 +989,12 @@ impl WaddyGui {
 
     fn menu_save(&mut self, instance_index: usize) {
         if let Some(path) = &self.instances[instance_index].path {
+            self.persistent_storage
+                .lock()
+                .unwrap()
+                .push_waddy_recent_wads(path.to_str().unwrap())
+                .expect(PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR);
+
             // TODO TOAST TOAST
             if let Err(err) = self.instances[instance_index]
                 .waddy
@@ -997,6 +1020,12 @@ impl WaddyGui {
             })
             .save_file()
         {
+            self.persistent_storage
+                .lock()
+                .unwrap()
+                .push_waddy_recent_wads(path.to_str().unwrap())
+                .expect(PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR);
+
             // TODO TOAST TOAST
             if let Err(err) = self.instances[instance_index]
                 .waddy
@@ -1026,6 +1055,8 @@ impl WaddyGui {
 
                 ui.close_menu();
             }
+
+            self.open_recent_menu_button(ui);
         });
 
         ui.separator();
@@ -1054,6 +1085,50 @@ impl WaddyGui {
                 }
             }
         }
+    }
+
+    fn open_recent_menu_button(&mut self, ui: &mut egui::Ui) {
+        ui.menu_button("Open Recent", |ui| {
+            let mutex = self.persistent_storage.clone();
+            let persistent_storage = mutex.lock().unwrap();
+            let recent_wads = persistent_storage.get_waddy_recent_wads();
+
+            let to_remove = if recent_wads.is_none() || recent_wads.unwrap().is_empty() {
+                ui.add_enabled(false, egui::Button::new("No recently opened"));
+
+                None
+            } else {
+                let recent_wads = recent_wads.unwrap().to_owned();
+
+                // start_waddy_instance will block until it has persistent_storage guard
+                drop(persistent_storage);
+
+                recent_wads.into_iter().find(|recent_wad| {
+                    if ui.button(recent_wad.as_str()).clicked() {
+                        let path = Path::new(recent_wad.as_str());
+
+                        if path.exists() {
+                            self.start_waddy_instance(ui, Some(Path::new(recent_wad.as_str())))
+                                .expect("cannot start a Waddy instance");
+
+                            ui.close_menu();
+                        } else {
+                            return true;
+                        }
+                    }
+
+                    false
+                })
+            };
+
+            if let Some(to_remove) = to_remove {
+                mutex
+                    .lock()
+                    .unwrap()
+                    .remove_waddy_recent_wads(&to_remove)
+                    .expect(PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR);
+            }
+        });
     }
 }
 

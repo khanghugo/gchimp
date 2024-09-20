@@ -1,4 +1,7 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+};
 
 use eframe::{egui, Theme};
 use egui_tiles::Tree;
@@ -7,6 +10,7 @@ use utils::preview_file_being_dropped;
 use crate::{
     config::{parse_config, parse_config_from_file, Config},
     err,
+    persistent_storage::PersistentStorage,
 };
 
 use self::{
@@ -58,12 +62,15 @@ pub fn gui() -> eyre::Result<()> {
         }
     }
 
+    let persistent_storage = PersistentStorage::start()?;
+    let persistent_storage = Arc::new(Mutex::new(persistent_storage));
+
     let gui_res = eframe::run_native(
         "gchimp",
         options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::new(MyApp::new(config_res)))
+            Ok(Box::new(MyApp::new(config_res, persistent_storage)))
         }),
     );
 
@@ -76,6 +83,8 @@ pub fn gui() -> eyre::Result<()> {
 struct MyApp {
     tree: Option<Tree<Pane>>,
     _no_config_status: String,
+    // duplicated because create_tree should have been a struct method
+    persistent_storage: Arc<Mutex<PersistentStorage>>,
 }
 
 impl eframe::App for MyApp {
@@ -113,17 +122,22 @@ impl eframe::App for MyApp {
 }
 
 impl MyApp {
-    pub fn new(config_res: eyre::Result<Config>) -> Self {
+    pub fn new(
+        config_res: eyre::Result<Config>,
+        persistent_storage: Arc<Mutex<PersistentStorage>>,
+    ) -> Self {
         if let Err(err) = config_res {
             return Self {
                 tree: None,
                 _no_config_status: format!("Error with parsing config.toml: {}", err),
+                persistent_storage,
             };
         }
 
         Self {
-            tree: Some(create_tree(config_res.unwrap())),
+            tree: Some(create_tree(config_res.unwrap(), persistent_storage.clone())),
             _no_config_status: "".to_string(),
+            persistent_storage,
         }
     }
 
@@ -132,7 +146,7 @@ impl MyApp {
 
         match config {
             Err(err) => self._no_config_status = err.to_string(),
-            Ok(config) => self.tree = Some(create_tree(config)),
+            Ok(config) => self.tree = Some(create_tree(config, self.persistent_storage.clone())),
         }
     }
 }

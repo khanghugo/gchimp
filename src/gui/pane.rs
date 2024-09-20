@@ -1,6 +1,8 @@
+use std::sync::{Arc, Mutex};
+
 use eframe::egui::{self, vec2, Sense, Stroke, TextStyle, Vec2};
 
-use crate::config::Config;
+use crate::{config::Config, persistent_storage::PersistentStorage};
 
 use super::{
     programs::{
@@ -46,14 +48,19 @@ impl Pane {
     }
 }
 
-pub fn create_tree(app_config: Config) -> egui_tiles::Tree<Pane> {
+pub fn create_tree(
+    app_config: Config,
+    persistent_storage: Arc<Mutex<PersistentStorage>>,
+) -> egui_tiles::Tree<Pane> {
     let mut tiles = egui_tiles::Tiles::default();
 
     let tabs = vec![
+        // TODO maybe no need to clone config?
+        // config is readonly so there should be a way with it
         tiles.insert_pane(Pane::S2G(S2GGui::new(app_config.clone()))),
         tiles.insert_pane(Pane::SkyMod(SkyModGui::new(app_config.clone()))),
         tiles.insert_pane(Pane::TexTile(TexTileGui::default())),
-        tiles.insert_pane(Pane::Waddy(WaddyGui::default())),
+        tiles.insert_pane(Pane::Waddy(WaddyGui::new(persistent_storage))),
         tiles.insert_pane(Pane::Map2Prop(Map2MdlGui::new(app_config.clone()))),
         tiles.insert_pane(Pane::DemDoc(DemDoc::default())),
         tiles.insert_pane(Pane::Blbh(BLBHGui::new(app_config.clone()))),

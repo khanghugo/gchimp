@@ -2,6 +2,8 @@ mod cli;
 mod config;
 mod entity;
 mod gui;
+mod persistent_storage;
+
 pub mod modules;
 pub mod utils;
 
