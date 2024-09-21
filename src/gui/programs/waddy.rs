@@ -551,7 +551,7 @@ impl WaddyGui {
                     // split into two steps because of rust
                     let filtered_tiles = (0..count)
                         .filter(|&texture_tile| {
-                            if is_search_enabled && !search_text.is_empty() {
+                            if is_search_enabled {
                                 self.instances[instance_index].texture_tiles[texture_tile]
                                     .name
                                     .to_lowercase()
