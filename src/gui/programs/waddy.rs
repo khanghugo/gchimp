@@ -542,11 +542,7 @@ impl WaddyGui {
                     let count = self.instances[instance_index].texture_tiles.len();
                     let is_search_enabled = self.instances[instance_index].search.enable;
 
-                    let search_text = if is_search_enabled {
-                        self.instances[instance_index].search.text.to_lowercase()
-                    } else {
-                        String::new()
-                    };
+                    let search_text = self.instances[instance_index].search.text.to_lowercase();
 
                     // split into two steps because of rust
                     let filtered_tiles = (0..count)
