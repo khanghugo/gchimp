@@ -529,51 +529,60 @@ impl WaddyGui {
     }
 
     fn texture_grid(&mut self, ui: &mut Ui, instance_index: usize) {
+        let tile_count = self.instances[instance_index].texture_tiles.len();
+
         let image_tile_size =
             BASE_IMAGE_TILE_SIZE * ui.ctx().options(|options| options.zoom_factor);
         let texture_per_row = ((ui.min_size().x / image_tile_size).floor() as usize).max(4);
+        let row_height = 2. // margin
+            + 18. * 2. // 2 labels
+            + image_tile_size;
 
-        ScrollArea::vertical().drag_to_scroll(false).show(ui, |ui| {
-            egui::Grid::new("waddy_grid")
-                .num_columns(texture_per_row)
-                .spacing([2., 2.])
-                .show(ui, |ui| {
-                    // TODO cleverly avoid rendering all tiles with basic math
-                    let count = self.instances[instance_index].texture_tiles.len();
-                    let is_search_enabled = self.instances[instance_index].search.enable;
+        let is_search_enabled = self.instances[instance_index].search.enable;
+        let search_text = self.instances[instance_index].search.text.to_lowercase();
+        let filtered_tiles = (0..tile_count)
+            .filter(|&texture_tile| {
+                if is_search_enabled {
+                    self.instances[instance_index].texture_tiles[texture_tile]
+                        .name
+                        .to_lowercase()
+                        .contains(search_text.as_str())
+                } else {
+                    true
+                }
+            })
+            .collect::<Vec<usize>>();
 
-                    let search_text = self.instances[instance_index].search.text.to_lowercase();
+        let total_rows = filtered_tiles.len().div_ceil(texture_per_row);
 
-                    // split into two steps because of rust
-                    let filtered_tiles = (0..count)
-                        .filter(|&texture_tile| {
-                            if is_search_enabled {
-                                self.instances[instance_index].texture_tiles[texture_tile]
-                                    .name
-                                    .to_lowercase()
-                                    .contains(search_text.as_str())
-                            } else {
-                                true
-                            }
-                        })
-                        .collect::<Vec<usize>>();
-
-                    filtered_tiles.into_iter().enumerate().for_each(
-                        |(filtered_index, texture_tile_index)| {
-                            if filtered_index % texture_per_row == 0 && filtered_index != 0 {
-                                ui.end_row()
-                            }
-
-                            self.texture_tile(
-                                ui,
-                                instance_index,
-                                texture_tile_index,
-                                image_tile_size,
-                            );
-                        },
-                    );
+        ScrollArea::vertical().drag_to_scroll(false).show_rows(
+            ui,
+            row_height,
+            total_rows,
+            |ui, row_range| {
+                // each row is one grid of grids
+                row_range.for_each(|row| {
+                    egui::Grid::new(format!("waddy_grid_row{}", row))
+                        .num_columns(texture_per_row)
+                        .spacing([2., 2.])
+                        .show(ui, |ui| {
+                            filtered_tiles
+                                .chunks(texture_per_row)
+                                .nth(row)
+                                .expect("invalid row")
+                                .iter()
+                                .for_each(|&texture_tile_index| {
+                                    self.texture_tile(
+                                        ui,
+                                        instance_index,
+                                        texture_tile_index,
+                                        image_tile_size,
+                                    );
+                                });
+                        });
                 });
-        });
+            },
+        );
     }
 
     // gui when there's WAD loaded
