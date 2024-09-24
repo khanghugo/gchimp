@@ -28,9 +28,7 @@ Usually it would just work out of the box. If there is any problem, try starting
 
 ### Planned features
 
-- [x] A functional enough Wally to edit WAD files 
-- [x] Texture filters such as tiling because tiling is nice to preserve overall detail for highly scaled texture
-- [x] [map2prop](https://erty-gamedev.github.io/Docs-Map2Prop/) clone that hopefully goes open source before the original project
+- [ ] Radiosity compiler. This will take a while.
 
 ## Building
 
