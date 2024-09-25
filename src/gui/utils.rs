@@ -158,13 +158,22 @@ pub fn display_text_in_viewport(ctx: &Context, s: impl Into<String>) -> bool {
 
 #[derive(Clone)]
 pub struct WadImage {
+    name: String,
+    dimensions: (u32, u32),
     texture: egui::TextureHandle,
 }
 
 impl WadImage {
-    pub fn new(handle: &egui::TextureHandle) -> Self {
+    #[allow(dead_code)]
+    pub fn new(
+        handle: &egui::TextureHandle,
+        name: impl AsRef<str> + Into<String>,
+        dimensions: (u32, u32),
+    ) -> Self {
         Self {
             texture: handle.clone(),
+            name: name.into(),
+            dimensions,
         }
     }
 
@@ -181,15 +190,31 @@ impl WadImage {
             .collect::<Vec<u8>>();
         // Load the texture only once.
         let handle = ui.ctx().load_texture(
-            name,
+            name.as_ref(),
             egui::ColorImage::from_rgb([dimensions.0 as usize, dimensions.1 as usize], &image),
             Default::default(),
         );
 
-        Self { texture: handle }
+        Self {
+            texture: handle,
+            name: name.into().to_owned(),
+            dimensions,
+        }
     }
 
     pub fn texture(&self) -> &egui::TextureHandle {
         &self.texture
+    }
+
+    pub fn dimensions(&self) -> (u32, u32) {
+        self.dimensions
+    }
+
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn name_mut(&mut self) -> &mut String {
+        &mut self.name
     }
 }

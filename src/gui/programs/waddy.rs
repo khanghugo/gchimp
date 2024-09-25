@@ -60,34 +60,38 @@ impl Default for SearchBar {
     }
 }
 
-struct LoadedImage {
-    image: WadImage,
-}
-
 struct TextureTile {
     index: usize,
-    name: String,
-    image: LoadedImage,
-    dimensions: (u32, u32),
+    wad_image: WadImage,
     in_rename: bool,
     prev_name: String,
 }
 
 impl TextureTile {
-    fn new(
-        index: usize,
-        name: impl AsRef<str> + Into<String>,
-        image: LoadedImage,
-        dimensions: (u32, u32),
-    ) -> Self {
+    fn new(index: usize, wad_image: WadImage) -> Self {
         Self {
             index,
-            name: name.into(),
-            image,
-            dimensions,
+            wad_image,
             in_rename: false,
             prev_name: String::new(),
         }
+    }
+
+    fn name(&self) -> &String {
+        self.wad_image.name()
+    }
+
+    fn name_mut(&mut self) -> &mut String {
+        self.wad_image.name_mut()
+    }
+
+    fn dimensions(&self) -> (u32, u32) {
+        self.wad_image.dimensions()
+    }
+
+    #[allow(dead_code)]
+    fn texture(&self) -> &egui::TextureHandle {
+        self.wad_image.texture()
     }
 }
 
@@ -119,7 +123,7 @@ impl WaddyGui {
         let current_id = egui::Id::new(format!(
             "{}{}",
             self.instances[instance_index].texture_tiles[texture_tile_index].index,
-            self.instances[instance_index].texture_tiles[texture_tile_index].name
+            self.instances[instance_index].texture_tiles[texture_tile_index].name()
         ));
 
         let is_selected = self.instances[instance_index]
@@ -140,8 +144,7 @@ impl WaddyGui {
             })
             .show(ui, |ui| {
                 let texture = self.instances[instance_index].texture_tiles[texture_tile_index]
-                    .image
-                    .image
+                    .wad_image
                     .texture();
                 let dimensions = if self.fit_texture {
                     let dimensions = texture.size_vec2();
@@ -168,14 +171,14 @@ impl WaddyGui {
                     // if clicked then copy the name of the texture
                     if ui
                         .add(
-                            egui::Label::new(&current_tile.name)
+                            egui::Label::new(current_tile.name())
                                 .selectable(false)
                                 .sense(Sense::click()),
                         )
                         .on_hover_text("Click to copy name")
                         .clicked()
                     {
-                        ui.output_mut(|o| o.copied_text = current_tile.name.to_string());
+                        ui.output_mut(|o| o.copied_text = current_tile.name().to_string());
                         ui.close_menu();
                     }
 
@@ -183,7 +186,7 @@ impl WaddyGui {
 
                     if ui.button("View").clicked() {
                         self.extra_image_viewports
-                            .push(WadImage::new(current_tile.image.image.texture()));
+                            .push(current_tile.wad_image.clone());
                         ui.close_menu();
                     }
 
@@ -193,7 +196,9 @@ impl WaddyGui {
                         current_tile.in_rename = true;
                         context_menu_clicked = true;
 
-                        current_tile.prev_name.clone_from(&current_tile.name);
+                        current_tile
+                            .prev_name
+                            .clone_from(&current_tile.name().clone());
                         ui.close_menu();
                     }
 
@@ -202,9 +207,9 @@ impl WaddyGui {
                         if ui.button("Export").clicked() {
                             if let Some(path) = rfd::FileDialog::new()
                                 .set_file_name(
-                                    &self.instances[instance_index].texture_tiles
+                                    self.instances[instance_index].texture_tiles
                                         [texture_tile_index]
-                                        .name,
+                                        .name(),
                                 )
                                 .add_filter("All Files", &["bmp"])
                                 .save_file()
@@ -240,7 +245,7 @@ impl WaddyGui {
                                         let current_tile = &self.instances[instance_index]
                                             .texture_tiles[texture_tile_index];
 
-                                        let texture_file_name = &current_tile.name;
+                                        let texture_file_name = &current_tile.name();
 
                                         // tODO TOAST
                                         if let Err(err) = self.instances[instance_index]
@@ -437,12 +442,11 @@ impl WaddyGui {
 
                 // middle click wound bring a new viewport
                 if clickable_image.middle_clicked() {
-                    self.extra_image_viewports.push(WadImage::new(
+                    self.extra_image_viewports.push(
                         self.instances[instance_index].texture_tiles[texture_tile_index]
-                            .image
-                            .image
-                            .texture(),
-                    ));
+                            .wad_image
+                            .clone(),
+                    );
                 };
 
                 ui.end_row();
@@ -450,8 +454,8 @@ impl WaddyGui {
                 if self.instances[instance_index].texture_tiles[texture_tile_index].in_rename {
                     let widget = ui.add(
                         egui::TextEdit::singleline(
-                            &mut self.instances[instance_index].texture_tiles[texture_tile_index]
-                                .name,
+                            self.instances[instance_index].texture_tiles[texture_tile_index]
+                                .name_mut(),
                         )
                         .font(egui::TextStyle::Small),
                     );
@@ -466,8 +470,10 @@ impl WaddyGui {
                         let current_tile =
                             &mut self.instances[instance_index].texture_tiles[texture_tile_index];
 
+                        let prev_name = current_tile.prev_name.clone();
+
                         current_tile.in_rename = false;
-                        current_tile.name.clone_from(&current_tile.prev_name);
+                        current_tile.name_mut().clone_from(&prev_name);
                     } else if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
                         let current_instance = &mut self.instances[instance_index];
                         let current_tile = &mut current_instance.texture_tiles[texture_tile_index];
@@ -477,16 +483,20 @@ impl WaddyGui {
 
                         if let Err(err) = current_instance
                             .waddy
-                            .rename_texture(texture_tile_index, current_tile.name.clone())
+                            .rename_texture(texture_tile_index, current_tile.name().clone())
                         {
                             // TODO learn how to do toast
                             println!("{:?}", err);
 
-                            current_tile.name.clone_from(&current_tile.prev_name);
-                        } else if current_tile.name.len() >= 16 {
+                            let prev_name = current_tile.prev_name.clone();
+
+                            current_tile.name_mut().clone_from(&prev_name);
+                        } else if current_tile.name().len() >= 16 {
                             println!("Texture name is too long");
 
-                            current_tile.name.clone_from(&current_tile.prev_name);
+                            let prev_name = current_tile.prev_name.clone();
+
+                            current_tile.name_mut().clone_from(&prev_name);
                         } else {
                             // this means things are good
                             self.instances[instance_index].is_changed = true;
@@ -498,11 +508,13 @@ impl WaddyGui {
 
                     // beside the context menu, double click on the name would also enter rename mode
                     if ui
-                        .label(custom_font(current_tile.name.clone()))
+                        .label(custom_font(current_tile.name().clone()))
                         .double_clicked()
                     {
                         current_tile.in_rename = true;
-                        current_tile.prev_name.clone_from(&current_tile.name);
+                        current_tile
+                            .prev_name
+                            .clone_from(&current_tile.name().clone());
                     };
                 }
 
@@ -510,10 +522,10 @@ impl WaddyGui {
                 ui.label(custom_font(format!(
                     "{}x{}",
                     self.instances[instance_index].texture_tiles[texture_tile_index]
-                        .dimensions
+                        .dimensions()
                         .0,
                     self.instances[instance_index].texture_tiles[texture_tile_index]
-                        .dimensions
+                        .dimensions()
                         .1
                 )));
             });
@@ -544,7 +556,7 @@ impl WaddyGui {
             .filter(|&texture_tile| {
                 if is_search_enabled {
                     self.instances[instance_index].texture_tiles[texture_tile]
-                        .name
+                        .name()
                         .to_lowercase()
                         .contains(search_text.as_str())
                 } else {
@@ -833,12 +845,7 @@ impl WaddyGui {
 
         self.instances[instance_index]
             .texture_tiles
-            .push(TextureTile::new(
-                instance_index,
-                texture_name,
-                LoadedImage { image: wad_image },
-                dimensions,
-            ));
+            .push(TextureTile::new(instance_index, wad_image));
 
         self.instances[instance_index].is_changed = true;
     }
@@ -876,7 +883,7 @@ impl WaddyGui {
             .enumerate()
             .filter_map(|(index, entry)| {
                 if let FileEntry::MipTex(miptex) = &entry.file_entry {
-                    let loaded_image = WadImage::from_wad_image(
+                    let wad_image = WadImage::from_wad_image(
                         ui,
                         entry.directory_entry.texture_name.get_string(),
                         miptex.mip_images[0].data.get_bytes(),
@@ -884,14 +891,7 @@ impl WaddyGui {
                         (miptex.width, miptex.height),
                     );
 
-                    return Some(TextureTile::new(
-                        index,
-                        waddy.wad().entries[index].texture_name(),
-                        LoadedImage {
-                            image: loaded_image,
-                        },
-                        waddy.wad().entries[index].file_entry.dimensions(),
-                    ));
+                    return Some(TextureTile::new(index, wad_image));
                     // None
                 }
 
