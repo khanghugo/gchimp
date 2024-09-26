@@ -10,7 +10,7 @@ impl VtfImageImpl for Dxt5 {
         let (width, height) = dimensions;
 
         let bit_count = width * height * 8; // 8 bpp
-        let byte_count = bit_count / 8;
+        let byte_count = (bit_count).div_ceil(8);
 
         // smaller mipmap sizes such as 1x1 or 2x2 still take full 128 bits
         let byte_count = byte_count.max(16);

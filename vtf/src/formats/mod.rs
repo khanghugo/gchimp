@@ -1,10 +1,12 @@
 use dxt::{Dxt1, Dxt5};
 use image::DynamicImage;
 use nom::{combinator::fail, error::context};
+use rgb8::{bgr888::Bgr888, rgb888::Rgb888};
 
 use crate::{IResult, ImageData};
 
 pub mod dxt;
+pub mod rgb8;
 
 mod utils;
 
@@ -103,8 +105,8 @@ impl VtfImage {
             VtfImageFormat::None => not_supported(i),
             VtfImageFormat::Rgba8888 => not_supported(i),
             VtfImageFormat::Abgr8888 => not_supported(i),
-            VtfImageFormat::Rgb888 => not_supported(i),
-            VtfImageFormat::Bgr888 => not_supported(i),
+            VtfImageFormat::Rgb888 => Rgb888::parse(i, dimensions),
+            VtfImageFormat::Bgr888 => Bgr888::parse(i, dimensions),
             VtfImageFormat::Rgb565 => not_supported(i),
             VtfImageFormat::I8 => not_supported(i),
             VtfImageFormat::Ia88 => not_supported(i),
@@ -128,7 +130,8 @@ impl VtfImage {
             VtfImageFormat::Rgba16161616f => not_supported(i),
             VtfImageFormat::Rgba16161616 => not_supported(i),
             VtfImageFormat::Uvlx8888 => not_supported(i),
-        }?;
+        }
+        .unwrap();
 
         Ok((
             i,
@@ -145,8 +148,8 @@ impl VtfImage {
             VtfImageFormat::None => todo!(),
             VtfImageFormat::Rgba8888 => todo!(),
             VtfImageFormat::Abgr8888 => todo!(),
-            VtfImageFormat::Rgb888 => todo!(),
-            VtfImageFormat::Bgr888 => todo!(),
+            VtfImageFormat::Rgb888 => Rgb888::to_image(&self.bytes, self.dimensions),
+            VtfImageFormat::Bgr888 => Bgr888::to_image(&self.bytes, self.dimensions),
             VtfImageFormat::Rgb565 => todo!(),
             VtfImageFormat::I8 => todo!(),
             VtfImageFormat::Ia88 => todo!(),
