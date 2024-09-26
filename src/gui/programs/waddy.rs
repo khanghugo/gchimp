@@ -111,6 +111,259 @@ impl WaddyGui {
         }
     }
 
+    // returns true if any context menu button is clicked
+    fn texture_tile_context_menu(&mut self, ui: &mut Ui, instance_index: usize) -> bool {
+        let mut context_menu_clicked = false;
+
+        // if a tile is selected, then we will do everything over that tile
+        // a tile is always guaranteed to be selected prior to this method
+        // if there's a lot of tiles selected then hide some options
+        let is_multiple_tiles_selected = self.instances[instance_index].selected.len() > 1;
+
+        // selected[0] will always hold because before this method call, we add to selected
+        let effective_tile_index = self.instances[instance_index].selected[0];
+        let effective_tile =
+            &mut self.instances[instance_index].texture_tiles[effective_tile_index];
+
+        // if there is ONE selected tile, then have everything from that tile instead
+        // if clicked then copy the name of the texture
+
+        if !is_multiple_tiles_selected {
+            if ui
+                .add(
+                    egui::Label::new(effective_tile.name())
+                        .selectable(false)
+                        .sense(Sense::click()),
+                )
+                .on_hover_text("Click to copy name")
+                .clicked()
+            {
+                ui.output_mut(|o| o.copied_text = effective_tile.name().to_string());
+                ui.close_menu();
+            }
+
+            ui.separator();
+
+            if ui.button("View").clicked() {
+                self.extra_image_viewports
+                    .push(effective_tile.wad_image.clone());
+                ui.close_menu();
+            }
+
+            ui.separator();
+
+            if ui.button("Rename").clicked() {
+                effective_tile.in_rename = true;
+                context_menu_clicked = true;
+
+                effective_tile
+                    .prev_name
+                    .clone_from(&effective_tile.name().clone());
+                ui.close_menu();
+            }
+        }
+
+        // export when there's lots of selected or not
+        if !is_multiple_tiles_selected {
+            if ui.button("Export").clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .set_file_name(effective_tile.name())
+                    .add_filter("All Files", &["bmp"])
+                    .save_file()
+                {
+                    // tODO TOAST
+                    if let Err(err) = self.instances[instance_index]
+                        .waddy
+                        .dump_texture_to_file(effective_tile_index, path)
+                    {
+                        println!("{}", err);
+                    }
+                }
+
+                ui.close_menu();
+            }
+        } else {
+            // when lots of selected there will be option to deselect
+            if ui.button("Deselect all").clicked() {
+                self.instances[instance_index].selected.clear();
+                ui.close_menu();
+            }
+
+            if ui
+                .button(format!(
+                    "Export ({})",
+                    self.instances[instance_index].selected.len()
+                ))
+                .clicked()
+            {
+                if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                    self.instances[instance_index].selected.par_iter().for_each(
+                        |&texture_tile_index| {
+                            let current_tile =
+                                &self.instances[instance_index].texture_tiles[texture_tile_index];
+
+                            let texture_file_name = &current_tile.name();
+
+                            // tODO TOAST
+                            if let Err(err) =
+                                self.instances[instance_index].waddy.dump_texture_to_file(
+                                    texture_tile_index,
+                                    path.join(texture_file_name),
+                                )
+                            {
+                                println!("{}", err);
+                            };
+                        },
+                    );
+                }
+
+                ui.close_menu();
+            }
+        }
+
+        // "copy to" would copy the textures(s) to other instances
+        // or texture (singular) to the clipboard
+        ui.separator();
+        ui.menu_button("Copy to", |ui| {
+            if ui.button("Clipboard").clicked() {
+                let image =
+                    &self.instances[instance_index].waddy.wad().entries[effective_tile_index];
+
+                let is_transparent = self.instances[instance_index].waddy.wad().entries
+                    [effective_tile_index]
+                    .directory_entry
+                    .texture_name
+                    .get_string()
+                    .starts_with("{");
+
+                if let Ok(mut clipboard) = Clipboard::new() {
+                    clipboard
+                        .set_image(arboard::ImageData {
+                            width: image.file_entry.dimensions().0 as usize,
+                            height: image.file_entry.dimensions().1 as usize,
+                            bytes: image
+                                .file_entry
+                                .image()
+                                .iter()
+                                .flat_map(|&color_idx| {
+                                    let [r, g, b] = image.file_entry.palette()[color_idx as usize];
+
+                                    if color_idx == 255 && is_transparent {
+                                        [r, g, b, 0]
+                                    } else {
+                                        [r, g, b, 255]
+                                    }
+                                })
+                                .collect::<Vec<u8>>()
+                                .into(),
+                        })
+                        .unwrap();
+                }
+
+                ui.close_menu();
+            }
+
+            // very fucky rust borrow checker shit so it is like this way
+            let instance_to_add_idx = self
+                .instances
+                .iter()
+                .enumerate()
+                .filter(|(idx, _)| *idx != instance_index)
+                .fold(None, |acc, (idx, instance)| {
+                    if ui
+                        .button(
+                            instance
+                                .path
+                                .as_ref()
+                                .unwrap()
+                                .file_name()
+                                .unwrap()
+                                .to_str()
+                                .unwrap(),
+                        )
+                        .clicked()
+                    {
+                        ui.close_menu();
+                        Some(idx)
+                    } else {
+                        acc
+                    }
+                });
+
+            if let Some(instance_to_add_idx) = instance_to_add_idx {
+                let to_add = if self.instances[instance_index].selected.is_empty() {
+                    vec![
+                        self.instances[instance_index].waddy.wad().entries[effective_tile_index]
+                            .clone(),
+                    ]
+                } else {
+                    self.instances[instance_index]
+                        .selected
+                        .iter()
+                        .map(|&tile_idx| {
+                            self.instances[instance_index].waddy.wad().entries[tile_idx].clone()
+                        })
+                        .collect()
+                };
+
+                // manually add seems very sad
+                to_add.into_iter().for_each(|new_entry| {
+                    self.instances[instance_to_add_idx]
+                        .waddy
+                        .wad_mut()
+                        .entries
+                        .push(new_entry);
+
+                    // update num_dirs
+                    // TODO don't do this and have the writer write the numbers for us
+                    self.instances[instance_to_add_idx]
+                        .waddy
+                        .wad_mut()
+                        .header
+                        .num_dirs += 1;
+
+                    self.update_after_add_image(ui, instance_to_add_idx);
+                });
+            }
+        });
+
+        ui.separator();
+
+        // delete when lots of selected or not
+        if !is_multiple_tiles_selected {
+            if ui.button("Delete").clicked() {
+                self.instances[instance_index]
+                    .to_delete
+                    .push(effective_tile_index);
+
+                ui.close_menu();
+            }
+        } else if ui
+            .button(format!(
+                "Delete ({})",
+                self.instances[instance_index].selected.len()
+            ))
+            .clicked()
+        {
+            let mut to_deletes = self.instances[instance_index].selected.clone();
+            self.instances[instance_index]
+                .to_delete
+                .append(&mut to_deletes);
+
+            ui.close_menu()
+        }
+
+        context_menu_clicked
+    }
+
+    // highlight 1 tile based on some actions and clear all of selected for that instance
+    fn select_texture_tile(&mut self, instance_index: usize, texture_tile_index: usize) {
+        self.instances[instance_index].selected.clear();
+        self.instances[instance_index]
+            .selected
+            .push(texture_tile_index);
+    }
+
     /// Returns index of texture to delete
     fn texture_tile(
         &mut self,
@@ -162,241 +415,17 @@ impl WaddyGui {
                         .selected(false),
                 );
 
+                // TODO make this context menu only once instead of doing for every tiles
+                // that means we might have to do something about the behavior of not clicking on any tiles
                 let mut context_menu_clicked = false;
 
                 clickable_image.context_menu(|ui| {
-                    let current_tile =
-                        &mut self.instances[instance_index].texture_tiles[texture_tile_index];
-
-                    // if clicked then copy the name of the texture
-                    if ui
-                        .add(
-                            egui::Label::new(current_tile.name())
-                                .selectable(false)
-                                .sense(Sense::click()),
-                        )
-                        .on_hover_text("Click to copy name")
-                        .clicked()
-                    {
-                        ui.output_mut(|o| o.copied_text = current_tile.name().to_string());
-                        ui.close_menu();
+                    // select tile if right click and there is only 1 selected tile
+                    if self.instances[instance_index].selected.len() <= 1 {
+                        self.select_texture_tile(instance_index, texture_tile_index);
                     }
 
-                    ui.separator();
-
-                    if ui.button("View").clicked() {
-                        self.extra_image_viewports
-                            .push(current_tile.wad_image.clone());
-                        ui.close_menu();
-                    }
-
-                    ui.separator();
-
-                    if ui.button("Rename").clicked() {
-                        current_tile.in_rename = true;
-                        context_menu_clicked = true;
-
-                        current_tile
-                            .prev_name
-                            .clone_from(&current_tile.name().clone());
-                        ui.close_menu();
-                    }
-
-                    // export when there's lots of selected or not
-                    if self.instances[instance_index].selected.is_empty() {
-                        if ui.button("Export").clicked() {
-                            if let Some(path) = rfd::FileDialog::new()
-                                .set_file_name(
-                                    self.instances[instance_index].texture_tiles
-                                        [texture_tile_index]
-                                        .name(),
-                                )
-                                .add_filter("All Files", &["bmp"])
-                                .save_file()
-                            {
-                                // tODO TOAST
-                                if let Err(err) = self.instances[instance_index]
-                                    .waddy
-                                    .dump_texture_to_file(texture_tile_index, path)
-                                {
-                                    println!("{}", err);
-                                }
-                            }
-
-                            ui.close_menu();
-                        }
-                    } else {
-                        // when lots of selected there will be option to deselect
-                        if ui.button("Deselect all").clicked() {
-                            self.instances[instance_index].selected.clear();
-                            ui.close_menu();
-                        }
-
-                        if ui
-                            .button(format!(
-                                "Export ({})",
-                                self.instances[instance_index].selected.len()
-                            ))
-                            .clicked()
-                        {
-                            if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                self.instances[instance_index].selected.par_iter().for_each(
-                                    |&texture_tile_index| {
-                                        let current_tile = &self.instances[instance_index]
-                                            .texture_tiles[texture_tile_index];
-
-                                        let texture_file_name = &current_tile.name();
-
-                                        // tODO TOAST
-                                        if let Err(err) = self.instances[instance_index]
-                                            .waddy
-                                            .dump_texture_to_file(
-                                                texture_tile_index,
-                                                path.join(texture_file_name),
-                                            )
-                                        {
-                                            println!("{}", err);
-                                        };
-                                    },
-                                );
-                            }
-
-                            ui.close_menu();
-                        }
-                    }
-
-                    // "copy to" would copy the textures(s) to other instances
-                    // or texture (singular) to the clipboard
-                    ui.separator();
-                    ui.menu_button("Copy to", |ui| {
-                        if ui.button("Clipboard").clicked() {
-                            let image = &self.instances[instance_index].waddy.wad().entries
-                                [texture_tile_index];
-
-                            let is_transparent = self.instances[instance_index].waddy.wad().entries
-                                [texture_tile_index]
-                                .directory_entry
-                                .texture_name
-                                .get_string()
-                                .starts_with("{");
-
-                            if let Ok(mut clipboard) = Clipboard::new() {
-                                clipboard
-                                    .set_image(arboard::ImageData {
-                                        width: image.file_entry.dimensions().0 as usize,
-                                        height: image.file_entry.dimensions().1 as usize,
-                                        bytes: image
-                                            .file_entry
-                                            .image()
-                                            .iter()
-                                            .flat_map(|&color_idx| {
-                                                let [r, g, b] =
-                                                    image.file_entry.palette()[color_idx as usize];
-
-                                                if color_idx == 255 && is_transparent {
-                                                    [r, g, b, 0]
-                                                } else {
-                                                    [r, g, b, 255]
-                                                }
-                                            })
-                                            .collect::<Vec<u8>>()
-                                            .into(),
-                                    })
-                                    .unwrap();
-                            }
-
-                            ui.close_menu();
-                        }
-
-                        // very fucky rust borrow checker shit so it is like this way
-                        let instance_to_add_idx = self
-                            .instances
-                            .iter()
-                            .enumerate()
-                            .filter(|(idx, _)| *idx != instance_index)
-                            .fold(None, |acc, (idx, instance)| {
-                                if ui
-                                    .button(
-                                        instance
-                                            .path
-                                            .as_ref()
-                                            .unwrap()
-                                            .file_name()
-                                            .unwrap()
-                                            .to_str()
-                                            .unwrap(),
-                                    )
-                                    .clicked()
-                                {
-                                    ui.close_menu();
-                                    Some(idx)
-                                } else {
-                                    acc
-                                }
-                            });
-
-                        if let Some(instance_to_add_idx) = instance_to_add_idx {
-                            let to_add = if self.instances[instance_index].selected.is_empty() {
-                                vec![self.instances[instance_index].waddy.wad().entries
-                                    [texture_tile_index]
-                                    .clone()]
-                            } else {
-                                self.instances[instance_index]
-                                    .selected
-                                    .iter()
-                                    .map(|&tile_idx| {
-                                        self.instances[instance_index].waddy.wad().entries[tile_idx]
-                                            .clone()
-                                    })
-                                    .collect()
-                            };
-
-                            // manually add seems very sad
-                            to_add.into_iter().for_each(|new_entry| {
-                                self.instances[instance_to_add_idx]
-                                    .waddy
-                                    .wad_mut()
-                                    .entries
-                                    .push(new_entry);
-
-                                // update num_dirs
-                                // TODO don't do this and have the writer write the numbers for us
-                                self.instances[instance_to_add_idx]
-                                    .waddy
-                                    .wad_mut()
-                                    .header
-                                    .num_dirs += 1;
-
-                                self.update_after_add_image(ui, instance_to_add_idx);
-                            });
-                        }
-                    });
-
-                    ui.separator();
-
-                    // delete when lots of selected or not
-                    if self.instances[instance_index].selected.is_empty() {
-                        if ui.button("Delete").clicked() {
-                            self.instances[instance_index]
-                                .to_delete
-                                .push(texture_tile_index);
-
-                            ui.close_menu();
-                        }
-                    } else if ui
-                        .button(format!(
-                            "Delete ({})",
-                            self.instances[instance_index].selected.len()
-                        ))
-                        .clicked()
-                    {
-                        let mut to_deletes = self.instances[instance_index].selected.clone();
-                        self.instances[instance_index]
-                            .to_delete
-                            .append(&mut to_deletes);
-
-                        ui.close_menu()
-                    }
+                    context_menu_clicked = self.texture_tile_context_menu(ui, instance_index);
                 });
 
                 // if left clicked, add to the list of selected
@@ -433,10 +462,7 @@ impl WaddyGui {
                                 .push(texture_tile_index);
                         }
                     } else {
-                        self.instances[instance_index].selected.clear();
-                        self.instances[instance_index]
-                            .selected
-                            .push(texture_tile_index);
+                        self.select_texture_tile(instance_index, texture_tile_index);
                     }
                 }
 
@@ -515,6 +541,8 @@ impl WaddyGui {
                         current_tile
                             .prev_name
                             .clone_from(&current_tile.name().clone());
+
+                        self.select_texture_tile(instance_index, texture_tile_index);
                     };
                 }
 
