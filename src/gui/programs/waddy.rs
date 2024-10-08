@@ -1054,6 +1054,9 @@ impl WaddyGui {
                             .waddy
                             .rename_texture(tile_idx, &new_name)
                             .expect("cannot rename texture");
+
+                        self.instances[instance_index].is_changed = true;
+                        ui.close_menu();
                     });
                 }
 
@@ -1068,6 +1071,9 @@ impl WaddyGui {
                             .waddy
                             .rename_texture(tile_idx, &new_name)
                             .expect("cannot rename texture");
+
+                        self.instances[instance_index].is_changed = true;
+                        ui.close_menu();
                     });
                 }
             });
