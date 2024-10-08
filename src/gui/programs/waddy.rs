@@ -1042,6 +1042,34 @@ impl WaddyGui {
                 if ui.checkbox(&mut self.fit_texture, "Fit texture").clicked() {
                     ui.close_menu();
                 }
+
+                if ui.button("To UPPERCASE").clicked() {
+                    (0..self.instances[instance_index].texture_tiles.len()).for_each(|tile_idx| {
+                        let tile_name =
+                            self.instances[instance_index].texture_tiles[tile_idx].name_mut();
+                        let new_name = tile_name.to_uppercase();
+
+                        tile_name.clone_from(&new_name);
+                        self.instances[instance_index]
+                            .waddy
+                            .rename_texture(tile_idx, &new_name)
+                            .expect("cannot rename texture");
+                    });
+                }
+
+                if ui.button("To lowercase").clicked() {
+                    (0..self.instances[instance_index].texture_tiles.len()).for_each(|tile_idx| {
+                        let tile_name =
+                            self.instances[instance_index].texture_tiles[tile_idx].name_mut();
+                        let new_name = tile_name.to_lowercase();
+
+                        tile_name.clone_from(&new_name);
+                        self.instances[instance_index]
+                            .waddy
+                            .rename_texture(tile_idx, &new_name)
+                            .expect("cannot rename texture");
+                    });
+                }
             });
 
             ui.separator();
