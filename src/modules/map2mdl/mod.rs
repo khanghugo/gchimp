@@ -552,11 +552,12 @@ impl Map2Mdl {
             return err!("Cannot pick up any WAD files.");
         }
 
+        // res is (original path, wad result)
         let wads_res = if !self.wads.is_empty() {
             self.wads
                 .iter()
-                .map(Wad::from_file)
-                .collect::<Vec<eyre::Result<Wad>>>()
+                .map(|path| (path.to_str().unwrap().to_owned(), Wad::from_file(path)))
+                .collect::<Vec<(String, eyre::Result<Wad>)>>()
         } else if valid_autopickup_wad {
             let hashset = if let Some(entity_entity) = &entity_entity {
                 &entity_entity.attributes
@@ -571,16 +572,18 @@ impl Map2Mdl {
             self.log(format!("Auto pickup WAD found: {}", wad).as_str());
 
             wad.split_terminator(";")
-                .map(Wad::from_file)
-                .collect::<Vec<eyre::Result<Wad>>>()
+                .map(|path_as_str| (path_as_str.to_owned(), Wad::from_file(path_as_str)))
+                .collect::<Vec<(String, eyre::Result<Wad>)>>()
         } else {
             unreachable!()
         };
 
         let err = wads_res
             .iter()
-            .filter_map(|res| res.as_ref().err())
-            .fold(String::new(), |acc, e| acc + e.to_string().as_ref() + "\n");
+            .filter_map(|(path, res)| res.as_ref().err().map(|e| (path, e)))
+            .fold(String::new(), |acc, (path, e)| {
+                acc + format!("cannot open {}: ", path).as_ref() + e.to_string().as_ref() + "\n"
+            });
 
         if !err.is_empty() {
             return err!("{}", err);
@@ -589,7 +592,7 @@ impl Map2Mdl {
         // now we create simple wad presentation because finding data is more annoying than making new data
         let wads = wads_res
             .iter()
-            .filter_map(|res| res.as_ref().ok())
+            .filter_map(|(_, res)| res.as_ref().ok())
             .collect::<Vec<&Wad>>();
 
         let simple_wads: SimpleWad = wads.as_slice().into();
