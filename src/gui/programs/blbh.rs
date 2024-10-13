@@ -22,6 +22,7 @@ pub struct BLBHGui {
     options: BLBHOptions,
     shrink_value: String,
     check_shrink_value: bool,
+    // origin: String,
     status: Arc<Mutex<String>>,
 }
 
@@ -34,6 +35,7 @@ impl BLBHGui {
             options: BLBHOptions::default(),
             shrink_value: BLBH_DEFAULT_UV_SHRINK_FACTOR.to_string(),
             check_shrink_value: false,
+            // origin: "0 0 0".to_string(),
             status: Arc::new(Mutex::new("Idle".to_string())),
         }
     }
@@ -51,6 +53,10 @@ impl BLBHGui {
         } = self.config.clone();
 
         let status = self.status.clone();
+
+        // options.origin = parse_triplet(&self.origin)
+        //     .map(|res| res.into())
+        //     .unwrap_or(DVec3::ZERO);
 
         "Running".clone_into(&mut status.lock().unwrap());
 
@@ -179,17 +185,24 @@ For best results, change this value by 1/512.",
             if ui.button("Default").clicked() {
                 self.shrink_value = BLBH_DEFAULT_UV_SHRINK_FACTOR.to_string()
             }
+
+            // origin
+            // ui.label("Origin");
+
+            // let text_editor = egui::TextEdit::singleline(&mut self.origin).desired_width(96.)   ;
+            // ui.add(text_editor)
+            //     .on_hover_text("Origin of the model. Space separated.");
         });
 
         ui.separator();
 
         if ui.button("Run").clicked() {
-            self.run()
+            self.run();
         }
 
         let binding = self.status.lock().unwrap();
         let mut status_text = binding.as_str();
-        ui.text_edit_singleline(&mut status_text);
+        ui.text_edit_multiline(&mut status_text);
 
         let ctx = ui.ctx();
         preview_file_being_dropped(ctx);

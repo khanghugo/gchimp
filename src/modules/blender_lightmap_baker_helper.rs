@@ -13,7 +13,7 @@ use crate::utils::{
     img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
     run_bin::run_studiomdl,
     simple_calculs::{Matrix2x2, Plane3D, Polygon3D},
-    smd_stuffs::textures_used_in_triangles,
+    smd_stuffs::{maybe_split_smd, textures_used_in_triangles},
 };
 
 pub struct BLBH {
@@ -29,6 +29,7 @@ pub struct BLBHOptions {
     pub compile_model: bool,
     pub flat_shade: bool,
     pub uv_shrink_factor: f32,
+    // pub origin: DVec3,
     pub studiomdl: String,
     #[cfg(target_os = "linux")]
     pub wineprefix: String,
@@ -42,6 +43,7 @@ impl Default for BLBHOptions {
             compile_model: true,
             flat_shade: true,
             uv_shrink_factor: BLBH_DEFAULT_UV_SHRINK_FACTOR,
+            // origin: DVec3::ZERO,
             studiomdl: Default::default(),
             #[cfg(target_os = "linux")]
             wineprefix: Default::default(),
@@ -415,7 +417,14 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
     smd.triangles = new_triangles;
 
-    smd.write(smd_path.with_file_name(format!("{}_blbh.smd", smd_file_name)))?;
+    // split smds
+    // TODO: split model, maybe too much
+    let smds = maybe_split_smd(&smd);
+
+    smds.iter().enumerate().for_each(|(idx, smd)| {
+        smd.write(smd_path.with_file_name(format!("{}{}_blbh.smd", smd_file_name, idx)))
+            .expect("cannot write smd file");
+    });
 
     if options.compile_model {
         let idle_smd = Smd::new_basic();
@@ -434,6 +443,14 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
         qc.set_cd(smd_root.to_str().unwrap());
         qc.set_cd_texture(texture_file_root.to_str().unwrap());
 
+        // // 270 rotation is needed.
+        // qc.add_origin(
+        //     options.origin.x * -1.,
+        //     options.origin.y * -1.,
+        //     options.origin.z * -1.,
+        //     Some(270.),
+        // );
+
         if options.flat_shade {
             // cannot just add texture indiscriminately
             // it is possible that UV does not cover some texture
@@ -446,12 +463,15 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
             });
         }
 
-        qc.add_body(
-            "studio0",
-            format!("{}_blbh", smd_file_name).as_str(),
-            false,
-            None,
-        );
+        smds.iter().enumerate().for_each(|(idx, _smd)| {
+            qc.add_body(
+                format!("studio{}", idx).as_str(),
+                format!("{}{}_blbh", smd_file_name, idx).as_str(),
+                false,
+                None,
+            );
+        });
+
         qc.add_sequence("idle", "idle", vec![]);
 
         let qc_path = smd_path.with_file_name(format!("{}_blbh.qc", smd_file_name));
@@ -505,6 +525,7 @@ mod test {
             convert_smd: true,
             compile_model: true,
             flat_shade: true,
+            // origin: DVec3::ZERO,
             uv_shrink_factor: BLBH_DEFAULT_UV_SHRINK_FACTOR,
             studiomdl: String::from("/home/khang/gchimp/dist/studiomdl.exe"),
             #[cfg(target_os = "linux")]
