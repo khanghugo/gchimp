@@ -174,7 +174,9 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
             // if fits inside a texture, add it into the result and continue
             if v1.0 == v2.0 && v2.0 == v3.0 && v1.1 == v2.1 && v2.1 == v3.1 {
-                let material = format!("{}{}{}.bmp", texture_file_name, v1.0, h_count - v1.1 - 1);
+                let weird_overflow = h_count.saturating_sub(v1.1).saturating_sub(1);
+
+                let material = format!("{}{}{}.bmp", texture_file_name, v1.0, weird_overflow);
                 let mut new_triangle = to_split.clone();
                 new_triangle.material = material;
                 new_triangle.vertices.iter_mut().for_each(|vertex| {
@@ -215,7 +217,15 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                     anchor_vector_uv1.y,
                 ])
                 .solve_cramer([target_vector_uv.x, target_vector_uv.y])
-                .expect("cannot solve by cramer's rule");
+                .expect(
+                    format!(
+                        "cannot solve by cramer's rule {} {} {:?}",
+                        anchor_vector_uv0,
+                        anchor_vector_uv1,
+                        [target_vector_uv.x, target_vector_uv.y]
+                    )
+                    .as_str(),
+                );
 
                 (anchor_vector_pos0 * coefficients[0] + anchor_vector_pos1 * coefficients[1])
                     + anchor_vertex.pos
@@ -300,7 +310,10 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
                 polygon_res = polygon_res
                     .iter()
-                    .flat_map(|polygon| polygon.split(&plane))
+                    .flat_map(|polygon| polygon.split3(&plane))
+                    // that means chatgpt copy pasted result does not work very good
+                    // but anyways
+                    .filter(|polygon| polygon.vertices().len() >= 3)
                     // sort vertices after first cut because i think something stupid in the split function
                     .map(|polygon| polygon.with_sorted_vertices().unwrap())
                     .collect();
@@ -326,7 +339,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                 polygon_res = polygon_res
                     .iter()
                     // triangulate will sort the vertices after so no need to sort vertices here
-                    .flat_map(|polygon| polygon.split(&plane))
+                    .flat_map(|polygon| polygon.split3(&plane))
                     .collect();
             });
 
@@ -403,8 +416,9 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                         source: None,
                     };
 
-                    let h = h_count - h - 1; // the texture is exported from top left while uv is bottom left
-                    let material = format!("{}{}{}.bmp", texture_file_name, w, h);
+                    let weird_overflow = h_count.saturating_sub(h).saturating_sub(1);
+                    // let h = h_count - h - 1; // the texture is exported from top left while uv is bottom left
+                    let material = format!("{}{}{}.bmp", texture_file_name, w, weird_overflow);
 
                     Triangle {
                         material,

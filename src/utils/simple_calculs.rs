@@ -146,6 +146,10 @@ impl Point3D {
     pub fn biggest_element(&self) -> f64 {
         self.x.max(self.y).max(self.z)
     }
+
+    pub fn get_geogebra_point(&self) -> String {
+        format!("({}, {}, {})", self.x, self.y, self.z)
+    }
 }
 
 impl From<[f64; 3]> for Point3D {
@@ -711,219 +715,45 @@ impl Polygon3D {
         [mins.into(), maxs.into()]
     }
 
-    pub fn cut(&self, plane: &Plane3D) -> Option<Self> {
-        let (not_removed, removed_vertices): (Vec<(usize, Point3D)>, _) = self
-            .vertices()
-            .iter()
-            .cloned()
-            .enumerate()
-            .partition(|(_, vertex)| matches!(plane.side_of_point(*vertex), SideOfPoint::In));
+    /// ChatGPT wrote this. It is so over.
+    pub fn split3(&self, plane: &Plane3D) -> Vec<Self> {
+        let mut new_face = Polygon3D::default();
+        let mut new_face2 = Polygon3D::default();
 
-        // no affected vertices
-        if removed_vertices.is_empty() {
-            return Some(self.clone());
-        }
+        let distance_from_plane = |point: Point3D| point.dot(plane.normal()) - plane.w;
 
-        // the entire polygon is removed
-        if removed_vertices.len() == self.0.len() {
-            return None;
-        }
+        let compute_intersection = |p1: Point3D, p2: Point3D| {
+            let d1 = distance_from_plane(p1);
+            let d2 = distance_from_plane(p2);
 
-        let mut polygon = self.clone();
+            let t = d1 / (d1 - d2);
 
-        let not_removed: Polygon3D = not_removed
-            .into_iter()
-            .map(|(_, v)| v)
-            .collect::<Vec<Point3D>>()
-            .into();
+            p1 + (p2 - p1) * t
+        };
 
-        let left_vertex = removed_vertices.iter().find(|(_, vertex)| {
-            not_removed
-                .vertices()
-                .contains(&self.get_vertex_neighbors(vertex).unwrap().1[0])
+        (0..self.0.len()).for_each(|idx| {
+            let curr = self.0[idx];
+            let next = self.0[(idx + 1) % self.0.len()];
+
+            let d1 = distance_from_plane(curr);
+            let d2 = distance_from_plane(next);
+
+            if d1 >= 0. {
+                new_face.add_vertex(curr);
+            }
+
+            if d1 <= 0. {
+                new_face2.add_vertex(curr);
+            }
+
+            if (d1 > 0. && d2 < 0.) || (d1 < 0. && d2 > 0.) {
+                let intersection = compute_intersection(curr, next);
+                new_face.add_vertex(intersection);
+                new_face2.add_vertex(intersection);
+            }
         });
 
-        let left_vertex = left_vertex.unwrap().1;
-
-        // cutting 1 vertex
-        if removed_vertices.len() == 1 {
-            // this means we only cut 1 vertex
-            let (idx, neighbors) = polygon.get_vertex_neighbors(&left_vertex).unwrap();
-            let line_left = Line3D::from_two_points(neighbors[0], left_vertex);
-            let line_right = Line3D::from_two_points(neighbors[1], left_vertex);
-
-            let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
-            let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
-
-            polygon.0.remove(idx);
-
-            polygon.insert_vertex(idx, new_left_vertex);
-            polygon.insert_vertex(idx, new_right_vertex);
-
-            // polygon.add_vertex(new_left_vertex);
-            // polygon.add_vertex(new_right_vertex);
-            // polygon.sort_vertices().unwrap();
-        } else {
-            let (_, left_neighbors) = polygon.get_vertex_neighbors(&left_vertex).unwrap();
-            let line_left = Line3D::from_two_points(left_neighbors[0], left_vertex);
-            let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
-
-            let right_vertex = removed_vertices
-                .iter()
-                .find(|(_, vertex)| {
-                    not_removed
-                        .vertices()
-                        .contains(&polygon.get_vertex_neighbors(vertex).unwrap().1[1])
-                })
-                .unwrap()
-                .1;
-
-            let (_, right_neighbors) = polygon.get_vertex_neighbors(&right_vertex).unwrap();
-            let line_right = Line3D::from_two_points(right_neighbors[1], right_vertex);
-            let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
-
-            removed_vertices.iter().rev().for_each(|(idx, _)| {
-                polygon.0.remove(*idx);
-            });
-
-            let left_neighbor_left_idx = removed_vertices[0].0;
-
-            polygon.insert_vertex(left_neighbor_left_idx, new_left_vertex);
-            polygon.insert_vertex(left_neighbor_left_idx, new_right_vertex);
-
-            // polygon.add_vertex(new_left_vertex);
-            // polygon.add_vertex(new_right_vertex);
-            // polygon.sort_vertices().unwrap();
-        }
-
-        Some(polygon)
-    }
-
-    // cant be fucked version
-    pub fn split2(&self, plane: &Plane3D) -> Vec<Self> {
-        let p1 = self.clone();
-        let p2 = self.clone();
-
-        let p1 = p1.cut(plane);
-        let p2 = p2.cut(&plane.get_backplane());
-
-        if p1.is_some() && p2.is_some() {
-            vec![p1.unwrap(), p2.unwrap()]
-        } else {
-            vec![self.clone()]
-        }
-    }
-
-    /// Splits polygon into possibly two from a plane
-    ///
-    /// Vertices aren't sorted so sort them plesase. Must sort vertices first otherwise the result is very bad
-    ///
-    // TODO the function won't guaranteed sorted vertices atm so sort it
-    //
-    // TODO it doesnt' work well, fix it
-    pub fn split(&self, plane: &Plane3D) -> Vec<Self> {
-        let (not_removed, removed_vertices): (Vec<(usize, Point3D)>, _) = self
-            .vertices()
-            .iter()
-            .cloned()
-            .enumerate()
-            // ~~slightly different from  cut function where this also takes side of point ON~~
-            // ill blame on the cutting plane that results in edge case, not sure why
-            // but right now, it works fine
-            // this is very dumb and shit
-            .partition(|(_, vertex)| matches!(plane.side_of_point(*vertex), SideOfPoint::In));
-        // lemma: since we are doing convex polygon, only the firstmost and fartmost vertices are connected
-        // to the other cut
-        // therefore, we only need to check for newly created vertices/edges from two cuts involving those two vertices
-        // so, we will have two cases to handle, one vertex is cut and more than one vertex is cut
-
-        // no affected vertices
-        if removed_vertices.is_empty() {
-            return vec![self.clone()];
-        }
-
-        // the entire polygon is on the other side of plane
-        // cut miss still
-        if removed_vertices.len() == self.vertices().len() {
-            return vec![self.clone()];
-        }
-
-        let mut old_polygon = self.clone();
-        let mut new_polygon: Self = Self(vec![]);
-
-        let not_removed: Polygon3D = not_removed
-            .into_iter()
-            .map(|(_, v)| v)
-            .collect::<Vec<Point3D>>()
-            .into();
-
-        let left_vertex = removed_vertices.iter().find(|(_, vertex)| {
-            not_removed
-                .vertices()
-                .contains(&old_polygon.get_vertex_neighbors(vertex).unwrap().1[0])
-        });
-
-        let left_vertex = left_vertex.unwrap().1;
-
-        // cutting 1 vertex
-        if removed_vertices.len() == 1 {
-            // this means we only cut 1 vertex
-            let (idx, neighbors) = old_polygon.get_vertex_neighbors(&left_vertex).unwrap();
-            let line_left = Line3D::from_two_points(neighbors[0], left_vertex);
-            let line_right = Line3D::from_two_points(neighbors[1], left_vertex);
-
-            let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
-            let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
-
-            new_polygon.add_vertex(old_polygon.0.remove(idx));
-
-            old_polygon.insert_vertex(idx, new_left_vertex);
-            old_polygon.insert_vertex(idx, new_right_vertex);
-
-            // polygon.add_vertex(new_left_vertex);
-            // polygon.add_vertex(new_right_vertex);
-            // polygon.sort_vertices().unwrap();
-
-            new_polygon.add_vertex(new_left_vertex);
-            new_polygon.add_vertex(new_right_vertex);
-        } else {
-            let (_, left_neighbors) = old_polygon.get_vertex_neighbors(&left_vertex).unwrap();
-            let line_left = Line3D::from_two_points(left_neighbors[0], left_vertex);
-            let new_left_vertex = plane.intersect_with_line(line_left).unwrap();
-
-            let right_vertex = removed_vertices
-                .iter()
-                .find(|(_, vertex)| {
-                    not_removed
-                        .vertices()
-                        .contains(&old_polygon.get_vertex_neighbors(vertex).unwrap().1[1])
-                })
-                .unwrap()
-                .1;
-
-            let (_, right_neighbors) = old_polygon.get_vertex_neighbors(&right_vertex).unwrap();
-            let line_right = Line3D::from_two_points(right_neighbors[1], right_vertex);
-            let new_right_vertex = plane.intersect_with_line(line_right).unwrap();
-
-            // TODO this doesnt add vertices in sorted order
-            removed_vertices.iter().rev().for_each(|(idx, _)| {
-                new_polygon.add_vertex(old_polygon.0.remove(*idx));
-            });
-
-            let left_neighbor_left_idx = removed_vertices[0].0;
-
-            old_polygon.insert_vertex(left_neighbor_left_idx, new_left_vertex);
-            old_polygon.insert_vertex(left_neighbor_left_idx, new_right_vertex);
-
-            // polygon.add_vertex(new_left_vertex);
-            // polygon.add_vertex(new_right_vertex);
-            // polygon.sort_vertices().unwrap();
-
-            new_polygon.add_vertex(new_left_vertex);
-            new_polygon.add_vertex(new_right_vertex);
-        }
-
-        vec![old_polygon, new_polygon]
+        return vec![new_face, new_face2];
     }
 
     pub fn flip(&self) -> Self {
@@ -932,6 +762,16 @@ impl Polygon3D {
         res.reverse();
 
         Self(res)
+    }
+
+    pub fn get_geogebra_points(&self) -> String {
+        let mut res = String::new();
+
+        self.vertices()
+            .iter()
+            .for_each(|vertex| res += format!("{}\n", vertex.get_geogebra_point()).as_str());
+
+        res
     }
 }
 
@@ -1184,6 +1024,80 @@ impl ConvexPolytope {
             .fold(Point3D::default(), |acc, e| acc + e.centroid().unwrap())
             / self.0.len() as f64)
     }
+
+    // pub fn convex_hull_clipping(self, planes: &[Plane3D]) -> Self {
+    //     planes.iter().fold(self, |acc, e| acc.cut2(e))
+    // }
+
+    // /// ChatGPT wrote this. It is so over.
+    // /// Pre-requisites:
+    // /// All vertices must be sorted
+    // pub fn cut2(&self, plane: &Plane3D) -> Self {
+    //     let mut res = Self(vec![]);
+
+    //     // KL: ChatGPT is almost right. In its implementation, it doesn't generate new face from intersections.
+    //     // The "new_face" in this case is just creating a polygon related to the polygon that is being cut.
+    //     // That means that newly created polygon could be the same as the polygon being cut.
+    //     let mut intersection_face = Polygon3D::default();
+
+    //     self.polygons()
+    //         .iter()
+    //         .enumerate()
+    //         .for_each(|(idx, polygon)| {
+    //             let mut new_face = Polygon3D::default();
+
+    //             (0..polygon.vertices().len()).for_each(|vertex_idx| {
+    //                 let curr_vertex = polygon.vertices()[vertex_idx];
+    //                 let next_vertex =
+    //                     polygon.vertices()[(vertex_idx + 1) % polygon.vertices().len()];
+
+    //                 let side_curr = plane.side_of_point(curr_vertex);
+    //                 let side_next = plane.side_of_point(next_vertex);
+
+    //                 // point is inside the plane
+    //                 if matches!(side_curr, SideOfPoint::In | SideOfPoint::On) {
+    //                     new_face.add_vertex(curr_vertex);
+    //                 }
+
+    //                 // crosses the plane
+    //                 if (matches!(side_curr, SideOfPoint::In)
+    //                     && matches!(side_next, SideOfPoint::Out))
+    //                     || (matches!(side_curr, SideOfPoint::Out)
+    //                         && matches!(side_next, SideOfPoint::In))
+    //                 {
+    //                     let line = Line3D::from_two_points(curr_vertex, next_vertex);
+    //                     let intersection = plane
+    //                         .intersect_with_line(line)
+    //                         .expect("line does not intersect with plane");
+    //                     new_face.add_vertex(intersection);
+    //                     intersection_face.add_vertex(intersection);
+    //                 }
+    //             });
+
+    //             if !new_face.vertices().is_empty() && new_face.vertices().len() < 3 {
+    //                 println!("polygon {:?}", polygon);
+    //                 println!("plane {:?}", plane);
+    //                 panic!("less than 3 vertices {}", new_face.vertices().len());
+    //             }
+
+    //             if !new_face.vertices().is_empty() {
+    //                 res.polygons_mut().push(
+    //                     new_face, // .with_sorted_vertices()
+    //                              // .expect("cannot sort new face vertices"),
+    //                 );
+    //             }
+    //         });
+
+    //     if intersection_face.vertices().len() > 2 {
+    //         res.polygons_mut().push(
+    //             intersection_face
+    //                 .with_sorted_vertices()
+    //                 .expect("cannot sort intersection face new vertices"),
+    //         );
+    //     }
+
+    //     res
+    // }
 
     /// Cuts a convex hull
     /// "Removed parts" lie on the opposite direction of the plane normal.
@@ -1519,7 +1433,7 @@ mod test {
             z: -8.731148864171701e-11,
             w: 3183484.0221992866,
         };
-        let res = polygon.split(&splitting_plane);
+        let res = polygon.split3(&splitting_plane);
 
         assert_eq!(res.len(), 2);
         assert_eq!(res[0].vertices().len(), 4);
