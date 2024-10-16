@@ -30,4 +30,4 @@ pub static TRENCHBROOM_EMPTY_TEXTURE: &str = "__TB_empty";
 
 pub static TEXTURE_PREFIXES: &[&str] = &["{", "!", "+", "-", "~"];
 
-pub static EPSILON: f64 = 0.000001;
+pub static EPSILON: f64 = 0.0000001;
