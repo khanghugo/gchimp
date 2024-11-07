@@ -6,6 +6,7 @@ pub mod demdoc;
 pub mod duplicate_triangle;
 pub mod find_low_scaling;
 pub mod light_scale;
+pub mod loop_wave;
 pub mod map2mdl;
 pub mod rotate_prop_static;
 pub mod s2g;

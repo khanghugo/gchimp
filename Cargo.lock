@@ -1213,6 +1213,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "cuet"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "431059ca3394d39724d2786d9cea37c8031ca413b64c868199aae2ab951362bf"
+
+[[package]]
 name = "cursor-icon"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1832,6 +1838,7 @@ dependencies = [
  "arboard",
  "bsp",
  "clap",
+ "cuet",
  "dem",
  "eframe",
  "egui_extras",
