@@ -50,14 +50,14 @@ pub fn maybe_split_smd(smd: &Smd) -> Vec<Smd> {
 
     let old_triangles = &smd.triangles;
 
-    let needed_smd = old_triangles.len() / MAX_SMD_TRIANGLE + 1;
+    let needed_smd = old_triangles.len() / *MAX_SMD_TRIANGLE + 1;
 
     (0..needed_smd)
         .map(|index| Smd {
             nodes: smd.nodes.clone(),
             skeleton: smd.skeleton.clone(),
             triangles: old_triangles
-                .chunks(MAX_SMD_TRIANGLE)
+                .chunks(*MAX_SMD_TRIANGLE)
                 .nth(index)
                 .unwrap()
                 .to_vec(),
