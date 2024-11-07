@@ -18,6 +18,14 @@ pub fn split_smd(smd_path: &str) -> eyre::Result<()> {
     let smd_path = PathBuf::from(smd_path);
     let smd_file_name = smd_path.file_stem().unwrap().to_str().unwrap();
 
+    if !smd_path.exists() {
+        return err!("{} does not exist", smd_path.display());
+    }
+
+    if smd_path.extension().is_none() || smd_path.extension().unwrap() != "smd" {
+        return err!("{} is not a .smd file", smd_path.display());
+    }
+
     let smd = Smd::from_file(&smd_path)?;
 
     let smds = maybe_split_smd(&smd);
@@ -36,8 +44,17 @@ pub fn split_smd(smd_path: &str) -> eyre::Result<()> {
 /// That SMD file must be under the $body command
 ///
 /// THe QC file must contain $modelname, $cd, and $cdtexture
-pub fn split_model(qc_path: &str) -> eyre::Result<()> {
-    let qc_path = PathBuf::from(qc_path);
+pub fn split_model(qc_path_str: &str) -> eyre::Result<()> {
+    let qc_path = PathBuf::from(qc_path_str);
+
+    if !qc_path.exists() {
+        return err!("{} does not exist", qc_path_str);
+    }
+
+    if qc_path.extension().is_none() || qc_path.extension().unwrap() != "qc" {
+        return err!("{} is not a .qc file", qc_path.display());
+    }
+
     let qc_file_name = qc_path.file_stem().unwrap().to_str().unwrap();
 
     let qc = Qc::from_file(&qc_path)?;
@@ -78,6 +95,7 @@ pub fn split_model(qc_path: &str) -> eyre::Result<()> {
         return err!("Does not contain $cdtexture");
     }
 
+    // this mean this only supports 1 smd mesh for now
     let body = qc.commands().iter().find_map(|command| {
         if let qc::QcCommand::Body(x) = command {
             Some(x)
@@ -94,7 +112,17 @@ pub fn split_model(qc_path: &str) -> eyre::Result<()> {
     let body = body.unwrap();
     let modelname = modelname.unwrap();
 
-    let smd = Smd::from_file(cd.join(body.mesh.clone()).with_extension("smd"))?;
+    let smd_path = cd.join(body.mesh.clone()).with_extension("smd");
+
+    if !smd_path.exists() {
+        return err!(
+            "Linked smd file `{}` with path `{}` does not exist",
+            body.mesh,
+            smd_path.display()
+        );
+    }
+
+    let smd = Smd::from_file(smd_path)?;
     let smd_file_name = body.mesh.clone();
 
     // this just conveniently fixes lots of things soooooooooooooooooo

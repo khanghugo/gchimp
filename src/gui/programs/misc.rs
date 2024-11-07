@@ -32,7 +32,7 @@ impl Default for Misc {
 impl Misc {
     fn split_model(&mut self, ui: &mut eframe::egui::Ui) {
         ui.label("Split model").on_hover_text(
-            "Splits a complete .qc linked with some smds to produce more smds with less triangles",
+            "Splits a complete .qc linked with ONE smd to produce more smds with less triangles",
         );
         egui::Grid::new("split_model")
             .num_columns(2)
