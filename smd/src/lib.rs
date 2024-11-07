@@ -55,8 +55,8 @@ pub struct Vertex {
 #[derive(Clone, Debug, PartialEq)]
 pub struct VertexSourceInfo {
     pub links: i32,
-    pub bone: i32,
-    pub weight: f64,
+    pub bone: Option<i32>,
+    pub weight: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -202,10 +202,15 @@ impl Smd {
                     write_dvec!(file, vertex.uv);
 
                     if let Some(source) = &vertex.source {
-                        file.write_all(
-                            format!("{} {} {}", source.links, source.bone, source.weight)
-                                .as_bytes(),
-                        )?
+                        file.write_all(format!("{}", source.links).as_bytes())?;
+
+                        if let Some(bone) = source.bone {
+                            file.write_all(format!(" {}", bone).as_bytes())?;
+                        }
+
+                        if let Some(weight) = source.weight {
+                            file.write_all(format!(" {}", weight).as_bytes())?;
+                        }
                     }
 
                     file.write_all("\n".as_bytes())?;
@@ -364,13 +369,14 @@ fn parse_skeleton(i: &str) -> IResult<Vec<Skeleton>> {
 }
 
 fn parse_vertex_source_info(i: &str) -> IResult<VertexSourceInfo> {
-    map(tuple((number, number, double)), |(links, bone, weight)| {
-        VertexSourceInfo {
+    map(
+        tuple((number, opt(number), opt(double))),
+        |(links, bone, weight)| VertexSourceInfo {
             links,
             bone,
             weight,
-        }
-    })(i)
+        },
+    )(i)
 }
 
 fn parse_vertex(i: &str) -> IResult<Vertex> {
@@ -660,7 +666,7 @@ end
         assert_eq!(tri1.vertices[1].pos.y, -1.);
 
         assert!(tri1.vertices[1].source.is_some());
-        assert_eq!(tri1.vertices[1].source.as_ref().unwrap().bone, 1);
+        assert_eq!(tri1.vertices[1].source.as_ref().unwrap().bone.unwrap(), 1);
     }
 
     // Won't test for vertexanimation. Too bad.
@@ -746,5 +752,18 @@ end
         let file = Smd::from_file("test/idle.smd");
 
         assert!(file.is_ok());
+    }
+
+    #[test]
+    fn parse_vertex_weird() {
+        // in source info, only link is there
+        let line =
+            "0  -0.680206 -1.746510 5.699451  -0.977121 -0.159969 -0.140159  0.090947 1.911250 0";
+        let (res, vertex) = parse_vertex(line).unwrap();
+
+        assert!(res.is_empty());
+
+        assert!(vertex.source.is_some());
+        assert_eq!(vertex.source.unwrap().links, 0);
     }
 }
