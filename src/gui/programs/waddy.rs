@@ -268,7 +268,7 @@ impl WaddyGui {
                 .instances
                 .iter()
                 .enumerate()
-                .filter(|(idx, _)| *idx != instance_index)
+                // .filter(|(idx, _)| *idx != instance_index) // allow copy to self
                 .fold(None, |acc, (idx, instance)| {
                     if ui
                         .button(
