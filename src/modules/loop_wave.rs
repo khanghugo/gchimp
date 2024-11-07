@@ -59,8 +59,7 @@ mod test {
 
     #[test]
     fn run() {
-        let path =
-            PathBuf::from("/home/khang/gchimp/examples/loop_wave/bhit_flesh-1.wav");
+        let path = PathBuf::from("/home/khang/gchimp/examples/loop_wave/bhit_flesh-1.wav");
         loop_wave(path).unwrap();
     }
 }

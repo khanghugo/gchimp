@@ -4,6 +4,7 @@ mod check_illegal_brush;
 mod check_missing_texture;
 mod custom_script;
 mod light_scale;
+mod loop_wave;
 mod map2mdl;
 mod rotate_prop_static;
 mod s2g;
@@ -59,6 +60,7 @@ pub fn cli() -> CliRes {
         &check_illegal_brush::CheckIllegalBrush,
         &map2mdl::Map2MdlCli,
         &split_model::SplitModel,
+        &loop_wave::LoopWave,
     ];
 
     let help = || {
