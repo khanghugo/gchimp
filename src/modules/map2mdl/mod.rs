@@ -427,7 +427,7 @@ impl Map2Mdl {
                 })
                 .collect();
 
-            return Ok(Some(res));
+            Ok(Some(res))
         }
 
         #[cfg(target_arch = "wasm32")]

@@ -219,15 +219,14 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                     anchor_vector_uv1.y,
                 ])
                 .solve_cramer([target_vector_uv.x, target_vector_uv.y])
-                .expect(
-                    format!(
+                .unwrap_or_else(|_| {
+                    panic!(
                         "cannot solve by cramer's rule {} {} {:?}",
                         anchor_vector_uv0,
                         anchor_vector_uv1,
                         [target_vector_uv.x, target_vector_uv.y]
                     )
-                    .as_str(),
-                );
+                });
 
                 (anchor_vector_pos0 * coefficients[0] + anchor_vector_pos1 * coefficients[1])
                     + anchor_vertex.pos

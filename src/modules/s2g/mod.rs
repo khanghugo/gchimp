@@ -273,7 +273,7 @@ impl S2G {
 
             let _ = handle.join();
 
-            return Ok(());
+            Ok(())
         });
 
         if res.filter_map(|a| a.err()).count() > 0 {
@@ -721,7 +721,7 @@ impl S2G {
 
             result.append(&mut goldsrc_mdl_path);
 
-            return Ok(result);
+            Ok(result)
         }
 
         #[cfg(target_arch = "wasm32")]
