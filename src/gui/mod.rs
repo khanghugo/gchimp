@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use eframe::{egui, Theme};
+use eframe::egui::{self, ThemePreference};
 use egui_tiles::Tree;
 use utils::preview_file_being_dropped;
 
@@ -42,7 +42,7 @@ pub fn gui() -> eyre::Result<()> {
 
     let icon = eframe::icon_data::from_png_bytes(include_bytes!("../.././media/logo.png")).unwrap();
 
-    let mut options = eframe::NativeOptions {
+    let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             // This is OKAY for now.
             .with_inner_size([PROGRAM_WIDTH, PROGRAM_HEIGHT])
@@ -53,15 +53,17 @@ pub fn gui() -> eyre::Result<()> {
         ..Default::default()
     };
 
-    if let Ok(config) = &config_res {
+    let theme_preference = if let Ok(config) = &config_res {
         if config.theme.contains("light") {
-            options.default_theme = Theme::Light
+            ThemePreference::Light
         } else if config.theme.contains("dark") {
-            options.default_theme = Theme::Dark
+            ThemePreference::Dark
         } else {
-            options.follow_system_theme = true;
+            ThemePreference::System
         }
-    }
+    } else {
+        ThemePreference::System
+    };
 
     let persistent_storage = PersistentStorage::start()?;
     let persistent_storage = Arc::new(Mutex::new(persistent_storage));
@@ -71,7 +73,11 @@ pub fn gui() -> eyre::Result<()> {
         options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::new(MyApp::new(config_res, persistent_storage)))
+            Ok(Box::new(MyApp::new(
+                config_res,
+                persistent_storage,
+                theme_preference,
+            )))
         }),
     );
 
@@ -86,15 +92,18 @@ pub fn gui() -> eyre::Result<()> {
     todo!("gui wasm32")
 }
 
-struct MyApp {
+pub struct MyApp {
     tree: Option<Tree<Pane>>,
     _no_config_status: String,
     // duplicated because create_tree should have been a struct method
     persistent_storage: Arc<Mutex<PersistentStorage>>,
+    theme: ThemePreference,
 }
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.options_mut(|option| option.theme_preference = self.theme);
+
         egui::CentralPanel::default().show(ctx, |ui| {
             if let Some(tree) = &mut self.tree {
                 let mut behavior = TreeBehavior {};
@@ -132,12 +141,14 @@ impl MyApp {
     pub fn new(
         config_res: eyre::Result<Config>,
         persistent_storage: Arc<Mutex<PersistentStorage>>,
+        theme: ThemePreference,
     ) -> Self {
         if let Err(err) = config_res {
             return Self {
                 tree: None,
                 _no_config_status: format!("Error with parsing config.toml: {}", err),
                 persistent_storage,
+                theme,
             };
         }
 
@@ -145,6 +156,7 @@ impl MyApp {
             tree: Some(create_tree(config_res.unwrap(), persistent_storage.clone())),
             _no_config_status: "".to_string(),
             persistent_storage,
+            theme,
         }
     }
 

@@ -1,6 +1,4 @@
-use eframe::egui::{
-    self, Align2, Color32, Context, Id, Image, LayerId, Order, TextStyle, TextureHandle,
-};
+use eframe::egui::{self, Align2, Color32, Context, Id, LayerId, Order, TextStyle, TextureHandle};
 
 /// Preview hovering files:
 pub fn preview_file_being_dropped(ctx: &egui::Context) {
@@ -51,35 +49,6 @@ macro_rules! include_image {
 }
 
 #[allow(dead_code)]
-/// Returns a boolean to indicate whether the viewport should be close.
-pub fn display_image_viewport(
-    ctx: &Context,
-    image: Image,
-    name: impl AsRef<str> + Into<String> + std::hash::Hash,
-) -> bool {
-    let should_stop = ctx.show_viewport_immediate(
-        egui::ViewportId::from_hash_of(&name),
-        egui::ViewportBuilder::default()
-            .with_title(name)
-            .with_inner_size([512., 512.]),
-        |ctx, _class| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.add(image);
-
-                if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
-                {
-                    return true;
-                };
-
-                false
-            })
-        },
-    );
-
-    should_stop.inner
-}
-
-#[allow(dead_code)]
 pub fn display_image_viewport_from_uri(
     ctx: &Context,
     uri: &str,
@@ -118,30 +87,6 @@ pub fn display_image_viewport_from_texture(ctx: &Context, texture: &TextureHandl
         |ctx, _class| {
             egui::CentralPanel::default().show(ctx, |ui| {
                 ui.add(egui::Image::new(texture));
-
-                if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
-                {
-                    return true;
-                };
-
-                false
-            })
-        },
-    );
-
-    should_draw.inner
-}
-
-#[allow(dead_code)]
-pub fn display_text_in_viewport(ctx: &Context, s: impl Into<String>) -> bool {
-    let should_draw = ctx.show_viewport_immediate(
-        egui::ViewportId::from_hash_of("some text yea"),
-        egui::ViewportBuilder::default()
-            .with_title("some text yea")
-            .with_inner_size([512., 512.]),
-        |ctx, _class| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.label(s.into());
 
                 if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
                 {
