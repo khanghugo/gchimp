@@ -3,7 +3,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use arboard::Clipboard;
 use eframe::egui::{self, Context, Modifiers, RichText, ScrollArea, Sense, Ui};
 use image::{ImageBuffer, RgbaImage};
 use wad::types::FileEntry;
@@ -166,6 +165,7 @@ impl WaddyGui {
         // export when there's lots of selected or not
         if !is_multiple_tiles_selected {
             if ui.button("Export").clicked() {
+                #[cfg(target_arch = "x86_64")]
                 if let Some(path) = rfd::FileDialog::new()
                     .set_file_name(effective_tile.name())
                     .add_filter("All Files", &["bmp"])
@@ -196,6 +196,7 @@ impl WaddyGui {
                 ))
                 .clicked()
             {
+                #[cfg(target_arch = "x86_64")]
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     self.instances[instance_index].selected.par_iter().for_each(
                         |&texture_tile_index| {
@@ -236,28 +237,34 @@ impl WaddyGui {
                     .get_string()
                     .starts_with("{");
 
-                if let Ok(mut clipboard) = Clipboard::new() {
-                    clipboard
-                        .set_image(arboard::ImageData {
-                            width: image.file_entry.dimensions().0 as usize,
-                            height: image.file_entry.dimensions().1 as usize,
-                            bytes: image
-                                .file_entry
-                                .image()
-                                .iter()
-                                .flat_map(|&color_idx| {
-                                    let [r, g, b] = image.file_entry.palette()[color_idx as usize];
+                #[cfg(target_arch = "x86_64")]
+                {
+                    use arboard::Clipboard;
 
-                                    if color_idx == 255 && is_transparent {
-                                        [r, g, b, 0]
-                                    } else {
-                                        [r, g, b, 255]
-                                    }
-                                })
-                                .collect::<Vec<u8>>()
-                                .into(),
-                        })
-                        .unwrap();
+                    if let Ok(mut clipboard) = Clipboard::new() {
+                        clipboard
+                            .set_image(arboard::ImageData {
+                                width: image.file_entry.dimensions().0 as usize,
+                                height: image.file_entry.dimensions().1 as usize,
+                                bytes: image
+                                    .file_entry
+                                    .image()
+                                    .iter()
+                                    .flat_map(|&color_idx| {
+                                        let [r, g, b] =
+                                            image.file_entry.palette()[color_idx as usize];
+
+                                        if color_idx == 255 && is_transparent {
+                                            [r, g, b, 0]
+                                        } else {
+                                            [r, g, b, 255]
+                                        }
+                                    })
+                                    .collect::<Vec<u8>>()
+                                    .into(),
+                            })
+                            .unwrap();
+                    }
                 }
 
                 ui.close_menu();
@@ -707,7 +714,10 @@ impl WaddyGui {
         let should_add_pasted_image = ui
             .input(|i| i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::V));
 
+        #[cfg(target_arch = "x86_64")]
         if should_add_pasted_image {
+            use arboard::Clipboard;
+
             if let Ok(mut clipboard) = Clipboard::new() {
                 if let Ok(image) = clipboard.get_image() {
                     let rgba_image: RgbaImage = ImageBuffer::from_raw(
@@ -941,6 +951,7 @@ impl WaddyGui {
     }
 
     fn menu_open(&mut self, ui: &mut Ui) -> bool {
+        #[cfg(target_arch = "x86_64")]
         if let Some(path) = rfd::FileDialog::new().pick_file() {
             let ext = path.extension().unwrap();
 
@@ -1008,6 +1019,7 @@ impl WaddyGui {
             if ui.button("Import").clicked() {
                 // TODO this is not consistent with drag and drop behavior
                 // this does not filter out file extension
+                #[cfg(target_arch = "x86_64")]
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
                     if let Err(err) = self.instances[instance_index]
                         .waddy
@@ -1023,6 +1035,7 @@ impl WaddyGui {
             }
 
             if ui.button("Export All").clicked() {
+                #[cfg(target_arch = "x86_64")]
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     // TODO TOAST TOAST
                     if let Err(err) = self.instances[instance_index]
@@ -1116,6 +1129,7 @@ impl WaddyGui {
     }
 
     fn menu_save_as_dialogue(&mut self, instance_index: usize) {
+        #[cfg(target_arch = "x86_64")]
         if let Some(path) = rfd::FileDialog::new()
             .add_filter("All Files", &["wad"])
             .set_file_name(if let Some(path) = &self.instances[instance_index].path {

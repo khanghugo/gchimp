@@ -11,8 +11,10 @@ use ndarray::prelude::*;
 use crate::utils::{
     constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
     img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
-    run_bin::run_studiomdl,
 };
+
+#[cfg(target_arch = "x86_64")]
+use crate::utils::run_bin::run_studiomdl;
 
 #[derive(Clone)]
 pub struct SkyModOptions {
@@ -467,36 +469,40 @@ impl SkyModBuilder {
             qc.write(qc_path.to_str().unwrap())?;
 
             // run studiomdl
-            #[cfg(target_os = "windows")]
-            let handle = run_studiomdl(qc_path.as_path(), self.studiomdl.as_ref().unwrap());
+            #[cfg(target_arch = "x86_64")]
+            {
+                #[cfg(target_os = "windows")]
+                let handle = run_studiomdl(qc_path.as_path(), self.studiomdl.as_ref().unwrap());
 
-            #[cfg(target_os = "linux")]
-            let handle = run_studiomdl(
-                qc_path.as_path(),
-                self.studiomdl.as_ref().unwrap(),
-                self.wineprefix.as_ref().unwrap(),
-            );
+                #[cfg(target_os = "linux")]
+                let handle = run_studiomdl(
+                    qc_path.as_path(),
+                    self.studiomdl.as_ref().unwrap(),
+                    self.wineprefix.as_ref().unwrap(),
+                );
 
-            match handle.join() {
-                Ok(res) => {
-                    let output = res?;
-                    let stdout = from_utf8(&output.stdout).unwrap();
+                match handle.join() {
+                    Ok(res) => {
+                        let output = res?;
+                        let stdout = from_utf8(&output.stdout).unwrap();
 
-                    let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
+                        let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
 
-                    if let Some(err_index) = maybe_err {
-                        let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
-                        let err_str = format!("Cannot compile: {}", err.trim());
+                        if let Some(err_index) = maybe_err {
+                            let err =
+                                stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
+                            let err_str = format!("Cannot compile: {}", err.trim());
+                            return Err(eyre!(err_str));
+                        }
+                    }
+                    Err(_) => {
+                        let err_str =
+                            "No idea what happens with running studiomdl. Probably just a dream.";
+
                         return Err(eyre!(err_str));
                     }
-                }
-                Err(_) => {
-                    let err_str =
-                        "No idea what happens with running studiomdl. Probably just a dream.";
-
-                    return Err(eyre!(err_str));
-                }
-            };
+                };
+            }
         }
 
         Ok(())

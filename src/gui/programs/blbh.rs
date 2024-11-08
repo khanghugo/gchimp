@@ -111,6 +111,7 @@ impl TabProgram for BLBHGui {
                     egui::TextEdit::singleline(&mut self.smd_path).hint_text("Choose .smd file"),
                 );
                 if ui.button("Add").clicked() {
+                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("SMD", &["smd"])
                         .pick_file()
@@ -128,6 +129,7 @@ impl TabProgram for BLBHGui {
                         .hint_text("Choose an image file"),
                 );
                 if ui.button("Add").clicked() {
+                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("Image", &["png", "bmp,", "jpg", "jpeg"])
                         .pick_file()

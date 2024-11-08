@@ -36,6 +36,7 @@ trait TabProgram {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 pub fn gui() -> eyre::Result<()> {
     let config_res = parse_config();
 
@@ -80,6 +81,11 @@ pub fn gui() -> eyre::Result<()> {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn gui() -> eyre::Result<()> {
+    todo!("gui wasm32")
+}
+
 struct MyApp {
     tree: Option<Tree<Pane>>,
     _no_config_status: String,
@@ -95,6 +101,7 @@ impl eframe::App for MyApp {
                 tree.ui(&mut behavior, ui);
             } else {
                 if ui.button("Add config.toml").highlight().clicked() {
+                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new().pick_file() {
                         self.parse_config(path.as_path());
                     }

@@ -11,10 +11,12 @@ use eyre::eyre;
 use crate::utils::{
     constants::{EPSILON, STUDIOMDL_ERROR_PATTERN},
     img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
-    run_bin::run_studiomdl,
     simple_calculs::{Matrix2x2, Plane3D, Polygon3D},
     smd_stuffs::{maybe_split_smd, textures_used_in_triangles},
 };
+
+#[cfg(target_arch = "x86_64")]
+use crate::utils::run_bin::run_studiomdl;
 
 pub struct BLBH {
     pub smd_path: PathBuf,
@@ -492,38 +494,45 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
         qc.write(qc_path.as_path())?;
 
         // run studiomdl
-        #[cfg(target_os = "windows")]
-        let handle = run_studiomdl(
-            qc_path.as_path(),
-            PathBuf::from(options.studiomdl.as_str()).as_path(),
-        );
+        #[cfg(target_arch = "x86_64")]
+        {
+            #[cfg(target_os = "windows")]
+            let handle = run_studiomdl(
+                qc_path.as_path(),
+                PathBuf::from(options.studiomdl.as_str()).as_path(),
+            );
 
-        #[cfg(target_os = "linux")]
-        let handle = run_studiomdl(
-            qc_path.as_path(),
-            PathBuf::from(options.studiomdl.as_str()).as_path(),
-            options.wineprefix.as_str(),
-        );
+            #[cfg(target_os = "linux")]
+            let handle = run_studiomdl(
+                qc_path.as_path(),
+                PathBuf::from(options.studiomdl.as_str()).as_path(),
+                options.wineprefix.as_str(),
+            );
 
-        match handle.join() {
-            Ok(res) => {
-                let output = res?;
-                let stdout = from_utf8(&output.stdout).unwrap();
+            match handle.join() {
+                Ok(res) => {
+                    let output = res?;
+                    let stdout = from_utf8(&output.stdout).unwrap();
 
-                let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
+                    let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
 
-                if let Some(err_index) = maybe_err {
-                    let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
-                    let err_str = format!("cannot compile: {}", err.trim());
+                    if let Some(err_index) = maybe_err {
+                        let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
+                        let err_str = format!("cannot compile: {}", err.trim());
+                        return Err(eyre!(err_str));
+                    }
+                }
+                Err(_) => {
+                    let err_str =
+                        "No idea what happens with running studiomdl. Probably just a dream.";
+
                     return Err(eyre!(err_str));
                 }
-            }
-            Err(_) => {
-                let err_str = "No idea what happens with running studiomdl. Probably just a dream.";
+            };
+        }
 
-                return Err(eyre!(err_str));
-            }
-        };
+        #[cfg(target_arch = "wasm32")]
+        todo!("blbh wasm32");
     }
 
     Ok(())

@@ -24,10 +24,12 @@ use crate::{
             relative_to_less_relative,
         },
         qc_stuffs::create_goldsrc_base_qc_from_source,
-        run_bin::{run_crowbar, run_studiomdl},
         smd_stuffs::source_smd_to_goldsrc_smd,
     },
 };
+
+#[cfg(target_arch = "x86_64")]
+use crate::utils::run_bin::{run_crowbar, run_studiomdl};
 
 mod constants;
 
@@ -229,6 +231,7 @@ impl S2G {
         self
     }
 
+    #[cfg(target_arch = "x86_64")]
     fn work_decompile(&mut self, input_files: &[PathBuf]) -> eyre::Result<()> {
         self.log_info("Decompiling model");
 
@@ -270,7 +273,7 @@ impl S2G {
 
             let _ = handle.join();
 
-            Ok(())
+            return Ok(());
         });
 
         if res.filter_map(|a| a.err()).count() > 0 {
@@ -278,6 +281,11 @@ impl S2G {
         }
 
         Ok(())
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn work_decompile(&mut self, input_files: &[PathBuf]) -> eyre::Result<()> {
+        todo!("s2g decompile wasm32")
     }
 
     // TODO: make this one to bitmap directly so we dont have to run bmp step
@@ -646,70 +654,78 @@ impl S2G {
 
         self.log_info(instr_msg.as_str());
 
-        let res = compile_able_qcs.par_iter().map(|path| {
-            #[cfg(target_os = "windows")]
-            let res = run_studiomdl(path, &self.options.studiomdl.as_ref().unwrap());
+        #[cfg(target_arch = "x86_64")]
+        {
+            let res = compile_able_qcs.par_iter().map(|path| {
+                #[cfg(target_os = "windows")]
+                let res = run_studiomdl(path, &self.options.studiomdl.as_ref().unwrap());
 
-            #[cfg(target_os = "linux")]
-            let res = run_studiomdl(
-                path,
-                self.options.studiomdl.as_ref().unwrap(),
-                self.options.wineprefix.as_ref().unwrap(),
-            );
+                #[cfg(target_os = "linux")]
+                let res = run_studiomdl(
+                    path,
+                    self.options.studiomdl.as_ref().unwrap(),
+                    self.options.wineprefix.as_ref().unwrap(),
+                );
 
-            match res.join() {
-                Ok(res) => {
-                    let output = res.unwrap();
-                    let stdout = from_utf8(&output.stdout).unwrap();
+                match res.join() {
+                    Ok(res) => {
+                        let output = res.unwrap();
+                        let stdout = from_utf8(&output.stdout).unwrap();
 
-                    let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
+                        let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
 
-                    if let Some(err_index) = maybe_err {
-                        let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
-                        let err_str = format!("Cannot compile {}: {}", path.display(), err.trim());
-                        self.log_err(&err_str);
+                        if let Some(err_index) = maybe_err {
+                            let err =
+                                stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
+                            let err_str =
+                                format!("Cannot compile {}: {}", path.display(), err.trim());
+                            self.log_err(&err_str);
 
-                        return Err(eyre!(err_str));
+                            return Err(eyre!(err_str));
+                        }
+
+                        Ok(())
                     }
+                    Err(_) => {
+                        let err_str =
+                            "No idea what happens with running studiomdl. Probably just a dream.";
 
-                    Ok(())
+                        self.log_err(err_str);
+
+                        Err(eyre!(err_str))
+                    }
                 }
-                Err(_) => {
-                    let err_str =
-                        "No idea what happens with running studiomdl. Probably just a dream.";
+            });
 
-                    self.log_err(err_str);
-
-                    Err(eyre!(err_str))
-                }
-            }
-        });
-
-        let res =
-            res.filter_map(|a| a.err())
-                .map(|a| a.to_string())
-                .reduce(String::new, |mut acc, e| {
+            let res = res.filter_map(|a| a.err()).map(|a| a.to_string()).reduce(
+                String::new,
+                |mut acc, e| {
                     acc += &e;
                     acc += "\n";
                     acc
-                });
+                },
+            );
 
-        if !res.is_empty() && !self.options.force {
-            return Err(eyre!(res));
+            if !res.is_empty() && !self.options.force {
+                return Err(eyre!(res));
+            }
+
+            let mut goldsrc_mdl_path = compile_able_qcs
+                .iter()
+                .map(|path| {
+                    let mut new_path = path.clone();
+                    new_path.set_extension("mdl");
+                    new_path
+                })
+                .collect::<Vec<PathBuf>>();
+
+            result.append(&mut goldsrc_mdl_path);
+
+            return Ok(result);
         }
 
-        let mut goldsrc_mdl_path = compile_able_qcs
-            .iter()
-            .map(|path| {
-                let mut new_path = path.clone();
-                new_path.set_extension("mdl");
-                new_path
-            })
-            .collect::<Vec<PathBuf>>();
-
-        result.append(&mut goldsrc_mdl_path);
-
-        Ok(result)
+        #[cfg(target_arch = "wasm32")]
+        todo!("s2g work compile");
     }
 
     /// Does all the work.

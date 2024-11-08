@@ -31,7 +31,6 @@ use crate::{
             textures_used_in_entity, textures_used_in_map,
         },
         misc::parse_triplet,
-        run_bin::run_studiomdl,
         smd_stuffs::{
             add_bitmap_extension_to_texture, find_centroid, find_centroid_from_triangles,
             find_mins_maxs, maybe_split_smd, move_by, textures_used_in_triangles,
@@ -40,6 +39,9 @@ use crate::{
         wad_stuffs::{export_texture, SimpleWad},
     },
 };
+
+#[cfg(target_arch = "x86_64")]
+use crate::utils::run_bin::run_studiomdl;
 
 pub mod entity;
 
@@ -411,19 +413,25 @@ impl Map2Mdl {
             return err!(err_str);
         }
 
-        let res: Vec<JoinHandle<eyre::Result<Output>>> = smd_and_qc_res
-            .into_par_iter()
-            .map(|res| {
-                run_studiomdl(
-                    res.unwrap().as_path(),
-                    self.options.studiomdl.as_ref().unwrap(),
-                    #[cfg(target_os = "linux")]
-                    self.options.wineprefix.as_ref().unwrap(),
-                )
-            })
-            .collect();
+        #[cfg(target_arch = "x86_64")]
+        {
+            let res: Vec<JoinHandle<eyre::Result<Output>>> = smd_and_qc_res
+                .into_par_iter()
+                .map(|res| {
+                    run_studiomdl(
+                        res.unwrap().as_path(),
+                        self.options.studiomdl.as_ref().unwrap(),
+                        #[cfg(target_os = "linux")]
+                        self.options.wineprefix.as_ref().unwrap(),
+                    )
+                })
+                .collect();
 
-        Ok(Some(res))
+            return Ok(Some(res));
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        todo!("wasm32 map2mdl convert from triangles");
     }
 
     fn maybe_export_texture(

@@ -131,6 +131,7 @@ impl SkyModGui {
         };
 
         if button.clicked() {
+            #[cfg(target_arch = "x86_64")]
             if let Some(path) = rfd::FileDialog::new().pick_file() {
                 self.textures[index] = path.display().to_string();
             }

@@ -40,6 +40,7 @@ impl Misc {
                 ui.label("QC:");
                 ui.add(egui::TextEdit::singleline(&mut self.qc).hint_text("Choose .qc file"));
                 if ui.button("Add").clicked() {
+                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new().add_filter("QC", &["qc"]).pick_file()
                     {
                         if path.extension().is_some_and(|ext| ext == "qc") {
@@ -66,6 +67,7 @@ impl Misc {
             ui.label("WAV:");
             ui.add(egui::TextEdit::singleline(&mut self.wav).hint_text("Choose .wav file"));
             if ui.button("Add").clicked() {
+                #[cfg(target_arch = "x86_64")]
                 if let Some(path) = rfd::FileDialog::new()
                     .add_filter("WAV", &["wav"])
                     .pick_file()
