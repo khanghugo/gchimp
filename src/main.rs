@@ -9,6 +9,7 @@ pub mod utils;
 
 use std::process::ExitCode;
 
+#[cfg(target_arch = "x86_64")]
 fn main() -> ExitCode {
     let cli_res = cli::cli();
 

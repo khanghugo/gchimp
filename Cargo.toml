@@ -50,7 +50,9 @@ log = "0.4.22"
 arboard = "3.4.0" # is not available on wasm32
 
 # [target.'cfg(target_arch = "wasm32")'.lib]
-# crate-type = ["cdylib", "rlib"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [workspace]
 members = [".", "map", "smd", "qc" , "wad", "bsp", "byte_writer", "vtf"]
