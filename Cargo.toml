@@ -13,7 +13,7 @@ map = { path = "map" }
 qc = { path = "qc" }
 wad = { path = "wad" }
 bsp = { path = "bsp" }
-dem = { path = "/home/khang/dem" }
+dem = { git = "https://github.com/khanghugo/dem.git" }
 vtf = { version = "0.1.0", path = "vtf" }
 
 # dependencies
