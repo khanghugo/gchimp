@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # local dependencies
-gchimp = { path = "../" }
+gchimp = { path = "../gchimp" }
 smd = { path = "../smd" }
 map = { path = "../map" }
 qc = { path = "../qc" }
