@@ -68,7 +68,7 @@ jobs:
     - name: Preparing upload
       run: |
         mkdir gchimp
-        cp target/${{ matrix.target }}/${{ matrix.configuration }}/${{ matrix.compiled }} gchimp/${{ matrix.filename }}
+        cp target/${{ matrix.target }}/${{ matrix.configuration }}/${{ matrix.filename-compiled }} gchimp/${{ matrix.filename }}
         cp -r dist gchimp/
         mv gchimp/dist/config.toml gchimp/config.toml
         
