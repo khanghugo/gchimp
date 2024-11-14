@@ -21,7 +21,7 @@ fn main() -> ExitCode {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-fn main() -> ExitCode {
-    ExitCode::from(1)
+#[cfg(not(target_arch = "x86_64"))]
+fn main() {
+    panic!("gchimp-native only works on x86_64 for the time being")
 }

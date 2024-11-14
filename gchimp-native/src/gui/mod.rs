@@ -37,7 +37,6 @@ trait TabProgram {
     }
 }
 
-#[cfg(target_arch = "x86_64")]
 pub fn gui() -> eyre::Result<()> {
     use crate::persistent_storage::PersistentStorage;
 
@@ -114,7 +113,6 @@ impl eframe::App for MyApp {
                 tree.ui(&mut behavior, ui);
             } else {
                 if ui.button("Add config.toml").highlight().clicked() {
-                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new().pick_file() {
                         self.parse_config(path.as_path());
                     }

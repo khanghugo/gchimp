@@ -98,7 +98,6 @@ impl DemDoc {
                 ui.label("Demo:");
                 ui.add(egui::TextEdit::singleline(&mut self.dem).hint_text("Choose .dem file"));
                 if ui.button("Add").clicked() {
-                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("Demo", &["dem"])
                         .pick_file()
@@ -113,7 +112,6 @@ impl DemDoc {
                 ui.label("Map:");
                 ui.add(egui::TextEdit::singleline(&mut self.bsp).hint_text("Choose .bsp file"));
                 if ui.button("Add").clicked() {
-                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("BSP", &["bsp"])
                         .pick_file()
@@ -185,7 +183,6 @@ impl DemDoc {
                 ui.label("Demo:");
                 ui.add(egui::TextEdit::singleline(&mut self.dem).hint_text("Choose .dem file"));
                 if ui.button("Add").clicked() {
-                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("Demo", &["dem"])
                         .pick_file()
@@ -233,7 +230,6 @@ impl DemDoc {
                 };
 
                 if ui.button("Add").clicked() {
-                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("Demo", &["dem"])
                         .pick_file()
@@ -262,7 +258,6 @@ impl DemDoc {
                 }
 
                 if ui.button("Add").clicked() {
-                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new().pick_folder() {
                         self.check_doctored_folder = path.display().to_string();
                         self.check_doctored_use_demo = false;

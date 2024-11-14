@@ -165,7 +165,6 @@ impl WaddyGui {
         // export when there's lots of selected or not
         if !is_multiple_tiles_selected {
             if ui.button("Export").clicked() {
-                #[cfg(target_arch = "x86_64")]
                 if let Some(path) = rfd::FileDialog::new()
                     .set_file_name(effective_tile.name())
                     .add_filter("All Files", &["bmp"])
@@ -196,7 +195,6 @@ impl WaddyGui {
                 ))
                 .clicked()
             {
-                #[cfg(target_arch = "x86_64")]
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     self.instances[instance_index].selected.par_iter().for_each(
                         |&texture_tile_index| {
@@ -236,8 +234,6 @@ impl WaddyGui {
                     .texture_name
                     .get_string()
                     .starts_with("{");
-
-                #[cfg(target_arch = "x86_64")]
                 {
                     use arboard::Clipboard;
 
@@ -714,7 +710,6 @@ impl WaddyGui {
         let should_add_pasted_image = ui
             .input(|i| i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::V));
 
-        #[cfg(target_arch = "x86_64")]
         if should_add_pasted_image {
             use arboard::Clipboard;
 
@@ -951,7 +946,6 @@ impl WaddyGui {
     }
 
     fn menu_open(&mut self, ui: &mut Ui) -> bool {
-        #[cfg(target_arch = "x86_64")]
         if let Some(path) = rfd::FileDialog::new().pick_file() {
             let ext = path.extension().unwrap();
 
@@ -1019,7 +1013,6 @@ impl WaddyGui {
             if ui.button("Import").clicked() {
                 // TODO this is not consistent with drag and drop behavior
                 // this does not filter out file extension
-                #[cfg(target_arch = "x86_64")]
                 if let Some(path) = rfd::FileDialog::new().pick_file() {
                     if let Err(err) = self.instances[instance_index]
                         .waddy
@@ -1035,7 +1028,6 @@ impl WaddyGui {
             }
 
             if ui.button("Export All").clicked() {
-                #[cfg(target_arch = "x86_64")]
                 if let Some(path) = rfd::FileDialog::new().pick_folder() {
                     // TODO TOAST TOAST
                     if let Err(err) = self.instances[instance_index]
@@ -1129,7 +1121,6 @@ impl WaddyGui {
     }
 
     fn menu_save_as_dialogue(&mut self, instance_index: usize) {
-        #[cfg(target_arch = "x86_64")]
         if let Some(path) = rfd::FileDialog::new()
             .add_filter("All Files", &["wad"])
             .set_file_name(if let Some(path) = &self.instances[instance_index].path {

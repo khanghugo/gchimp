@@ -162,7 +162,6 @@ Append \"_<scalar>\" if tiling",
 
         ui.horizontal(|ui| {
             if ui.button("Add file(s)").clicked() {
-                #[cfg(target_arch = "x86_64")]
                 if let Some(paths) = rfd::FileDialog::new().pick_files() {
                     for path in paths {
                         self.add_item(path.as_path());
@@ -171,7 +170,6 @@ Append \"_<scalar>\" if tiling",
             }
 
             if ui.button("Add folder(s)").clicked() {
-                #[cfg(target_arch = "x86_64")]
                 if let Some(paths) = rfd::FileDialog::new().pick_folders() {
                     for path in paths {
                         self.add_item(path.as_path());

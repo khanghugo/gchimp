@@ -145,7 +145,6 @@ impl TabProgram for S2GGui {
                     );
                 });
                 if ui.button("+").clicked() {
-                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("Model files", &["mdl"])
                         .pick_file()
@@ -165,7 +164,6 @@ impl TabProgram for S2GGui {
                     );
                 });
                 if ui.button("+").clicked() {
-                    #[cfg(target_arch = "x86_64")]
                     if let Some(path) = rfd::FileDialog::new().pick_folder() {
                         self.drag_and_drop.folder_path = path.display().to_string();
                         self.drag_and_drop.use_folder = true;

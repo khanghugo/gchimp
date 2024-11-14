@@ -115,7 +115,6 @@ impl TabProgram for Map2MdlGui {
                         );
                     });
                     if ui.button("Add").clicked() {
-                        #[cfg(target_arch = "x86_64")]
                         if let Some(path) = rfd::FileDialog::new().pick_file() {
                             if path.extension().is_some_and(|ext| ext == "map") {
                                 self.map = path.display().to_string();

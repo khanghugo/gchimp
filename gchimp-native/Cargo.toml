@@ -28,13 +28,5 @@ egui_tiles = "0.10.1"
 rfd = "0.14.1"
 egui_extras = {version = "0.29.1", features = ["all_loaders", "http"]}
 
-# enable wasm compile
-getrandom = { version = "0.2.15", features = ["js"] }
-wasm-bindgen = "0.2.95"
-wasm-bindgen-futures = "0.4.45"
-log = "0.4.22"
-
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 arboard = "3.4.0" # is not available on wasm32
-
-# [target.'cfg(target_arch = "wasm32")'.lib]
