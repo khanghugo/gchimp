@@ -124,7 +124,8 @@ impl SkyModGui {
         let button = if self.texture_paths[index].is_empty() {
             ui.add_sized([FACE_SIZE, FACE_SIZE], egui::Button::new(text))
         } else {
-            // path is valid, now check if image is loaded based on uri
+            // now path is valid, check if the texture is loaded
+            // otherwise we load new texture
             let image = egui::Image::new((
                 (if let Some(handle) = &self.texture_handles[index] {
                     handle.clone()
@@ -143,32 +144,9 @@ impl SkyModGui {
                 },
             ));
 
-            // let image = if self.texture_uris[index].is_empty() {
-            //     println!("new load");
-            // let (uri, image) = include_image!(&self.texture_paths[index]);
-            // let bytes = ui.ctx().include_bytes(uri, bytes);
-            // let image = egui::Image::new(format!("file://{}", self.texture_paths[index]));
-            //     self.texture_uris[index] = uri;
-            //     image
-            // } else {
-            //     println!("old load {}", self.texture_uris[index]);
-            //     ImageSource::Uri(self.texture_uris[index].clone().into())
-            // };
-            // ui.ctx().include_bytes(format!("bytes://{}", self.texture_paths[index]), bytes);
-            // let uri = format!("bytes://{}", self.texture_paths[index]);
-
-            // let image = if self.texture_handles[index].is_empty() {
-            //     let (uri, image) = include_image!(&self.texture_paths[index]);
-            //     self.texture_handles[index] = uri;
-            //     image
-            // } else {
-            //     ImageSource::Uri(uri.into())
-            // };
-
             ui.add_sized(
                 [FACE_SIZE, FACE_SIZE],
                 egui::ImageButton::new(image).frame(false),
-                // egui::Image::new(format!("file://{}", self.texture_paths[index])),
             )
         };
 
@@ -327,6 +305,11 @@ Recommeded to leave it checked for uniformly lit texture.",
                             .as_str(),
                     ) {
                         self.texture_paths[idx as usize] = path.display().to_string();
+
+                        if let Some(handle) = &self.texture_handles[idx as usize] {
+                            drop(handle.clone())
+                        }
+
                         self.texture_handles[idx as usize] = None;
 
                         let skybox_name = path.file_stem().unwrap().to_str().unwrap();
