@@ -33,6 +33,8 @@ jobs:
             filename: gchimp.exe
             filename-compiled: gchimp-native.exe
             label: Windows
+
+          - native-package: gchimp-native
             
           - configuration: release
             release-flag: '--release'
@@ -61,7 +63,7 @@ jobs:
       uses: actions-rs/cargo@v1.0.1
       with:
         command: build
-        args: --target ${{ matrix.target }} ${{ matrix.release-flag }}
+        args: --target ${{ matrix.target }} ${{ matrix.release-flag }} --package ${{ matrix.native-package }}
       
     - name: Preparing upload
       run: |
