@@ -37,3 +37,9 @@ To build native egui application, do
 ```sh
 cargo build --package gchimp-native
 ```
+
+To run native egui application, do
+
+```sh
+cargo run --release --package gchimp-native
+```
