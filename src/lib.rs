@@ -1,9 +1,5 @@
-mod cli;
-mod config;
-mod entity;
-mod persistent_storage;
+pub mod config;
+pub mod entity;
 
-mod modules;
-mod utils;
-
-pub mod gui;
+pub mod modules;
+pub mod utils;

@@ -4,6 +4,7 @@ use std::{
 };
 
 use eframe::egui::{self, Context, Modifiers, RichText, ScrollArea, Sense, Ui};
+use gchimp::modules::waddy::Waddy;
 use image::{ImageBuffer, RgbaImage};
 use wad::types::FileEntry;
 
@@ -15,7 +16,6 @@ use crate::{
         utils::{display_image_viewport_from_texture, preview_file_being_dropped, WadImage},
         TabProgram,
     },
-    modules::waddy::Waddy,
     persistent_storage::PersistentStorage,
 };
 

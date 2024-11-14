@@ -6,10 +6,9 @@ use std::{
 use eframe::egui;
 use egui_extras::{Column, TableBuilder};
 
-use crate::{
-    gui::{utils::preview_file_being_dropped, TabProgram},
-    modules::textile::{TexTileBuilder, TexTileOptions, TexTileSync},
-};
+use gchimp::modules::textile::{TexTileBuilder, TexTileOptions, TexTileSync};
+
+use crate::gui::{utils::preview_file_being_dropped, TabProgram};
 
 pub struct TexTileGui {
     items: Vec<PathBuf>,

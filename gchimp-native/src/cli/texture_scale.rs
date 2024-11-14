@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::modules::texture_scale::texture_scale;
+use gchimp::modules::texture_scale::texture_scale;
 
 pub struct TextureScale;
 impl Cli for TextureScale {

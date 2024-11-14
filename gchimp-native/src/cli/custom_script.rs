@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::modules::custom_script::custom_script;
+use gchimp::modules::custom_script::custom_script;
 
 use super::{Cli, CliRes};
 

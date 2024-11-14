@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::modules::loop_wave::loop_wave;
+use gchimp::modules::loop_wave::loop_wave;
 
 use super::{Cli, CliRes};
 

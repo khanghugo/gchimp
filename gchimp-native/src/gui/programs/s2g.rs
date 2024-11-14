@@ -5,14 +5,15 @@ use std::{
 
 use eframe::egui::{self, ScrollArea};
 
-use crate::{
+use gchimp::{
     config::Config,
-    gui::{
-        constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
-        utils::preview_file_being_dropped,
-        TabProgram,
-    },
     modules::s2g::{S2GOptions, S2GSteps, S2GSync, S2G},
+};
+
+use crate::gui::{
+    constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
+    utils::preview_file_being_dropped,
+    TabProgram,
 };
 
 struct DragAndDrop {

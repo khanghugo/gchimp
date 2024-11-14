@@ -7,11 +7,12 @@ use eframe::egui::{self, ThemePreference};
 use egui_tiles::Tree;
 use utils::preview_file_being_dropped;
 
-use crate::{
+use gchimp::{
     config::{parse_config, parse_config_from_file, Config},
     err,
-    persistent_storage::PersistentStorage,
 };
+
+use crate::persistent_storage::PersistentStorage;
 
 use self::{
     constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
@@ -38,9 +39,12 @@ trait TabProgram {
 
 #[cfg(target_arch = "x86_64")]
 pub fn gui() -> eyre::Result<()> {
+    use crate::persistent_storage::PersistentStorage;
+
     let config_res = parse_config();
 
-    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../.././media/logo.png")).unwrap();
+    let icon =
+        eframe::icon_data::from_png_bytes(include_bytes!("../../.././media/logo.png")).unwrap();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

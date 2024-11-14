@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::modules::split_model::split_model;
+use gchimp::modules::split_model::split_model;
 
 pub struct SplitModel;
 

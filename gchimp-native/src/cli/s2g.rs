@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use crate::{
+use gchimp::{
     config::{parse_config, Config},
     modules::s2g::S2G,
 };

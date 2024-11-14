@@ -1,6 +1,6 @@
 use map::Map;
 
-use crate::modules::check_illegal_brush::check_illegal_brush;
+use gchimp::modules::check_illegal_brush::check_illegal_brush;
 
 use super::{Cli, CliRes};
 

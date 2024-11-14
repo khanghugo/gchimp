@@ -1,6 +1,6 @@
 use map::Map;
 
-use crate::modules::light_scale::light_scale;
+use gchimp::modules::light_scale::light_scale;
 
 use super::{Cli, CliRes};
 

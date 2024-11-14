@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use super::*;
 
-use crate::{
+use gchimp::{
     config::{parse_config, Config},
     modules::map2mdl::{entity::MAP2MDL_ENTITY_NAME, Map2Mdl},
 };

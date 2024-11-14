@@ -1,11 +1,6 @@
 mod cli;
-mod config;
-mod entity;
 mod gui;
 mod persistent_storage;
-
-pub mod modules;
-pub mod utils;
 
 use std::process::ExitCode;
 
@@ -24,4 +19,9 @@ fn main() -> ExitCode {
         cli::CliRes::Ok => ok_exit,
         cli::CliRes::Err => err_exit,
     }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() -> ExitCode {
+    ExitCode::from(1)
 }

@@ -8,14 +8,13 @@ use bsp::Bsp;
 use dem::{open_demo, write_demo};
 use eframe::egui;
 
-use crate::{
-    gui::{utils::preview_file_being_dropped, TabProgram},
-    modules::demdoc::{
-        change_map::change_map,
-        check_doctored::{check_doctored, check_doctored_folder},
-        kz_stats::add_kz_stats,
-    },
+use gchimp::modules::demdoc::{
+    change_map::change_map,
+    check_doctored::{check_doctored, check_doctored_folder},
+    kz_stats::add_kz_stats,
 };
+
+use crate::gui::{utils::preview_file_being_dropped, TabProgram};
 
 pub struct DemDoc {
     bsp: String,

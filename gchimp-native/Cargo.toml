@@ -1,0 +1,40 @@
+[package]
+name = "gchimp-native"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# local dependencies
+gchimp = { path = "../" }
+smd = { path = "../smd" }
+map = { path = "../map" }
+qc = { path = "../qc" }
+wad = { path = "../wad" }
+bsp = { path = "../bsp" }
+dem = { path = "/home/khang/dem" }
+vtf = { path = "../vtf" }
+
+# dependencies
+eyre = "0.6.12"
+clap = { version = "4.5.4", features = ["derive"] }
+toml = { version = "0.8.13", features = ["default"] }
+serde = { version = "1.0.202", features = ["derive"] }
+image = { version = "0.25.1", features = ["png"] }
+rayon = "1.10.0"
+
+# egui stuffs
+eframe = { version = "0.29.1", features = ["accesskit", "default_fonts", "wayland", "x11"] }
+egui_tiles = "0.10.1"
+rfd = "0.14.1"
+egui_extras = {version = "0.29.1", features = ["all_loaders", "http"]}
+
+# enable wasm compile
+getrandom = { version = "0.2.15", features = ["js"] }
+wasm-bindgen = "0.2.95"
+wasm-bindgen-futures = "0.4.45"
+log = "0.4.22"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+arboard = "3.4.0" # is not available on wasm32
+
+# [target.'cfg(target_arch = "wasm32")'.lib]

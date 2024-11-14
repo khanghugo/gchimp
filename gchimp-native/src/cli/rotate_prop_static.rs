@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::modules::rotate_prop_static::rotate_prop_static;
+use gchimp::modules::rotate_prop_static::rotate_prop_static;
 
 pub struct RotatePropStatic;
 impl Cli for RotatePropStatic {

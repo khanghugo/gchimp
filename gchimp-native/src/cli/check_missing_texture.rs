@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 use map::Map;
 use wad::types::Wad;
 
-use crate::modules::check_missing_texture::check_missing_texture;
+use gchimp::modules::check_missing_texture::check_missing_texture;
 
 use super::{Cli, CliRes};
 

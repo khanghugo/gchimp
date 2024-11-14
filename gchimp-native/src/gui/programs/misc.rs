@@ -6,10 +6,9 @@ use std::{
 
 use eframe::egui;
 
-use crate::{
-    gui::{utils::preview_file_being_dropped, TabProgram},
-    modules::{loop_wave::loop_wave, split_model::split_model},
-};
+use gchimp::modules::{loop_wave::loop_wave, split_model::split_model};
+
+use crate::gui::{utils::preview_file_being_dropped, TabProgram};
 
 pub struct Misc {
     qc: String,

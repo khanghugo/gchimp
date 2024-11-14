@@ -2,7 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use eframe::egui::{self, vec2, Sense, Stroke, TextStyle, Vec2};
 
-use crate::{config::Config, persistent_storage::PersistentStorage};
+use gchimp::config::Config;
+
+use crate::persistent_storage::PersistentStorage;
 
 use super::{
     programs::{

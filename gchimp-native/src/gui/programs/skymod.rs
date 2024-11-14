@@ -6,14 +6,15 @@ use std::{
 
 use eframe::egui::{self, ScrollArea, Vec2};
 
-use crate::{
+use gchimp::{
     config::Config,
-    gui::{
-        constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
-        utils::{load_egui_image_to_texture, preview_file_being_dropped},
-        TabProgram,
-    },
     modules::skymod::{SkyModBuilder, SkyModOptions},
+};
+
+use crate::gui::{
+    constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
+    utils::{load_egui_image_to_texture, preview_file_being_dropped},
+    TabProgram,
 };
 
 static FACE_SIZE: f32 = 94.;

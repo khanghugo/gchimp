@@ -6,13 +6,14 @@ use std::{
 
 use eframe::egui;
 
-use crate::{
+use gchimp::{
     config::Config,
-    gui::{utils::preview_file_being_dropped, TabProgram},
     modules::blender_lightmap_baker_helper::{
         blender_lightmap_baker_helper, BLBHOptions, BLBH, BLBH_DEFAULT_UV_SHRINK_FACTOR,
     },
 };
+
+use crate::gui::{utils::preview_file_being_dropped, TabProgram};
 
 #[derive(Debug)]
 pub struct BLBHGui {
