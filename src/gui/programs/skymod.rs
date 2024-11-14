@@ -1,20 +1,18 @@
 use std::{
-    io::Read,
     path::PathBuf,
     sync::{Arc, Mutex},
     thread,
 };
 
-use eframe::egui::{self, ScrollArea};
+use eframe::egui::{self, ScrollArea, Vec2};
 
 use crate::{
     config::Config,
     gui::{
         constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
-        utils::preview_file_being_dropped,
+        utils::{load_egui_image_to_texture, preview_file_being_dropped},
         TabProgram,
     },
-    include_image,
     modules::skymod::{SkyModBuilder, SkyModOptions},
 };
 
@@ -24,7 +22,8 @@ static SKY_TEXTURE_SUFFIX: [&str; 6] = ["up", "dn", "lf", "rt", "ft", "bk"];
 pub struct SkyModGui {
     app_config: Config,
     // order is: up left front right back down
-    textures: Vec<String>,
+    texture_paths: Vec<String>,
+    texture_handles: Vec<Option<egui::TextureHandle>>,
     options: SkyModOptions,
     skybox_size: String,
     texture_per_face: String,
@@ -36,7 +35,8 @@ impl SkyModGui {
     pub fn new(app_config: Config) -> Self {
         Self {
             app_config,
-            textures: vec![String::new(); 6],
+            texture_paths: vec![String::new(); 6],
+            texture_handles: vec![None; 6],
             options: SkyModOptions::default(),
             skybox_size: String::from("131072"),
             texture_per_face: String::from("1"),
@@ -45,33 +45,31 @@ impl SkyModGui {
         }
     }
 
-    fn program_output(&mut self, s: &str) {
-        let mut lock = self.program_output.lock().unwrap();
-        *lock = s.to_string();
-    }
-
     fn run(&mut self) {
         let texture_per_face = self.texture_per_face.parse::<u32>();
         let skybox_size = self.skybox_size.parse::<u32>();
 
+        let output = self.program_output.clone();
+        "Running".clone_into(&mut output.lock().unwrap());
+
         if texture_per_face.is_err() {
-            self.program_output("Texture per face is not a number");
+            "Texture per face is not a number".clone_into(&mut output.lock().unwrap());
             return;
         }
 
         if skybox_size.is_err() {
-            self.program_output("Skybox size is not a number");
+            "Skybox size is not a number".clone_into(&mut output.lock().unwrap());
             return;
         }
 
         if self.options.output_name.is_empty() {
-            self.program_output("Output name is empty");
+            "Output name is empty".clone_into(&mut output.lock().unwrap());
             return;
         }
 
         self.idle = false;
 
-        let textures = self.textures.clone();
+        let textures = self.texture_paths.clone();
         let studiomdl = self.app_config.studiomdl.clone();
 
         #[cfg(target_os = "linux")]
@@ -110,30 +108,74 @@ impl SkyModGui {
 
         match handle.join().unwrap() {
             Ok(_) => {
-                self.program_output("OK");
+                "OK".clone_into(&mut output.lock().unwrap());
                 self.idle = true;
             }
             Err(err) => {
-                self.program_output(err.to_string().as_str());
+                err.to_string()
+                    .as_str()
+                    .clone_into(&mut output.lock().unwrap());
                 self.idle = true;
             }
         };
     }
 
     fn selectable_face(&mut self, ui: &mut eframe::egui::Ui, index: usize, text: &str) {
-        let button = if self.textures[index].is_empty() {
+        let button = if self.texture_paths[index].is_empty() {
             ui.add_sized([FACE_SIZE, FACE_SIZE], egui::Button::new(text))
         } else {
+            // path is valid, now check if image is loaded based on uri
+            let image = egui::Image::new((
+                (if let Some(handle) = &self.texture_handles[index] {
+                    handle.clone()
+                } else {
+                    let handle =
+                        load_egui_image_to_texture(ui, self.texture_paths[index].clone()).unwrap();
+
+                    self.texture_handles[index] = Some(handle.clone());
+
+                    handle
+                })
+                .id(),
+                Vec2 {
+                    x: FACE_SIZE,
+                    y: FACE_SIZE,
+                },
+            ));
+
+            // let image = if self.texture_uris[index].is_empty() {
+            //     println!("new load");
+            // let (uri, image) = include_image!(&self.texture_paths[index]);
+            // let bytes = ui.ctx().include_bytes(uri, bytes);
+            // let image = egui::Image::new(format!("file://{}", self.texture_paths[index]));
+            //     self.texture_uris[index] = uri;
+            //     image
+            // } else {
+            //     println!("old load {}", self.texture_uris[index]);
+            //     ImageSource::Uri(self.texture_uris[index].clone().into())
+            // };
+            // ui.ctx().include_bytes(format!("bytes://{}", self.texture_paths[index]), bytes);
+            // let uri = format!("bytes://{}", self.texture_paths[index]);
+
+            // let image = if self.texture_handles[index].is_empty() {
+            //     let (uri, image) = include_image!(&self.texture_paths[index]);
+            //     self.texture_handles[index] = uri;
+            //     image
+            // } else {
+            //     ImageSource::Uri(uri.into())
+            // };
+
             ui.add_sized(
                 [FACE_SIZE, FACE_SIZE],
-                egui::ImageButton::new(include_image!(&self.textures[index])).frame(false),
+                egui::ImageButton::new(image).frame(false),
+                // egui::Image::new(format!("file://{}", self.texture_paths[index])),
             )
         };
 
         if button.clicked() {
             #[cfg(target_arch = "x86_64")]
             if let Some(path) = rfd::FileDialog::new().pick_file() {
-                self.textures[index] = path.display().to_string();
+                self.texture_paths[index] = path.display().to_string();
             }
         };
     }
@@ -146,6 +188,7 @@ impl TabProgram for SkyModGui {
 
     fn tab_ui(&mut self, ui: &mut eframe::egui::Ui) -> egui_tiles::UiResponse {
         ui.separator();
+        ui.ctx().forget_all_images();
 
         egui::Grid::new("Texture grid")
             .num_columns(4)
@@ -156,7 +199,9 @@ impl TabProgram for SkyModGui {
             .show(ui, |ui| {
                 ui.label("");
                 if ui.button("Reset").clicked() {
-                    self.textures.iter_mut().for_each(|tex| tex.clear());
+                    self.texture_paths.iter_mut().for_each(|tex| tex.clear());
+                    (0..self.texture_handles.len())
+                        .for_each(|idx| self.texture_handles[idx] = None);
                 };
                 self.selectable_face(ui, 0, "U");
                 ui.end_row();
@@ -272,95 +317,48 @@ Recommeded to leave it checked for uniformly lit texture.",
                     return;
                 }
 
-                self.options.output_name = paths[0]
-                    .file_stem()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .replace("bk", "");
+                paths.iter().for_each(|path| {
+                    if let Some(idx) = file_name_to_index(
+                        path.file_stem()
+                            .unwrap()
+                            .to_str()
+                            .unwrap()
+                            .to_lowercase()
+                            .as_str(),
+                    ) {
+                        self.texture_paths[idx as usize] = path.display().to_string();
+                        self.texture_handles[idx as usize] = None;
 
-                self.textures[0] = paths
-                    .iter()
-                    .find(|p| {
-                        p.file_stem()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_lowercase()
-                            .ends_with("up")
-                    })
-                    .unwrap()
-                    .display()
-                    .to_string();
-                self.textures[1] = paths
-                    .iter()
-                    .find(|p| {
-                        p.file_stem()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_lowercase()
-                            .ends_with("lf")
-                    })
-                    .unwrap()
-                    .display()
-                    .to_string();
-                self.textures[2] = paths
-                    .iter()
-                    .find(|p| {
-                        p.file_stem()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_lowercase()
-                            .ends_with("ft")
-                    })
-                    .unwrap()
-                    .display()
-                    .to_string();
-                self.textures[3] = paths
-                    .iter()
-                    .find(|p| {
-                        p.file_stem()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_lowercase()
-                            .ends_with("rt")
-                    })
-                    .unwrap()
-                    .display()
-                    .to_string();
-                self.textures[4] = paths
-                    .iter()
-                    .find(|p| {
-                        p.file_stem()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_lowercase()
-                            .ends_with("bk")
-                    })
-                    .unwrap()
-                    .display()
-                    .to_string();
-                self.textures[5] = paths
-                    .iter()
-                    .find(|p| {
-                        p.file_stem()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_lowercase()
-                            .ends_with("dn")
-                    })
-                    .unwrap()
-                    .display()
-                    .to_string();
+                        let skybox_name = path.file_stem().unwrap().to_str().unwrap();
+                        let skybox_name = &skybox_name[..skybox_name.len() - 2];
+                        self.options.output_name = skybox_name.to_string();
+                    }
+                });
             }
         });
+
+        // make it continuous
+        ui.ctx().request_repaint();
 
         // Make it non drag-able
         egui_tiles::UiResponse::None
     }
+}
+
+// input is `file` or `filebk` or `fileup`
+fn file_name_to_index(s: &str) -> Option<u32> {
+    let last_two = &s[s.len().saturating_sub(2)..s.len()];
+
+    // order is: up left front right back down
+    let idx: u32 = match last_two {
+        "up" => 0,
+        "lf" => 1,
+        "ft" => 2,
+        "rt" => 3,
+        "bk" => 4,
+        "dn" => 5,
+        _ => return None,
+    };
+
+    Some(idx)
 }

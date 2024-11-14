@@ -1,4 +1,8 @@
-use eframe::egui::{self, Align2, Color32, Context, Id, LayerId, Order, TextStyle, TextureHandle};
+use std::path::{Path, PathBuf};
+
+use eframe::egui::{
+    self, Align2, Color32, ColorImage, Context, Id, LayerId, Order, TextStyle, TextureHandle,
+};
 
 /// Preview hovering files:
 pub fn preview_file_being_dropped(ctx: &egui::Context) {
@@ -27,26 +31,6 @@ pub fn preview_files_being_dropped_min_max_file(ctx: &egui::Context, min: usize,
 
 //     is_in(p.x, rect.min.x, rect.max.x) && is_in(p.y, rect.min.y, rect.max.y)
 // }
-
-// gamer
-#[macro_export]
-macro_rules! include_image {
-    ($path:expr) => {{
-        let mut buf: Vec<u8> = vec![];
-        let _ = std::fs::OpenOptions::new()
-            .read(true)
-            .open($path)
-            .unwrap()
-            .read_to_end(&mut buf);
-
-        let cow = format!("bytes://{}", $path);
-
-        $crate::gui::egui::ImageSource::Bytes {
-            uri: ::std::borrow::Cow::Borrowed(cow.leak()),
-            bytes: $crate::gui::egui::load::Bytes::Static(buf.leak()),
-        }
-    }};
-}
 
 #[allow(dead_code)]
 pub fn display_image_viewport_from_uri(
@@ -162,4 +146,23 @@ impl WadImage {
     pub fn name_mut(&mut self) -> &mut String {
         &mut self.name
     }
+}
+
+pub fn load_egui_image_to_texture(
+    ui: &mut egui::Ui,
+    path: impl Into<PathBuf> + AsRef<Path>,
+) -> eyre::Result<egui::TextureHandle> {
+    let image = image::open(path.as_ref())?;
+    let path: PathBuf = path.into();
+
+    let size = [image.width() as _, image.height() as _];
+    let image_buffer = image.to_rgba8();
+    let pixels: image::FlatSamples<&[u8]> = image_buffer.as_flat_samples();
+    let color_image = ColorImage::from_rgba_unmultiplied(size, pixels.as_slice());
+
+    let handle = ui
+        .ctx()
+        .load_texture(path.to_str().unwrap(), color_image, Default::default());
+
+    Ok(handle)
 }
