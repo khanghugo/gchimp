@@ -43,3 +43,5 @@ To run native egui application, do
 ```sh
 cargo run --release --package gchimp-native
 ```
+
+To serve static web application, refer to [GCHIMP-WEB-README.md](./gchimp-web/www/GCHIMP-WEB-README.md)
