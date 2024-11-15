@@ -44,4 +44,8 @@ To run native egui application, do
 cargo run --release --package gchimp-native
 ```
 
-To serve static web application, refer to [GCHIMP-WEB-README.md](./gchimp-web/www/GCHIMP-WEB-README.md)
+## Deploying to the web
+
+You can deploy gchimp to the web. The features are limited at the moment
+
+Refer to [GCHIMP-WEB-README.md](./gchimp-web/www/GCHIMP-WEB-README.md)
