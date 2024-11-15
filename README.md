@@ -48,4 +48,4 @@ cargo run --release --package gchimp-native
 
 You can deploy gchimp to the web. The features are limited at the moment
 
-Refer to [GCHIMP-WEB-README.md](./gchimp-web/www/GCHIMP-WEB-README.md)
+Refer to [GCHIMP-WEB-README.md](./gchimp-web/www/README.md)
