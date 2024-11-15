@@ -67,6 +67,7 @@ jobs:
       
     - name: Preparing upload
       run: |
+        mv gchimp _gchimp
         mkdir gchimp
         cp target/${{ matrix.target }}/${{ matrix.configuration }}/${{ matrix.filename-compiled }} gchimp/${{ matrix.filename }}
         cp -r dist gchimp/
