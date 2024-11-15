@@ -1,6 +1,7 @@
 import { ChangeEvent, createRef, useState } from "react"
 
 import "./styles.css";
+import { Button } from "../button";
 
 interface UploadButtonProps {
     label: string,
@@ -19,11 +20,10 @@ export const UploadButton = ({ label, id, onChange, fileName }: UploadButtonProp
         onChange(e);
     };
 
-    return <button onClick={() => hiddenFileInput.current?.click()}>
-        <h2>{label}</h2>
+    return <Button onClick={() => hiddenFileInput.current?.click()} label={label}>
         <input type="file" id={id} ref={hiddenFileInput} onChange={(e) => localOnChange(e)} />
         <p>{fileName ? fileName : file && file}</p>
-    </button>
+    </Button>
 }
 
 const extract_file_name = (s: string): string => {

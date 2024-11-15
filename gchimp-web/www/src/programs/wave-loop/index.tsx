@@ -36,7 +36,7 @@ export const WaveLoop = () => {
     const changeFile = (e: ChangeEvent<HTMLInputElement>) => {
         const file = (e.target as HTMLInputElement).files?.item(0);
         // the path will be sandboxed so we only care about the file stem
-        setName(e.target.value);
+        setName(file?.name);
         setFile(file ? file : null);
     }
 
@@ -45,8 +45,7 @@ export const WaveLoop = () => {
 
         const file = e.dataTransfer.files.item(0);
 
-        if (file?.name)
-            setName(file?.name);
+        setName(file?.name);
 
         setFile(file ? file : null);
     }
@@ -82,12 +81,12 @@ export const WaveLoop = () => {
         file, submitButton
     ]);
 
-    return <GchimpProgram name="Wave Loop" className="wave-loop" onDrop={onDrop}>
+    return <GchimpProgram name="Wave Loop" className={`wave-loop`} onDrop={onDrop} >
         <form onSubmit={async (e) => runWaveLoop(e)}>
-            <UploadButton label={"Select WAV"} id={"wave-loop-path"} onChange={(e) => changeFile(e)} fileName={name} />
+            <UploadButton label={"Select or Drop WAV"} id={"wave-loop-path"} onChange={(e) => changeFile(e)} fileName={name} />
             <div>
                 <input type="submit" ref={submitButton} />
-                <button type="button" disabled={output === null} onClick={getLoopedWave}><h2>Get WAV</h2></button>
+                <button type="button" disabled={output === null} onClick={getLoopedWave}><h2>Get looped WAV</h2></button>
             </div>
             {/* <textarea readOnly={true} value={status} /> */}
         </form>

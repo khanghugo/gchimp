@@ -1,5 +1,3 @@
-button {
-    input {
-        display: none;
-    }
+button input {
+    display: none;
 }
