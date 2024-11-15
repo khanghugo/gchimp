@@ -20,7 +20,8 @@ const nextConfig: NextConfig = {
   },
   outputFileTracingIncludes: {
     '/api/**/*': ['./node_modules/**/*.wasm', './node_modules/**/*.proto'],
-  }
+  },
+  output: 'export',
 };
 
 // HOLY FUCK. I AM GOING TO KILL WHOEVER GETS PAID TO DO THIS
