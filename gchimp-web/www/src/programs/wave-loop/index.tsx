@@ -8,8 +8,8 @@ import { UploadButton } from "@/components/upload-button";
 export const WaveLoop = () => {
     const [name, setName] = useState<string | undefined>(undefined);
     const [file, setFile] = useState<File | null>(null);
-    const [_status, setStatus] = useState<string>("Status: Idle");
-    const [output, setOutput] = useState<Uint8Array<ArrayBufferLike> | null>(null);
+    // const [status, setStatus] = useState<string>("Status: Idle");
+    const [output, setOutput] = useState<Uint8Array | null>(null);
 
     const submitButton = createRef<HTMLInputElement>();
 
@@ -26,7 +26,7 @@ export const WaveLoop = () => {
         };
 
         if (!file) {
-            setStatus("No file selected")
+            // setStatus("No file selected")
             return;
         }
 
@@ -44,8 +44,6 @@ export const WaveLoop = () => {
         e.preventDefault();
 
         const file = e.dataTransfer.files.item(0);
-
-        console.log(e.dataTransfer.files);
 
         if (file?.name)
             setName(file?.name);
