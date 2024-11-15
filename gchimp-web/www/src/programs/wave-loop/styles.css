@@ -1,0 +1,29 @@
+.wave-loop {
+    h1 {
+        margin: 10px;
+    }
+    
+    display: flex;
+    flex-direction: column;
+
+    * {
+        width: 100%;
+    }
+
+    button {
+        margin-bottom: 10px;
+    }
+
+    border: 2px solid grey;
+    border-radius: 16px;
+    padding: 24px;
+
+    textarea {
+        resize: none;
+        text-align: center;
+    }
+
+    input[type="submit"] {
+        display: none;
+    }
+}

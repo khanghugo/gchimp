@@ -1,0 +1,6 @@
+section {
+    /* this is stupid */
+    * {
+        font-family: inherit;
+    }
+}
