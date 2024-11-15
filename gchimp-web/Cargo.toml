@@ -4,7 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+console_error_panic_hook = "0.1.7"
 gchimp = { path = "../gchimp" }
+
+wasm-bindgen = "0.2.95"
+wasm-bindgen-futures = "0.4.45"
+web-sys = "0.3.72"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

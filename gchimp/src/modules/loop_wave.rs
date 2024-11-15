@@ -9,12 +9,12 @@ use cuet::{ChunkWriter, CuePoint};
 use crate::err;
 
 pub fn loop_wave(wav_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
-    if !wav_path.as_ref().is_file() {
-        return err!("{} is not a file", wav_path.as_ref().display());
-    }
-
     if !wav_path.as_ref().exists() {
         return err!("{} does not exist", wav_path.as_ref().display());
+    }
+
+    if !wav_path.as_ref().is_file() {
+        return err!("{} is not a file", wav_path.as_ref().display());
     }
 
     if wav_path.as_ref().extension().is_none() || wav_path.as_ref().extension().unwrap() != "wav" {
@@ -25,14 +25,7 @@ pub fn loop_wave(wav_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()>
     let mut bytes = vec![];
     file.read_to_end(&mut bytes)?;
 
-    let cue = CuePoint::from_sample_offset(1, 1);
-    let mut cue_bytes = vec![1u8, 0, 0, 0];
-    cue_bytes.extend_from_slice(&cue.as_bytes());
-    let cues = [cue];
-
-    let write_cursor = io::Cursor::new(&mut bytes);
-    let mut writer = ChunkWriter::new(write_cursor).unwrap();
-    writer.append_cue_chunk(cues.as_slice())?;
+    let bytes = loop_wave_from_wave_bytes(bytes)?;
 
     let file_name = wav_path.as_ref().file_stem().unwrap().to_str().unwrap();
     let out_path = wav_path
@@ -49,6 +42,17 @@ pub fn loop_wave(wav_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()>
     out_file.flush()?;
 
     Ok(())
+}
+
+pub fn loop_wave_from_wave_bytes(mut bytes: Vec<u8>) -> eyre::Result<Vec<u8>> {
+    let cue = CuePoint::from_sample_offset(1, 1);
+    let cues = [cue];
+
+    let write_cursor = io::Cursor::new(&mut bytes);
+    let mut writer = ChunkWriter::new(write_cursor).unwrap();
+    writer.append_cue_chunk(cues.as_slice())?;
+
+    return Ok(bytes);
 }
 
 #[cfg(test)]
