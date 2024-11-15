@@ -4,6 +4,10 @@ This crate will re-export `gchimp` modules for `wasm32-unknown-unknown` and then
 
 ## Building
 
+You need `wasm-pack` to nicely package `gchimp-web`. Refer to your OS package manager to get it.
+
+Then,
+
 ```sh
 wasm-pack build
 ```
