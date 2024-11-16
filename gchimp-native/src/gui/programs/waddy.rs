@@ -12,7 +12,7 @@ use rayon::prelude::*;
 
 use crate::{
     gui::{
-        constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
+        constants::{IMAGE_FORMATS, PROGRAM_HEIGHT, PROGRAM_WIDTH},
         utils::{display_image_viewport_from_texture, preview_file_being_dropped, WadImage},
         TabProgram,
     },
@@ -946,7 +946,10 @@ impl WaddyGui {
     }
 
     fn menu_open(&mut self, ui: &mut Ui) -> bool {
-        if let Some(path) = rfd::FileDialog::new().pick_file() {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter("WAD/BSP", &["wad", "bsp"])
+            .pick_file()
+        {
             let ext = path.extension().unwrap();
 
             if ext == "wad" || ext == "bsp" {
@@ -1013,7 +1016,10 @@ impl WaddyGui {
             if ui.button("Import").clicked() {
                 // TODO this is not consistent with drag and drop behavior
                 // this does not filter out file extension
-                if let Some(path) = rfd::FileDialog::new().pick_file() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("Image", IMAGE_FORMATS)
+                    .pick_file()
+                {
                     if let Err(err) = self.instances[instance_index]
                         .waddy
                         .add_texture_from_path(path)
@@ -1122,7 +1128,7 @@ impl WaddyGui {
 
     fn menu_save_as_dialogue(&mut self, instance_index: usize) {
         if let Some(path) = rfd::FileDialog::new()
-            .add_filter("All Files", &["wad"])
+            .add_filter("WAD", &["wad"])
             .set_file_name(if let Some(path) = &self.instances[instance_index].path {
                 path.file_stem().unwrap().to_str().unwrap()
             } else {

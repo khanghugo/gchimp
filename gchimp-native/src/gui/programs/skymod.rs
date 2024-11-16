@@ -11,7 +11,7 @@ use gchimp::modules::skymod::{SkyModBuilder, SkyModOptions};
 use crate::{
     config::Config,
     gui::{
-        constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
+        constants::{IMAGE_FORMATS, PROGRAM_HEIGHT, PROGRAM_WIDTH},
         utils::{load_egui_image_to_texture, preview_file_being_dropped},
         TabProgram,
     },
@@ -152,7 +152,10 @@ impl SkyModGui {
         };
 
         if button.clicked() {
-            if let Some(path) = rfd::FileDialog::new().pick_file() {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("Image", IMAGE_FORMATS)
+                .pick_file()
+            {
                 self.texture_paths[index] = path.display().to_string();
             }
         };

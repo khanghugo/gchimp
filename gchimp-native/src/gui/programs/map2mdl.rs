@@ -115,7 +115,10 @@ impl TabProgram for Map2MdlGui {
                         );
                     });
                     if ui.button("Add").clicked() {
-                        if let Some(path) = rfd::FileDialog::new().pick_file() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("MAP", &["map"])
+                            .pick_file()
+                        {
                             if path.extension().is_some_and(|ext| ext == "map") {
                                 self.map = path.display().to_string();
                                 self.use_entity = false;

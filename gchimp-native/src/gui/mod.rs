@@ -113,7 +113,10 @@ impl eframe::App for MyApp {
                 tree.ui(&mut behavior, ui);
             } else {
                 if ui.button("Add config.toml").highlight().clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_file() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("TOML", &["toml"])
+                        .pick_file()
+                    {
                         self.parse_config(path.as_path());
                     }
                 }

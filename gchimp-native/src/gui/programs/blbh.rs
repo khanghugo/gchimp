@@ -12,7 +12,7 @@ use gchimp::modules::blender_lightmap_baker_helper::{
 
 use crate::{
     config::Config,
-    gui::{utils::preview_file_being_dropped, TabProgram},
+    gui::{constants::IMAGE_FORMATS, utils::preview_file_being_dropped, TabProgram},
 };
 
 #[derive(Debug)]
@@ -130,7 +130,7 @@ impl TabProgram for BLBHGui {
                 );
                 if ui.button("Add").clicked() {
                     if let Some(path) = rfd::FileDialog::new()
-                        .add_filter("Image", &["png", "bmp,", "jpg", "jpeg"])
+                        .add_filter("Image", IMAGE_FORMATS)
                         .pick_file()
                     {
                         self.texture_path = path.display().to_string();
