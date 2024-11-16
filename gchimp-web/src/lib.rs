@@ -1,4 +1,4 @@
-use wasm_bindgen::{convert::FromWasmAbi, prelude::*};
+use wasm_bindgen::prelude::*;
 
 use gchimp::modules::loop_wave::loop_wave_from_wave_bytes as _loop_wave;
 

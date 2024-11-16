@@ -52,7 +52,7 @@ pub fn loop_wave_from_wave_bytes(mut bytes: Vec<u8>) -> eyre::Result<Vec<u8>> {
     let mut writer = ChunkWriter::new(write_cursor).unwrap();
     writer.append_cue_chunk(cues.as_slice())?;
 
-    return Ok(bytes);
+    Ok(bytes)
 }
 
 #[cfg(test)]
