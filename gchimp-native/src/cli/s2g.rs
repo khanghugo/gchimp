@@ -1,13 +1,12 @@
+use crate::config::{parse_config, Config};
+
 use super::*;
 
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
-use gchimp::{
-    config::{parse_config, Config},
-    modules::s2g::S2G,
-};
+use gchimp::modules::s2g::S2G;
 
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]

@@ -2,15 +2,15 @@ use std::{path::PathBuf, thread};
 
 use eframe::egui::{self, ScrollArea};
 
-use gchimp::{
-    config::Config,
-    modules::map2mdl::{entity::MAP2MDL_ENTITY_NAME, Map2Mdl, Map2MdlOptions, Map2MdlSync},
-};
+use gchimp::modules::map2mdl::{entity::MAP2MDL_ENTITY_NAME, Map2Mdl, Map2MdlOptions, Map2MdlSync};
 
-use crate::gui::{
-    constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
-    utils::preview_file_being_dropped,
-    TabProgram,
+use crate::{
+    config::Config,
+    gui::{
+        constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
+        utils::preview_file_being_dropped,
+        TabProgram,
+    },
 };
 
 pub struct Map2MdlGui {

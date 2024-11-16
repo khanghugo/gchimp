@@ -1,4 +1,5 @@
 mod cli;
+mod config;
 mod gui;
 mod persistent_storage;
 

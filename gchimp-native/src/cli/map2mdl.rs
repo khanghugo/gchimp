@@ -1,11 +1,10 @@
 use std::path::PathBuf;
 
+use crate::config::{parse_config, Config};
+
 use super::*;
 
-use gchimp::{
-    config::{parse_config, Config},
-    modules::map2mdl::{entity::MAP2MDL_ENTITY_NAME, Map2Mdl},
-};
+use gchimp::modules::map2mdl::{entity::MAP2MDL_ENTITY_NAME, Map2Mdl};
 
 pub struct Map2MdlCli;
 impl Cli for Map2MdlCli {

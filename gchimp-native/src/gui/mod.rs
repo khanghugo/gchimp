@@ -7,12 +7,12 @@ use eframe::egui::{self, ThemePreference};
 use egui_tiles::Tree;
 use utils::preview_file_being_dropped;
 
-use gchimp::{
-    config::{parse_config, parse_config_from_file, Config},
-    err,
-};
+use gchimp::err;
 
-use crate::persistent_storage::PersistentStorage;
+use crate::{
+    config::{parse_config, parse_config_from_file, Config},
+    persistent_storage::PersistentStorage,
+};
 
 use self::{
     constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
