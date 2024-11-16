@@ -1,4 +1,4 @@
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::{convert::FromWasmAbi, prelude::*};
 
 use gchimp::modules::loop_wave::loop_wave_from_wave_bytes as _loop_wave;
 
@@ -8,8 +8,11 @@ extern "C" {
 }
 
 #[wasm_bindgen]
-pub fn loop_wave(wave_bytes: Vec<u8>) -> Vec<u8> {
+pub fn loop_wave(wave_bytes: Vec<u8>) -> Result<Vec<u8>, JsValue> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    _loop_wave(wave_bytes).unwrap()
+    match _loop_wave(wave_bytes) {
+        Ok(bytes) => Ok(bytes),
+        Err(err) => Err(JsValue::from_str(err.to_string().as_str())),
+    }
 }

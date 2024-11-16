@@ -60,8 +60,8 @@ export const WaveLoop = () => {
         const link = document.createElement('a');
 
         link.href = url;
-        console.assert(name, "no file name");
 
+        console.assert(name, "no file name");
         if (name)
             link.download = `${extract_file_name(name)}_loop.wav`;
 
@@ -72,13 +72,18 @@ export const WaveLoop = () => {
 
     // when new file is selected, run the program right away
     useEffect(() => {
-        if (!file || !submitButton.current)
-            return;
+        // check the files
+        if (!name || (name && !name.endsWith(".wav")) || !file || !submitButton.current) {
+            setName(undefined);
+            setFile(null);
+            setOutput(null);
+            return
+        }
 
         // equivalent to clicking the run button
         submitButton.current?.click();
     }, [
-        file, submitButton
+        file, submitButton, name
     ]);
 
     return <GchimpProgram name="Wave Loop" className={`wave-loop`} onDrop={onDrop} >
