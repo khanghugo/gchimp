@@ -1,8 +1,16 @@
 import type { NextConfig } from "next";
 
+const firstCommitDate = new Date("Thu Apr 4 21:23:34 2024 -0400");
+const currentDate = new Date();
+const diffDate = Math.floor(((currentDate as any) - (firstCommitDate as any)) as number / (60 * 60 * 24 * 1000));
+
 const nextConfig: NextConfig = {
-  /* config options here */
-  webpack(config, { isServer, dev }) {
+  generateBuildId: async () => {
+    // getMonth() starts from 0. Very nice. Fuck you.
+    return `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}-${currentDate.getDate()} (${diffDate})`;
+  },
+
+  webpack(config, { isServer, dev, buildId }) {
     config.experiments = {
       ...config.experiments,
       asyncWebAssembly: true,
@@ -16,12 +24,16 @@ const nextConfig: NextConfig = {
       config.plugins.push(new WasmChunksFixPlugin());
     }
 
+    // publicize buildId
+    process.env.GCHIMP_WEB_BUILD_ID = JSON.stringify(buildId);
+
     return config;
   },
+
   outputFileTracingIncludes: {
     '/api/**/*': ['./node_modules/**/*.wasm', './node_modules/**/*.proto'],
   },
-  output: 'export',
+  // output: 'export',
 };
 
 // HOLY FUCK. I AM GOING TO KILL WHOEVER GETS PAID TO DO THIS

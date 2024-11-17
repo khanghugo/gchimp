@@ -2,6 +2,10 @@ import styles from "./page.module.css";
 import Image from "next/image";
 
 export const Footer = () => {
+  const _buildId = (process.env.GCHIMP_WEB_BUILD_ID as string) || "development";
+  const _splits = _buildId.split("\"");
+  const buildId = _splits.length == 1 ? _splits[0] : _splits[1];
+
   return <footer className={styles.footer}>
     <a
       href="https://github.com/khanghugo/gchimp"
@@ -31,5 +35,6 @@ export const Footer = () => {
       />
       Want to try native gchimp?
     </a>
+    <small className={styles.buildId}>{`buildID: ${buildId}`}</small>
   </footer>
 }
