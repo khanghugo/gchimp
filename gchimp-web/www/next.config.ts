@@ -33,7 +33,8 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/api/**/*': ['./node_modules/**/*.wasm', './node_modules/**/*.proto'],
   },
-  // output: 'export',
+  // FUCK OFF GIVE ME A COMMAND FOR THIS
+  output: process.env.NEXTJS_EXPORT ? 'export' : 'standalone',
 };
 
 // HOLY FUCK. I AM GOING TO KILL WHOEVER GETS PAID TO DO THIS
