@@ -109,6 +109,8 @@ a.secondary {
   padding: 8px;
   box-shadow: 4px 4px black;
 
+  border: 2px solid black;
+
   font-size: large;
 }
 
@@ -137,7 +139,9 @@ a.secondary {
   align-items: center;
 
   background-color: hotpink;
-  filter: drop-shadow(8px 8px black);
+  box-shadow: 8px 8px black;
+
+  border: 2px solid black;
 }
 
 .header h1 {
@@ -154,7 +158,7 @@ a.secondary {
   margin-left: -16px;
   margin-bottom: 16px;
 
-  border-bottom: 4px solid black;
+  border-bottom: 2px solid black;
 
   text-align: center;
 }
