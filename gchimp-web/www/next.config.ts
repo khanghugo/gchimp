@@ -35,6 +35,7 @@ const nextConfig: NextConfig = {
   },
   // FUCK OFF GIVE ME A COMMAND FOR THIS
   output: process.env.NEXTJS_EXPORT ? 'export' : 'standalone',
+  distDir: "www",
 };
 
 // HOLY FUCK. I AM GOING TO KILL WHOEVER GETS PAID TO DO THIS
