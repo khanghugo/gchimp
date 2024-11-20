@@ -1155,4 +1155,25 @@ $hbox 0 \"static_prop\" 0 0 0 0 0 0";
 
         assert!(file.is_ok())
     }
+
+    #[test]
+    fn masked_texture() {
+        let i = "\
+$texturegroup \"skinfamilies\"
+{
+	{ \"conc_c01_blk2\" \"conc_c01_blu2\" \"{grass2\" \"conc_t02_blk1\" \"conc_t02_blk2\" \"conc_f02_blk2\" \"conc_c01_blk1\" \"{conc_d08_gry3\" \"sky_blue_3\" \"conc_f02_blk1\" \"slime02\" \"{conc_b03_light\" \"conc_f01_wht1\" \"{conc_d06_gry3\" \"32_cyan_3\" \"conc_t04_blk1\" \"stn_p01_wht1\" \"ground_brwn03\" \"conc_t02_wht1\" \"{fern_b\" \"{conc_d03_gry3\" \"conc_c01_red2\" \"{conc_d05_gry3\" \"*telelun\" \"conc_c01_wht1\" \"*lava01\" \"trigger\" \"gilbertthedoggo\" \"stn_p03_blk1\" \"{conc_b01_light\" \"blue_3\" }
+}
+";
+
+        let (rest, res) = parse_texture_group(i).unwrap();
+        assert!(rest.is_empty());
+
+        assert!(matches!(res, QcCommand::TextureGroup { .. }));
+
+        if let QcCommand::TextureGroup { name, groups } = res {
+            assert_eq!(groups.len(), 1);
+            assert_eq!(groups[0].len(), 31);
+            assert_eq!(name, "skinfamilies");
+        }
+    }
 }

@@ -77,7 +77,8 @@ pub fn take_until_unbalanced(
     move |i: &str| {
         let mut index = 0;
         let mut bracket_counter = 0;
-        while let Some(n) = &i[index..].find(&[opening_bracket, closing_bracket, '\\'][..]) {
+        let mut ignore_bracket = false;
+        while let Some(n) = &i[index..].find(&[opening_bracket, closing_bracket, '\\', '"'][..]) {
             index += n;
             let mut it = i[index..].chars();
             match it.next() {
@@ -89,13 +90,24 @@ pub fn take_until_unbalanced(
                         index += c.len_utf8();
                     }
                 }
+                // ignore bracket inside quotation mark
+                Some('"') => {
+                    ignore_bracket = !ignore_bracket;
+                    index += '"'.len_utf8();
+                }
                 Some(c) if c == opening_bracket => {
-                    bracket_counter += 1;
+                    if !ignore_bracket {
+                        bracket_counter += 1;
+                    }
+
+                    // need to increment when matching, otherwise deadlock
                     index += opening_bracket.len_utf8();
                 }
                 Some(c) if c == closing_bracket => {
-                    // Closing bracket.
-                    bracket_counter -= 1;
+                    if !ignore_bracket {
+                        bracket_counter -= 1;
+                    }
+
                     index += closing_bracket.len_utf8();
                 }
                 // Can not happen.
