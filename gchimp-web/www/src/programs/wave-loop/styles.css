@@ -15,9 +15,10 @@
         padding: 10px;
     }
 
-    border: 2px solid grey;
-    border-radius: 16px;
+    border: 2px solid black;
     padding: 24px;
+
+    box-shadow: 8px 8px black;
 
     textarea {
         resize: none;

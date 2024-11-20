@@ -1,17 +1,20 @@
 button {
-    background-color: inherit;
-    border: 2px solid darkgray;
-    border-radius: 8px;
+    border: 2px solid black;
+
+    box-shadow: 2px 2px black;
 
     cursor: pointer;
+
+    background-color: seagreen;
 }
 
 button:hover {
-    background-color: gray;
+    background-color: limegreen;
     opacity: 80%;
 }
 
 button[disabled] {
     cursor: not-allowed;
-    background-color: inherit;
+    background-color: gray;
+    color: lightgray;
 }

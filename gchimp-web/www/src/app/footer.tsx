@@ -28,7 +28,7 @@ export const Footer = () => {
     >
       <Image
         aria-hidden
-        src="/window.svg"
+        src="/download.svg"
         alt="File icon"
         width={16}
         height={16}
