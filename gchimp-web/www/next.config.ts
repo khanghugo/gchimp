@@ -7,7 +7,7 @@ const diffDate = Math.floor(((currentDate as any) - (firstCommitDate as any)) as
 const nextConfig: NextConfig = {
   generateBuildId: async () => {
     // getMonth() starts from 0. Very nice. Fuck you.
-    return `${currentDate.getFullYear()}-${currentDate.getMonth() + 1}-${currentDate.getDate()} (${diffDate})`;
+    return `${diffDate} - ${currentDate.getFullYear()}-${currentDate.getMonth() + 1}-${currentDate.getDate()}, ${currentDate.getHours()}:${currentDate.getMinutes()}`;
   },
 
   webpack(config, { isServer, dev, buildId }) {
