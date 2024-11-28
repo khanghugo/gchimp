@@ -1,13 +1,12 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs::{self, OpenOptions},
-    io::Read,
+    io::{Read, Write},
     path::{Path, PathBuf},
-    time::SystemTime,
 };
 
 use bsp::Bsp;
-use chrono::Utc;
+use chrono::Local;
 use wad::types::Wad;
 
 use crate::{
@@ -15,19 +14,25 @@ use crate::{
     utils::constants::{MODEL_ENTITIES, SOUND_ENTITIES, SPRITE_ENTITIES},
 };
 
-pub struct ResMakeOptions<'a> {
-    /// Skips checking whether the parent directory of the bsp file is valid
-    skip_check: bool,
-    /// Uses a WAD table to look up textures
-    wad_table: Option<&'a HashMap<String, Vec<String>>>,
+pub struct ResMakeOptions {
+    /// Wheter to includes external WAD inside .res
+    wad_check: bool,
 }
 
-type WadTable = HashMap<String, HashSet<String>>;
+impl Default for ResMakeOptions {
+    fn default() -> Self {
+        Self { wad_check: false }
+    }
+}
+
+// need to be a vector so we can sort it by wad file name
+type WadTable = Vec<(String, HashSet<String>)>;
 
 pub struct ResMake {
     bsp_file: Option<PathBuf>,
     // If this is set to gamemod folder, it will do mass ResMake
     root_folder: Option<PathBuf>,
+    options: ResMakeOptions,
 }
 
 impl Default for ResMake {
@@ -35,6 +40,7 @@ impl Default for ResMake {
         Self {
             bsp_file: Default::default(),
             root_folder: Default::default(),
+            options: Default::default(),
         }
     }
 }
@@ -56,8 +62,16 @@ impl ResMake {
         self
     }
 
+    pub fn wad_check(&mut self, v: bool) -> &mut Self {
+        self.options.wad_check = v;
+
+        self
+    }
+
     fn check_bsp_file(&self) -> eyre::Result<()> {
-        let path = self.bsp_file.as_ref().expect("bsp_file is not set");
+        let Some(path) = self.bsp_file.as_ref() else {
+            return err!("bsp_file is not set");
+        };
 
         if !path.exists() {
             return err!("bsp file `{}` does not exist", path.display());
@@ -78,8 +92,10 @@ impl ResMake {
         Ok(())
     }
 
-    fn check_bsp_file_parent(&self) -> eyre::Result<(PathBuf)> {
-        let path = self.bsp_file.as_ref().expect("bsp_file is not set");
+    fn check_bsp_file_parent(&self) -> eyre::Result<PathBuf> {
+        let Some(path) = self.bsp_file.as_ref() else {
+            return err!("bsp_file is not set");
+        };
 
         // now we have a /path/to/gamemod/maps/bsp.bsp
         // need to assert that we are inside a gamemod
@@ -121,13 +137,42 @@ impl ResMake {
         res
     }
 
-    pub fn resmake_single_bsp(&self) -> eyre::Result<()> {
+    pub fn _get_resmake_single_bsp_string(&self) -> eyre::Result<String> {
         self.check_bsp_file()?;
         self.check_bsp_file_parent()?;
 
-        let wad_table = self.generate_wad_table()?;
+        let wad_table = if self.options.wad_check {
+            Some(self.generate_wad_table()?)
+        } else {
+            None
+        };
 
-        // resmake_single_bsp(self.bsp_file.as_ref().unwrap(), None)?;
+        let bsp = Bsp::from_file(self.bsp_file.as_ref().unwrap())?;
+
+        resmake_single_bsp(
+            &bsp,
+            self.bsp_file.as_ref().unwrap(),
+            wad_table.as_ref(),
+            &self.options,
+        )
+    }
+
+    pub fn single_bsp(&self) -> eyre::Result<()> {
+        let res_string = self._get_resmake_single_bsp_string()?;
+
+        let Some(bsp_path) = self.bsp_file.as_ref() else {
+            return err!("no bsp path given");
+        };
+
+        let out_path = bsp_path.with_extension("res");
+        let mut file = OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(out_path)?;
+
+        file.write_all(res_string.as_bytes())?;
+        file.flush()?;
 
         Ok(())
     }
@@ -153,7 +198,7 @@ fn need_external_wad(bsp: &Bsp) -> HashSet<String> {
         let texture = &bsp.textures[texindex as usize];
 
         if texture.mip_offsets[0] == 0 {
-            external_textures.insert(texture.texture_name.get_string());
+            external_textures.insert(texture.texture_name.get_string_standard());
         }
     }
 
@@ -174,7 +219,6 @@ fn generate_wad_table(gamemod_dir: &Path) -> eyre::Result<WadTable> {
     let root_folder = gamemod_dir;
 
     let mut wad_table = WadTable::new();
-    let mut count = 0;
 
     let huh = fs::read_dir(&root_folder)?;
 
@@ -184,17 +228,24 @@ fn generate_wad_table(gamemod_dir: &Path) -> eyre::Result<WadTable> {
         .filter(|path| path.extension().is_some() && path.extension().unwrap() == "wad")
         .for_each(|path| {
             let wad_file_name = path.file_name().unwrap().to_str().unwrap().to_string();
-            let wad = Wad::from_file(&path)
-                .unwrap_or_else(|_| panic!("cannot open wad file: {}", path.display()));
-            wad_table.insert(wad_file_name.clone(), HashSet::new());
+
+            // Some wad files are retarded and they are not even WAD3
+            // This means my wad lib should be very correct
+            let wad = match Wad::from_file(&path) {
+                Ok(wad) => wad,
+                Err(_) => return,
+            };
+
+            wad_table.push((wad_file_name, HashSet::new()));
+            let l = wad_table.len();
 
             wad.entries.iter().for_each(|wad_entry| {
-                wad_table.get_mut(&wad_file_name).map(|map_entry| {
-                    map_entry.insert(wad_entry.texture_name());
-                    count = count + 1;
-                });
+                wad_table[l - 1].1.insert(wad_entry.texture_name());
             });
         });
+
+    // vector so we can sort it
+    wad_table.sort_by(|a, b| a.0.cmp(&b.0));
 
     Ok(wad_table)
 }
@@ -205,15 +256,18 @@ fn resmake_header() -> String {
 // .res generated by gchimp ResMake
 // https://github.com/khanghugo/gchimp
 // Generated date: {}
-
 ",
-        Utc::now().to_rfc2822()
+        Local::now().to_rfc2822()
     )
 }
 
 // should not be used directly because this does not have any checks
-fn resmake_single_bsp(bsp_path: &Path, wad_table: Option<&WadTable>) -> eyre::Result<()> {
-    let bsp = Bsp::from_file(bsp_path)?;
+fn resmake_single_bsp(
+    bsp: &Bsp,
+    bsp_path: &Path,
+    wad_table: Option<&WadTable>,
+    options: &ResMakeOptions,
+) -> eyre::Result<String> {
     let bsp_name = bsp_path.file_stem().unwrap().to_str().unwrap();
 
     let mut res_file = String::new();
@@ -237,6 +291,7 @@ fn resmake_single_bsp(bsp_path: &Path, wad_table: Option<&WadTable>) -> eyre::Re
     }
 
     if !used_models.is_empty() {
+        res_file += "\n";
         res_file += "// models \n";
 
         let mut used_models = used_models.into_iter().collect::<Vec<_>>();
@@ -433,7 +488,7 @@ fn resmake_single_bsp(bsp_path: &Path, wad_table: Option<&WadTable>) -> eyre::Re
     // .wad
     let external_textures = need_external_wad(&bsp);
 
-    if !external_textures.is_empty() {
+    if !external_textures.is_empty() && options.wad_check {
         if let Some(wad_table) = wad_table {
             let mut used_wads = HashSet::<String>::new();
 
@@ -460,22 +515,37 @@ fn resmake_single_bsp(bsp_path: &Path, wad_table: Option<&WadTable>) -> eyre::Re
         }
     }
 
-    println!("{}", res_file);
-
-    Ok(())
+    Ok(res_file)
 }
 
 #[cfg(test)]
 mod test {
     use std::path::PathBuf;
 
-    use super::{generate_wad_table, resmake_single_bsp};
+    use crate::modules::resmake::ResMake;
 
     #[test]
-    fn run() {
-        let path = PathBuf::from("/home/khang/bxt/_game_native/cstrike_downloads/");
+    fn no_path() {
+        let resmake = ResMake::new();
 
-        // resmake_single_bsp(path.as_path(), None).unwrap();
-        generate_wad_table(&path).unwrap();
+        assert!(resmake.single_bsp().is_err());
+    }
+
+    #[test]
+    fn run_external_wad_no_find() {
+        let path = PathBuf::from("/home/khang/bxt/_game_native/valve/maps/c2a2c.bsp");
+        let mut binding = ResMake::new();
+        let resmake = binding.bsp_file(path);
+
+        println!("{}", resmake._get_resmake_single_bsp_string().unwrap())
+    }
+
+    #[test]
+    fn run_external_wad_yes_find() {
+        let path = PathBuf::from("/home/khang/bxt/_game_native/valve/maps/c2a2c.bsp");
+        let mut binding = ResMake::new();
+        let resmake = binding.bsp_file(path).wad_check(true);
+
+        println!("{}", resmake._get_resmake_single_bsp_string().unwrap())
     }
 }
