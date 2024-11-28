@@ -6,15 +6,17 @@ use std::{
 
 use eframe::egui;
 
-use gchimp::modules::{loop_wave::loop_wave, split_model::split_model};
+use gchimp::modules::{loop_wave::loop_wave, resmake::ResMake, split_model::split_model};
 
 use crate::gui::{utils::preview_file_being_dropped, TabProgram};
 
 pub struct Misc {
     qc: String,
     wav: String,
+    bsp: String,
     split_model_status: Arc<Mutex<String>>,
     loop_wave_status: Arc<Mutex<String>>,
+    resmake_status: Arc<Mutex<String>>,
 }
 
 impl Default for Misc {
@@ -22,8 +24,10 @@ impl Default for Misc {
         Self {
             qc: Default::default(),
             wav: Default::default(),
+            bsp: Default::default(),
             split_model_status: Arc::new(Mutex::new(String::from("Idle"))),
             loop_wave_status: Arc::new(Mutex::new(String::from("Idle"))),
+            resmake_status: Arc::new(Mutex::new(String::from("Idle"))),
         }
     }
 }
@@ -86,6 +90,34 @@ impl Misc {
         });
     }
 
+    fn resmake(&mut self, ui: &mut eframe::egui::Ui) {
+        ui.label("ResMake")
+            .on_hover_text("Basically a RESGEN clone");
+        egui::Grid::new("resmake").num_columns(2).show(ui, |ui| {
+            ui.label("BSP:");
+            ui.add(egui::TextEdit::singleline(&mut self.bsp).hint_text("Choose .bsp file"));
+            if ui.button("Add").clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .add_filter("BSP", &["bsp"])
+                    .pick_file()
+                {
+                    if path.extension().is_some_and(|ext| ext == "bsp") {
+                        self.bsp = path.display().to_string();
+                    }
+                }
+            }
+            ui.end_row();
+
+            if ui.button("Run").clicked() {
+                self.run_resmake()
+            }
+
+            let binding = self.resmake_status.lock().unwrap();
+            let mut status_text = binding.as_str();
+            ui.text_edit_singleline(&mut status_text)
+        });
+    }
+
     fn run_split_model(&mut self) {
         let qc = self.qc.clone();
         let status = self.split_model_status.clone();
@@ -114,6 +146,24 @@ impl Misc {
             }
         });
     }
+
+    fn run_resmake(&mut self) {
+        let bsp = self.bsp.clone();
+        let bsp_path = PathBuf::from(bsp);
+        let status = self.resmake_status.clone();
+        "Running".clone_into(&mut status.lock().unwrap());
+
+        thread::spawn(move || {
+            let mut resmake = ResMake::new();
+            resmake.bsp_file(bsp_path);
+
+            if let Err(err) = resmake.single_bsp() {
+                err.to_string().clone_into(&mut status.lock().unwrap());
+            } else {
+                "Done".clone_into(&mut status.lock().unwrap());
+            }
+        });
+    }
 }
 
 impl TabProgram for Misc {
@@ -128,6 +178,9 @@ impl TabProgram for Misc {
         ui.separator();
 
         self.loop_wave(ui);
+        ui.separator();
+
+        self.resmake(ui);
         ui.separator();
 
         let ctx = ui.ctx();
