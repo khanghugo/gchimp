@@ -6,7 +6,11 @@ use std::{
 
 use eframe::egui;
 
-use gchimp::modules::{loop_wave::loop_wave, resmake::ResMake, split_model::split_model};
+use gchimp::modules::{
+    loop_wave::loop_wave,
+    resmake::{ResMake, ResMakeOptions},
+    split_model::split_model,
+};
 
 use crate::gui::{utils::preview_file_being_dropped, TabProgram};
 
@@ -14,6 +18,7 @@ pub struct Misc {
     qc: String,
     wav: String,
     bsp: String,
+    resmake_options: ResMakeOptions,
     split_model_status: Arc<Mutex<String>>,
     loop_wave_status: Arc<Mutex<String>>,
     resmake_status: Arc<Mutex<String>>,
@@ -25,6 +30,7 @@ impl Default for Misc {
             qc: Default::default(),
             wav: Default::default(),
             bsp: Default::default(),
+            resmake_options: Default::default(),
             split_model_status: Arc::new(Mutex::new(String::from("Idle"))),
             loop_wave_status: Arc::new(Mutex::new(String::from("Idle"))),
             resmake_status: Arc::new(Mutex::new(String::from("Idle"))),
@@ -107,14 +113,23 @@ impl Misc {
                 }
             }
             ui.end_row();
+        });
 
+        ui.checkbox(&mut self.resmake_options.wad_check, "Check WAD")
+            .on_hover_text(
+                "\
+Whether to include external WAD in .res if found.
+Should only be used when BSP file is inside a proper folder structure.",
+            );
+
+        ui.horizontal(|ui| {
             if ui.button("Run").clicked() {
                 self.run_resmake()
             }
 
             let binding = self.resmake_status.lock().unwrap();
             let mut status_text = binding.as_str();
-            ui.text_edit_singleline(&mut status_text)
+            ui.text_edit_singleline(&mut status_text);
         });
     }
 
