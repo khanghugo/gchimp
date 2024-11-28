@@ -147,5 +147,9 @@ mod test {
     #[test]
     fn parse_gfx() {
         let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/gfx.wad").unwrap();
+        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/cached.wad").unwrap();
+        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/decals.wad").unwrap();
+        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/tempdecal.wad").unwrap();
+        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/spraypaint.wad").unwrap();
     }
 }
