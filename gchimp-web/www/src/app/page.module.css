@@ -56,6 +56,12 @@
   font-weight: 600;
 }
 
+.programs {
+  display: flex;
+  flex-direction: row;
+  gap: 32px;
+}
+
 .ctas {
   display: flex;
   gap: 16px;
@@ -146,12 +152,7 @@ a.secondary {
 
 .header h1 {
   background-color: orchid;
-  /* text-shadow: 2px 2px 2px white; */
-  /* box-shadow: 2px 2px black; */
   padding: 16px;
-  /* width: 100%; */
-
-  /* border: 2px solid black; */
 
   margin-top: -16px;
   margin-right: -16px;

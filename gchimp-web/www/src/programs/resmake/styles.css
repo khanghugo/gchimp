@@ -1,10 +1,10 @@
-.wave-loop {
-    background-color: turquoise;
+.resMake {
+    background-color: aliceblue;
 
     h1 {
         margin: 10px;
-        color: turquoise;
-        filter: invert(1);
+        color: aliceblue;
+        filter: invert(1)
     }
 
     display: flex;
