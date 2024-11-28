@@ -1760,6 +1760,7 @@ dependencies = [
 name = "gchimp-web"
 version = "0.3.0"
 dependencies = [
+ "bsp",
  "console_error_panic_hook",
  "gchimp",
  "wasm-bindgen",

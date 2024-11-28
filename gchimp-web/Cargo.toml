@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+bsp = { version = "0.1.0", path = "../bsp" }
 console_error_panic_hook = "0.1.7"
 gchimp = { path = "../gchimp" }
 
