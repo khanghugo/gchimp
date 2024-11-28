@@ -78,7 +78,7 @@ impl fmt::Debug for TextureName {
 }
 
 impl TextureName {
-    // impl Debug has its own to_string.....
+    // impl Debug to_string is the same as this
     pub fn get_string(&self) -> String {
         let mut res: Vec<u8> = vec![];
 
@@ -91,6 +91,11 @@ impl TextureName {
         }
 
         from_utf8(&res).unwrap().to_string()
+    }
+
+    /// Texture name will all be upper case
+    pub fn get_string_standard(&self) -> String {
+        self.get_string().to_uppercase()
     }
 
     pub fn from_string(s: impl AsRef<str> + Into<String>) -> Self {
@@ -346,6 +351,10 @@ impl Entry {
 
     pub fn texture_name(&self) -> String {
         self.directory_entry.texture_name.get_string()
+    }
+
+    pub fn texture_name_standard(&self) -> String {
+        self.directory_entry.texture_name.get_string_standard()
     }
 
     pub fn set_name(&mut self, s: impl AsRef<str> + Into<String> + Clone) -> eyre::Result<()> {
