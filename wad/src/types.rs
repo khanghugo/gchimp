@@ -300,7 +300,8 @@ impl MipTex {
 
 #[derive(Debug, Clone)]
 pub struct CharInfo {
-    pub startoffset: i16,
+    pub offset_y: i8,
+    pub offset_x: i8,
     pub charwidth: i16,
 }
 

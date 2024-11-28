@@ -151,20 +151,27 @@ fn parse_font(i: &[u8]) -> IResult<Font> {
     let (i, (row_count, row_height)) = tuple((le_u32, le_u32))(i)?;
 
     let (i, font_info) = count(
-        map(tuple((le_i16, le_i16)), |(startoffset, charwidth)| {
-            CharInfo {
-                startoffset,
+        map(
+            tuple((le_i8, le_i8, le_i16)),
+            |(offset_y, offset_x, charwidth)| CharInfo {
+                offset_y,
+                offset_x,
                 charwidth,
-            }
-        }),
+            },
+        ),
         256,
     )(i)?;
 
     let (i, data) = count(le_u8, (width * height) as usize)(i)?;
     let (i, colors_used) = le_i16(i)?;
+
+    // println!("color used is {}", colors_used);
+    // color used is always 256 because of course why not.
+
     let (i, palette) = count(
         map(take(3usize), |res: &[u8]| [res[0], res[1], res[2]]),
-        colors_used as usize,
+        // colors_used as usize,
+        256,
     )(i)?;
 
     Ok((
@@ -182,7 +189,7 @@ fn parse_font(i: &[u8]) -> IResult<Font> {
     ))
 }
 
-static FILE_TYPES: &[i8] = &[0x42, 0x43, 0x45];
+static FILE_TYPES: &[i8] = &[0x40, 0x42, 0x43, 0x45, 0x46];
 
 pub fn parse_wad(i: &[u8]) -> IResult<Wad> {
     let file_start = i;
@@ -230,9 +237,24 @@ pub fn parse_wad(i: &[u8]) -> IResult<Wad> {
             let file_entry_start = &file_start[directory_entry.entry_offset as usize..];
 
             let file_entry = match directory_entry.file_type {
-                0x42 => FileEntry::Qpic(parse_qpic(file_entry_start).ok()?.1),
-                0x43 => FileEntry::MipTex(parse_miptex(file_entry_start).ok()?.1),
-                0x45 => FileEntry::Font(parse_font(file_entry_start).ok()?.1),
+                0x42 => FileEntry::Qpic(
+                    parse_qpic(file_entry_start)
+                        .ok()
+                        .expect("cannot parse qpic")
+                        .1,
+                ),
+                0x43 | 0x40 => FileEntry::MipTex(
+                    parse_miptex(file_entry_start)
+                        .ok()
+                        .expect("cannot parse miptex")
+                        .1,
+                ),
+                0x45 | 0x46 => FileEntry::Font(
+                    parse_font(file_entry_start)
+                        .ok()
+                        .expect("cannot parse font")
+                        .1,
+                ),
                 _ => unreachable!(""),
             };
 

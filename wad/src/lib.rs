@@ -143,4 +143,9 @@ mod test {
         // check the memory usage
         std::thread::sleep(std::time::Duration::from_secs(5));
     }
+
+    #[test]
+    fn parse_gfx() {
+        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/gfx.wad").unwrap();
+    }
 }
