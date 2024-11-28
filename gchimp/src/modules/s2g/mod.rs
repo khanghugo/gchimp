@@ -542,9 +542,12 @@ impl S2G {
                         smd_path_for_qc
                     };
 
-                    let smd_path_for_writing = qc_path.parent().unwrap().join(
-                        smd_path_for_qc.with_extension("smd"), // now writes extension because it is file
-                    );
+                    // info_player_start.001_goldsrc0 and .with_extension() will remove the .001_goldsrc0 portion
+                    // so what we want to do is to add .smd without using with_extension
+                    let smd_path_for_writing = qc_path.parent().unwrap().join(format!(
+                        "{}.smd",
+                        smd_path_for_qc.file_name().unwrap().to_str().unwrap()
+                    ));
 
                     match smd.write(smd_path_for_writing.display().to_string().as_str()) {
                         Ok(_) => {}
