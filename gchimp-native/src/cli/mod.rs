@@ -6,6 +6,7 @@ mod custom_script;
 mod light_scale;
 mod loop_wave;
 mod map2mdl;
+mod resmake;
 mod rotate_prop_static;
 mod s2g;
 mod split_model;
@@ -61,6 +62,7 @@ pub fn cli() -> CliRes {
         &map2mdl::Map2MdlCli,
         &split_model::SplitModel,
         &loop_wave::LoopWave,
+        &resmake::ResMake,
     ];
 
     let help = || {
