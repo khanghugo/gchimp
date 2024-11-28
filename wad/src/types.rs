@@ -65,11 +65,17 @@ impl DirectoryEntry {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 /// Don't use to_string() method.
 ///
 /// Use get_string() instead
 pub struct TextureName(pub Vec<u8>);
+
+impl fmt::Debug for TextureName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple(&self.get_string()).field(&self.0).finish()
+    }
+}
 
 impl TextureName {
     // impl Debug has its own to_string.....
