@@ -306,6 +306,7 @@ fn resmake_single_bsp(
     // sound
     // "message": "audio.wav"
     // prefix for folder "sounds" is not included.
+    // so we need to include it
     let mut used_sounds = HashSet::<&str>::new();
 
     for entity in &bsp.entities {
@@ -328,7 +329,7 @@ fn resmake_single_bsp(
         used_sounds.sort();
 
         for used_sound in used_sounds {
-            res_file += used_sound;
+            res_file += format!("sound/{}", used_sound).as_str();
             res_file += "\n";
         }
     }
