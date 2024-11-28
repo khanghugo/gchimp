@@ -208,11 +208,15 @@ pub fn parse_wad(i: &[u8]) -> IResult<Wad> {
         return context(err_str, fail)(b"");
     }
 
-    if directory_entries
+    if let Some(unknown_file_entry) = directory_entries
         .iter()
-        .any(|entry| !FILE_TYPES.contains(&entry.file_type))
+        .find(|entry| !FILE_TYPES.contains(&entry.file_type))
     {
-        let err_str = "Unknown texture file type.";
+        let err_str = format!(
+            "unknown texture file type: {:#02x}",
+            unknown_file_entry.file_type
+        )
+        .leak();
 
         println!("{}", err_str);
 
