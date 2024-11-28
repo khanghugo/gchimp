@@ -113,6 +113,7 @@ impl Cli for S2GCli {
     }
 
     fn cli_help(&self) {
-        todo!()
+        // handled by clap
+        unreachable!()
     }
 }
