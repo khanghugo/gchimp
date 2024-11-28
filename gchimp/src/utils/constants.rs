@@ -39,3 +39,12 @@ pub static TRENCHBROOM_EMPTY_TEXTURE: &str = "__TB_empty";
 pub static TEXTURE_PREFIXES: &[&str] = &["{", "!", "+", "-", "~"];
 
 pub static EPSILON: f64 = 0.0000001;
+
+pub const MODEL_ENTITIES: &[&str] = &["cycler", "cycler_sprite", "env_sprite"];
+pub const SOUND_ENTITIES: &[&str] = &[
+    "ambient_generic",
+    // it is pretty stupid that no one can use it
+    // "trigger_cdaudio"
+];
+
+pub const SPRITE_ENTITIES: &[&str] = &["env_sprite", "env_beam", "env_glow", "env_laser"];

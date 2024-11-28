@@ -32,6 +32,7 @@ nom = "7.1.3"
 rand = "0.8.5"
 lazy_static = "1.5.0"
 cuet = "0.1.0"
+chrono = "0.4.38"
 
 # enable js support for this random shit so that wasm32 can compile
 getrandom = { version = "0.2.15", features = ["js"] }
