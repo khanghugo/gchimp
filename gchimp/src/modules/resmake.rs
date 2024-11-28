@@ -460,27 +460,30 @@ pub fn resmake_single_bsp(
         }
     }
 
-    // maps
-    // .bsp, .res, detail texture file
-    res_file += "\n";
-    res_file += "// maps\n";
+    // no need to add .bsp and .res because they are no needed
+    // {
+    //     // maps
+    //     // .bsp, .res, detail texture file
+    //     res_file += "\n";
+    //     res_file += "// maps\n";
 
-    // .bsp
-    res_file += format!("maps/{}.bsp\n", bsp_name).as_str();
+    //     // .bsp
+    //     res_file += format!("maps/{}.bsp\n", bsp_name).as_str();
 
-    entry_count += 1;
+    //     entry_count += 1;
 
-    // _detail.txt
-    if has_detail_textures {
-        res_file += format!("maps/{}_detail.txt\n", bsp_name).as_str();
+    //     // _detail.txt
+    //     if has_detail_textures {
+    //         res_file += format!("maps/{}_detail.txt\n", bsp_name).as_str();
 
-        entry_count += 1;
-    }
+    //         entry_count += 1;
+    //     }
 
-    // .res
-    res_file += format!("maps/{}.res\n", bsp_name).as_str();
+    //     // .res
+    //     res_file += format!("maps/{}.res\n", bsp_name).as_str();
 
-    entry_count += 1;
+    //     entry_count += 1;
+    // }
 
     // .wad
     let external_textures = need_external_wad(&bsp);
