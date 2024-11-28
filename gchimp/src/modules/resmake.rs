@@ -452,38 +452,16 @@ fn resmake_single_bsp(
     res_file += "\n";
     res_file += "// maps\n";
 
-    // there are no checks here, don't use this function by itself
-    let bsp_file_components = bsp_path.components().collect::<Vec<_>>();
-    let l = bsp_file_components.len();
-
     // .bsp
-    res_file += format!(
-        "{}/{}/{}\n",
-        bsp_file_components[l - 3].as_os_str().to_str().unwrap(),
-        bsp_file_components[l - 2].as_os_str().to_str().unwrap(),
-        bsp_file_components[l - 1].as_os_str().to_str().unwrap()
-    )
-    .as_str();
+    res_file += format!("maps/{}.bsp\n", bsp_name).as_str();
 
     // _detail.txt
     if has_detail_textures {
-        res_file += format!(
-            "{}/{}/{}_detail.txt\n",
-            bsp_file_components[l - 3].as_os_str().to_str().unwrap(),
-            bsp_file_components[l - 2].as_os_str().to_str().unwrap(),
-            bsp_name
-        )
-        .as_str();
+        res_file += format!("maps/{}_detail.txt\n", bsp_name).as_str();
     }
 
     // .res
-    res_file += format!(
-        "{}/{}/{}.res\n",
-        bsp_file_components[l - 3].as_os_str().to_str().unwrap(),
-        bsp_file_components[l - 2].as_os_str().to_str().unwrap(),
-        bsp_name
-    )
-    .as_str();
+    res_file += format!("maps/{}.res\n", bsp_name).as_str();
 
     // .wad
     let external_textures = need_external_wad(&bsp);
