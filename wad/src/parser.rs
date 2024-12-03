@@ -114,6 +114,14 @@ pub fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
     let (palette_start, colors_used) = le_i16(palette_start)?;
 
     // hard code it to be 256 just to be safe
+    // UPDATE: i did not hardcode and this happens
+    // this is just to make sure that wally does not do dumb shit to normal wads again
+    let colors_used = if colors_used <= 0 || colors_used > 256 {
+        256
+    } else {
+        colors_used
+    };
+
     let (_, palette) = count(
         map(take(3usize), |res: &[u8]| [res[0], res[1], res[2]]),
         colors_used as usize,
