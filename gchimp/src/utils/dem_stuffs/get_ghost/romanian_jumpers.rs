@@ -40,6 +40,7 @@ pub fn romanian_jumpers_ghost_parse(filename: &str) -> eyre::Result<GhostInfo> {
                 viewangles: Vec3::from_array([ghost.viewangles[0], ghost.viewangles[1], 0.]),
                 buttons: ghost.buttons.into(),
                 anim: None,
+                fov: None,
             })
             .collect(),
     })

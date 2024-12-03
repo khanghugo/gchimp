@@ -1,28 +1,10 @@
-use std::fs::File;
-use std::io::Read;
-
 use dem::hldemo::{Demo, FrameData};
 use dem::types::{EngineMessage, NetMessage};
 use dem::{init_parse, parse_netmsg};
 
 use super::*;
 
-pub fn demo_ghost_parse(filename: &str) -> eyre::Result<GhostInfo> {
-    let pathbuf = PathBuf::from(filename);
-
-    let mut bytes = Vec::new();
-    let mut f = File::open(pathbuf)?;
-    f.read_to_end(&mut bytes)?;
-
-    let demo = Demo::parse(&bytes);
-
-    // Huh cannot propagate error from the `parse`. Interesting.
-    if demo.is_err() {
-        return Err(eyre::eyre!("Cannot read demo."));
-    }
-
-    let demo = demo.unwrap();
-
+pub fn demo_ghost_parse(filename: &str, demo: &Demo) -> eyre::Result<GhostInfo> {
     // Because player origin/viewangles and animation are on different frame, we have to sync it.
     // Order goes: players info > animation > player info > ...
     // TODO parses everything within netmsg
@@ -36,6 +18,8 @@ pub fn demo_ghost_parse(filename: &str) -> eyre::Result<GhostInfo> {
 
     let mut origin = [0f32; 3];
     let mut viewangles = [0f32; 3];
+
+    let mut fov: Option<f32> = None;
 
     let aux = init_parse!(demo);
 
@@ -58,6 +42,7 @@ pub fn demo_ghost_parse(filename: &str) -> eyre::Result<GhostInfo> {
             FrameData::ClientData(client) => {
                 origin = client.origin;
                 viewangles = client.viewangles;
+                fov = client.fov.into();
 
                 // ClientData happens before NetMsg so we can reset some values here.
                 sequence = None;
@@ -170,6 +155,7 @@ pub fn demo_ghost_parse(filename: &str) -> eyre::Result<GhostInfo> {
                         gaitsequence,
                         blending,
                     }),
+                    fov,
                 })
             }
             _ => None,

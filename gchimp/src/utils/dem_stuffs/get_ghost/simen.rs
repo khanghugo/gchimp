@@ -76,6 +76,7 @@ fn simen_wrbot_line(i: &str) -> IResult<&str, SimenGhostFrame> {
                 viewangles: Vec3::from_array([pitch, yaw, 0.]),
                 buttons: buttons.into(),
                 anim: None,
+                fov: None,
             },
             velocity: [velx, vely, velz],
             buttons,

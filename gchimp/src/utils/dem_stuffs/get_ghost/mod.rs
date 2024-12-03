@@ -1,7 +1,9 @@
 use std::array::from_fn;
 use std::path::PathBuf;
 
-use glam::Vec3;
+use dem::hldemo::Demo;
+use dem::open_demo;
+use glam::{FloatExt, Vec3};
 
 use crate::err;
 
@@ -16,12 +18,18 @@ mod romanian_jumpers;
 mod simen;
 mod surf_gateway;
 
+pub fn get_ghost_demo(filename: &str, demo: &Demo) -> eyre::Result<GhostInfo> {
+    demo_ghost_parse(filename, &demo)
+}
+
 pub fn get_ghost(filename: &str) -> eyre::Result<GhostInfo> {
     let pathbuf = PathBuf::from(filename);
     let path = pathbuf.to_str().unwrap();
 
     if path.ends_with(".dem") {
-        demo_ghost_parse(filename)
+        let demo = open_demo(pathbuf)?;
+
+        demo_ghost_parse(filename, &demo)
     } else if path.ends_with(".simen.txt") {
         // Either this, or use enum in main file.
         simen_ghost_parse(filename)
@@ -43,6 +51,7 @@ pub struct GhostFrame {
     pub frametime: Option<f64>,
     pub buttons: Option<u32>,
     pub anim: Option<GhostFrameAnim>,
+    pub fov: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -127,6 +136,14 @@ impl GhostInfo {
             // attention, lerp to `from + diff`
             .lerp(from_frame.viewangles + viewangles_diff, target as f32);
 
+        let new_fov = if from_frame.fov.is_some() && to_frame.fov.is_some() {
+            let from_fov = from_frame.fov.unwrap();
+            let to_fov = to_frame.fov.unwrap();
+            Some(from_fov.lerp(to_fov, target as f32))
+        } else {
+            None
+        };
+
         // Maybe do some interpolation for sequence in the future? Though only demo would have it.
         Some(GhostFrame {
             origin: new_origin,
@@ -134,6 +151,7 @@ impl GhostInfo {
             frametime: from_frame.frametime,
             buttons: from_frame.buttons,
             anim: from_frame.anim.clone(),
+            fov: new_fov,
         })
     }
 
@@ -164,6 +182,14 @@ impl GhostInfo {
 
         to_index
     }
+
+    // /// Rotates viewangle and vieworigin around origin z axis (height) by `rotation` value
+    // pub fn rotate(&mut self, rotation: f32) -> &mut Self {
+    //     for frame in &mut self.frames {
+    //         frame.
+    //     }
+    //     self
+    // }
 }
 
 /// Difference between curr and next
