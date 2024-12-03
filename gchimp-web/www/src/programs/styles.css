@@ -1,4 +1,12 @@
 section {
+    background-color: aliceblue;
+
+    h1 {
+        margin: 10px;
+        color: aliceblue;
+        filter: invert(1)
+    }
+    
     /* this is stupid */
     * {
         font-family: inherit;

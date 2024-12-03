@@ -1,12 +1,4 @@
 .wave-loop {
-    background-color: turquoise;
-
-    h1 {
-        margin: 10px;
-        color: turquoise;
-        filter: invert(1);
-    }
-
     display: flex;
     flex-direction: column;
 

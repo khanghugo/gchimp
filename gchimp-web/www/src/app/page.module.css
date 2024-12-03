@@ -59,6 +59,8 @@
 .programs {
   display: flex;
   flex-direction: row;
+  align-items: start;
+  justify-content: center;
   gap: 32px;
 }
 
