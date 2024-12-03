@@ -21,12 +21,13 @@ use dem::{
 };
 use nom::{number::complete::float, sequence::tuple};
 
+use crate::utils::dem_stuffs::get_ghost::get_ghost;
 use crate::{
     get_cs_delta_msg, insert_packet_entity_state_delta_with_index,
     insert_packet_entity_state_with_index, modules::demdoc::ResourceType, rand_int_range,
 };
 
-use super::{get_ghost::get_ghost, Buttons, NetMsgDataMethods};
+use super::{Buttons, NetMsgDataMethods};
 
 const DEMO_BUFFER_SIZE: [u8; 8] = [1, 0, 0, 0, 0, 0, 180, 66];
 const DEFAULT_IN_SEQ: i32 = 143791;
