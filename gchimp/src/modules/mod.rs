@@ -2,6 +2,7 @@ pub mod blender_lightmap_baker_helper;
 pub mod check_illegal_brush;
 pub mod check_missing_texture;
 pub mod custom_script;
+pub mod dem2cam;
 pub mod demdoc;
 pub mod duplicate_triangle;
 pub mod find_low_scaling;
