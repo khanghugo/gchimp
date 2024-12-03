@@ -101,8 +101,8 @@ DATA
 // end portion copied from bxt-rs
 
 pub struct Dem2CamOptions {
-    frametime: Option<f32>,
-    rotation: Option<f32>,
+    pub frametime: Option<f32>,
+    pub rotation: Option<f32>,
 }
 
 impl Default for Dem2CamOptions {

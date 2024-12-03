@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 
 use bsp::Bsp;
 use gchimp::modules::{
+    dem2cam::{Dem2CamOptions, _dem2cam_string},
     loop_wave::loop_wave_from_wave_bytes as _loop_wave,
     resmake::{resmake_single_bsp, ResMakeOptions},
 };
@@ -36,5 +37,34 @@ pub fn resmake(bsp_bytes: Vec<u8>, filename: &str) -> Result<String, JsValue> {
     match resmake_single_bsp(&bsp, bsp_path, None, &ResMakeOptions { wad_check: false }) {
         Err(err) => Err(JsValue::from_str(err.to_string().as_str())),
         Ok(ok) => Ok(ok),
+    }
+}
+
+#[wasm_bindgen]
+pub fn dem2cam(demo_bytes: Vec<u8>, filename: &str, override_fps: f32) -> Result<String, JsValue> {
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+
+    let demo = dem::open_demo_from_bytes(&demo_bytes);
+    let demo = match demo {
+        Ok(demo) => demo,
+        Err(err) => return Err(JsValue::from_str(err.to_string().as_str())),
+    };
+
+    let demo_path = Path::new(filename);
+
+    match _dem2cam_string(
+        &demo,
+        demo_path,
+        &Dem2CamOptions {
+            frametime: if override_fps == 0. {
+                None
+            } else {
+                override_fps.into()
+            },
+            rotation: None,
+        },
+    ) {
+        Ok(ok) => Ok(ok),
+        Err(err) => Err(JsValue::from_str(err.to_string().as_str())),
     }
 }
