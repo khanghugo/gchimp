@@ -64,10 +64,11 @@ fn make_pcm16u_mono_and_22050(bytes: Vec<u8>) -> eyre::Result<Vec<u8>> {
     };
 
     const BEST_SAMPLING_RATE: u32 = 22050;
+    const BEST_BIT_PER_SAMPLE: u16 = 16;
 
     let samples2 = wav_io::resample::linear(f32_samples, 1, header.sample_rate, BEST_SAMPLING_RATE);
 
-    let res_wav_header = wav_io::new_header(BEST_SAMPLING_RATE, 16, false, true);
+    let res_wav_header = wav_io::new_header(BEST_SAMPLING_RATE, BEST_BIT_PER_SAMPLE, false, true);
 
     let Ok(res_bytes) = wav_io::write_to_bytes(&res_wav_header, &samples2) else {
         return err!("cannot write .wav");
@@ -104,6 +105,12 @@ mod test {
     #[test]
     fn run_32bit() {
         let path = PathBuf::from("/home/khang/gchimp/examples/loop_wave/birds_32bit.wav");
+        loop_wave(path).unwrap();
+    }
+
+    #[test]
+    fn run_8bit() {
+        let path = PathBuf::from("/home/khang/gchimp/examples/loop_wave/eightbits.wav");
         loop_wave(path).unwrap();
     }
 }

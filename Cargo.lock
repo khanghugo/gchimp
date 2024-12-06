@@ -4556,8 +4556,10 @@ checksum = "65fc09f10666a9f147042251e0dda9c18f166ff7de300607007e96bdebc1068d"
 [[package]]
 name = "wav_io"
 version = "0.1.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3236ffff9f79a92caa694bbad1cbbd3e13958993f3f983c1066414d487a1d33"
+source = "git+https://github.com/khanghugo/wav_io.git#391dc4da78116ba11b771f0bc1b19fd5390d1190"
+dependencies = [
+ "thiserror",
+]
 
 [[package]]
 name = "wayland-backend"
