@@ -1729,6 +1729,7 @@ dependencies = [
  "toml",
  "vtf",
  "wad",
+ "wav_io",
 ]
 
 [[package]]
@@ -4551,6 +4552,12 @@ name = "wasm-bindgen-shared"
 version = "0.2.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65fc09f10666a9f147042251e0dda9c18f166ff7de300607007e96bdebc1068d"
+
+[[package]]
+name = "wav_io"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3236ffff9f79a92caa694bbad1cbbd3e13958993f3f983c1066414d487a1d33"
 
 [[package]]
 name = "wayland-backend"
