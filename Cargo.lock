@@ -4555,8 +4555,9 @@ checksum = "65fc09f10666a9f147042251e0dda9c18f166ff7de300607007e96bdebc1068d"
 
 [[package]]
 name = "wav_io"
-version = "0.1.14"
-source = "git+https://github.com/khanghugo/wav_io.git#391dc4da78116ba11b771f0bc1b19fd5390d1190"
+version = "0.1.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8da73fea006d63a207a7606a9f74732bf9558d1033eea1927fcc2071fd39df82"
 dependencies = [
  "thiserror",
 ]
