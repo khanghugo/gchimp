@@ -15,6 +15,10 @@ pub fn bsp2wad_bytes(bsp_bytes: &[u8]) -> eyre::Result<Vec<u8>> {
     let mut out_wad = Wad::new();
 
     textures.iter().for_each(|texture| {
+        if texture.mip_offsets[0] == 0 {
+            return;
+        }
+
         let mip_maps = texture
             .mip_images
             .iter()
@@ -64,5 +68,10 @@ mod test {
     #[test]
     fn run() {
         bsp2wad("/home/khang/bxt/game_isolated/valve/maps/c1a0.bsp").unwrap();
+    }
+
+    #[test]
+    fn run_no_embedded() {
+        bsp2wad("/home/khang/bxt/game_isolated/valve/maps/c4a2b.bsp").unwrap();
     }
 }
