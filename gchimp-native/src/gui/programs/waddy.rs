@@ -273,19 +273,13 @@ impl WaddyGui {
                 .enumerate()
                 // .filter(|(idx, _)| *idx != instance_index) // allow copy to self
                 .fold(None, |acc, (idx, instance)| {
-                    if ui
-                        .button(
-                            instance
-                                .path
-                                .as_ref()
-                                .unwrap()
-                                .file_name()
-                                .unwrap()
-                                .to_str()
-                                .unwrap(),
-                        )
-                        .clicked()
-                    {
+                    let instance_name = instance
+                        .path
+                        .as_ref()
+                        .map(|path| path.file_name().unwrap().to_str().unwrap().to_string())
+                        .unwrap_or(format!("New WAD ({})", idx));
+
+                    if ui.button(instance_name).clicked() {
                         ui.close_menu();
                         Some(idx)
                     } else {
