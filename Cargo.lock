@@ -1150,6 +1150,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "dem"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a731da21f5a7ea0200d692eeceae2f7140fef9795fcb533e4f140931d3b5125"
+dependencies = [
+ "bitvec",
+ "eyre",
+ "nom 7.1.3",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1708,7 +1719,7 @@ dependencies = [
  "chrono",
  "clap",
  "cuet",
- "dem",
+ "dem 0.2.0",
  "eyre",
  "gcd",
  "getrandom",
@@ -1739,7 +1750,7 @@ dependencies = [
  "arboard",
  "bsp",
  "clap",
- "dem",
+ "dem 0.1.0",
  "eframe",
  "egui_extras",
  "egui_tiles",
@@ -1763,7 +1774,7 @@ version = "0.3.0"
 dependencies = [
  "bsp",
  "console_error_panic_hook",
- "dem",
+ "dem 0.2.0",
  "gchimp",
  "wasm-bindgen",
  "wasm-bindgen-futures",

@@ -1,6 +1,4 @@
-use dem::hldemo::{Demo, FrameData};
-use dem::types::{EngineMessage, NetMessage};
-use dem::{init_parse, parse_netmsg};
+use dem::types::{EngineMessage, FrameData, MessageData, NetMessage};
 
 use super::*;
 
@@ -21,12 +19,10 @@ pub fn demo_ghost_parse(filename: &str, demo: &Demo) -> eyre::Result<GhostInfo> 
 
     let mut fov: Option<f32> = None;
 
-    let aux = init_parse!(demo);
-
     let ghost_frames = demo.directory.entries[1]
         .frames
         .iter()
-        .filter_map(|frame| match &frame.data {
+        .filter_map(|frame| match &frame.frame_data {
             // FrameData::ClientData(client) => {
             //     Some(GhostFrame {
             //         origin: client.origin.into(),
@@ -40,8 +36,13 @@ pub fn demo_ghost_parse(filename: &str, demo: &Demo) -> eyre::Result<GhostInfo> 
             //     })
             // }
             FrameData::ClientData(client) => {
-                origin = client.origin;
-                viewangles = client.viewangles;
+                origin = [client.origin[0], client.origin[1], client.origin[2]];
+
+                viewangles = [
+                    client.viewangles[0],
+                    client.viewangles[1],
+                    client.viewangles[2],
+                ];
                 fov = client.fov.into();
 
                 // ClientData happens before NetMsg so we can reset some values here.
@@ -51,14 +52,10 @@ pub fn demo_ghost_parse(filename: &str, demo: &Demo) -> eyre::Result<GhostInfo> 
 
                 None
             }
-            FrameData::NetMsg((_, data)) => {
-                let parse = parse_netmsg(data.msg, &aux);
-
-                if parse.is_err() {
+            FrameData::NetworkMessage(ref box_type) => {
+                let MessageData::Parsed(ref messages) = box_type.as_ref().1.messages else {
                     return None;
-                }
-
-                let (_, messages) = parse.unwrap();
+                };
 
                 // Every time there is svc_clientdata, there is svc_deltapacketentities
                 // Even if there isn't, this is more safe to make sure that we have the client data.

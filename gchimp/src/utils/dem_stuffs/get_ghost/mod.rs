@@ -1,8 +1,8 @@
 use std::array::from_fn;
 use std::path::PathBuf;
 
-use dem::hldemo::Demo;
 use dem::open_demo;
+use dem::types::Demo;
 use glam::{FloatExt, Vec3};
 
 use crate::err;

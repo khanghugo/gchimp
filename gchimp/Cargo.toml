@@ -12,7 +12,7 @@ map = { path = "../map" }
 qc = { path = "../qc" }
 wad = { path = "../wad" }
 bsp = { path = "../bsp" }
-dem = { git = "https://github.com/khanghugo/dem.git" }
+dem = "0.2.0"
 vtf = { version = "0.1.0", path = "../vtf" }
 
 # dependencies

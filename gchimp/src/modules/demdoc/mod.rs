@@ -1,5 +1,3 @@
-use dem::hldemo::{MoveVars, NetMsgData, NetMsgInfo, RefParams, UserCmd};
-
 pub mod change_map;
 pub mod check_doctored;
 pub mod ghost2dem;

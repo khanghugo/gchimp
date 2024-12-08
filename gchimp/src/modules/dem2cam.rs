@@ -5,8 +5,8 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use dem::hldemo::Demo;
 use dem::open_demo;
+use dem::types::Demo;
 
 use crate::utils::dem_stuffs::get_ghost::get_ghost_demo;
 

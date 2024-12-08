@@ -6,8 +6,8 @@ use crate::{config::Config, persistent_storage::PersistentStorage};
 
 use super::{
     programs::{
-        blbh::BLBHGui, demdoc::DemDoc, map2mdl::Map2MdlGui, misc::Misc, s2g::S2GGui,
-        skymod::SkyModGui, textile::TexTileGui, waddy::WaddyGui,
+        blbh::BLBHGui, map2mdl::Map2MdlGui, misc::Misc, s2g::S2GGui, skymod::SkyModGui,
+        textile::TexTileGui, waddy::WaddyGui,
     },
     TabProgram,
 };
@@ -19,7 +19,7 @@ pub enum Pane {
     TexTile(TexTileGui),
     Waddy(WaddyGui),
     Blbh(BLBHGui),
-    DemDoc(DemDoc),
+    // DemDoc(DemDoc),
     Misc(Misc),
 }
 
@@ -31,7 +31,7 @@ impl Pane {
             Pane::SkyMod(skymod) => skymod.tab_title(),
             Pane::TexTile(textile) => textile.tab_title(),
             Pane::Waddy(a) => a.tab_title(),
-            Pane::DemDoc(a) => a.tab_title(),
+            // Pane::DemDoc(a) => a.tab_title(),
             Pane::Blbh(a) => a.tab_title(),
             Pane::Misc(misc) => misc.tab_title(),
         }
@@ -44,7 +44,7 @@ impl Pane {
             Pane::SkyMod(skymod) => skymod.tab_ui(ui),
             Pane::TexTile(textile) => textile.tab_ui(ui),
             Pane::Waddy(a) => a.tab_ui(ui),
-            Pane::DemDoc(a) => a.tab_ui(ui),
+            // Pane::DemDoc(a) => a.tab_ui(ui),
             Pane::Blbh(a) => a.tab_ui(ui),
             Pane::Misc(misc) => misc.tab_ui(ui),
         }
@@ -66,7 +66,7 @@ pub fn create_tree(
         tiles.insert_pane(Pane::Waddy(WaddyGui::new(persistent_storage))),
         tiles.insert_pane(Pane::Map2Prop(Map2MdlGui::new(app_config.clone()))),
         tiles.insert_pane(Pane::Blbh(BLBHGui::new(app_config.clone()))),
-        tiles.insert_pane(Pane::DemDoc(DemDoc::default())),
+        // tiles.insert_pane(Pane::DemDoc(DemDoc::default())),
         tiles.insert_pane(Pane::Misc(Misc::default())),
     ];
 

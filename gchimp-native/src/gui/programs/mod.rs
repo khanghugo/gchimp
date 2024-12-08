@@ -1,5 +1,5 @@
 pub mod blbh;
-pub mod demdoc;
+// pub mod demdoc;
 pub mod map2mdl;
 pub mod misc;
 pub mod s2g;
