@@ -4,6 +4,7 @@ pub mod check_missing_texture;
 pub mod custom_script;
 pub mod dem2cam;
 // pub mod demdoc;
+pub mod bsp2wad;
 pub mod duplicate_triangle;
 pub mod find_low_scaling;
 pub mod light_scale;

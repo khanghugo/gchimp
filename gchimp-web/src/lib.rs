@@ -4,6 +4,7 @@ use wasm_bindgen::prelude::*;
 
 use bsp::Bsp;
 use gchimp::modules::{
+    bsp2wad::bsp2wad_bytes,
     dem2cam::{Dem2CamOptions, _dem2cam_string},
     loop_wave::loop_wave_from_wave_bytes as _loop_wave,
     resmake::{resmake_single_bsp, ResMakeOptions},
@@ -66,5 +67,15 @@ pub fn dem2cam(demo_bytes: Vec<u8>, filename: &str, override_fps: f32) -> Result
     ) {
         Ok(ok) => Ok(ok),
         Err(err) => Err(JsValue::from_str(err.to_string().as_str())),
+    }
+}
+
+#[wasm_bindgen]
+pub fn bsp2wad(bsp_bytes: Vec<u8>) -> Result<Vec<u8>, JsValue> {
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+
+    match bsp2wad_bytes(&bsp_bytes) {
+        Err(err) => Err(JsValue::from_str(err.to_string().as_str())),
+        Ok(ok) => Ok(ok),
     }
 }

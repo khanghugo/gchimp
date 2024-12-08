@@ -1,0 +1,59 @@
+.bsp2wad {
+    background-color: aliceblue;
+    max-width: 27%;
+
+    h1 {
+        margin: 10px;
+        color: aliceblue;
+        filter: invert(1)
+    }
+
+    display: flex;
+    flex-direction: column;
+
+    * {
+        width: 100%;
+    }
+
+    button {
+        margin-bottom: 10px;
+        padding: 10px;
+    }
+
+    border: 2px solid black;
+    padding: 24px;
+
+    box-shadow: 8px 8px black;
+
+    textarea {
+        resize: none;
+        text-align: center;
+    }
+
+    input[type="submit"] {
+        display: none;
+    }
+
+    .override-fps {
+        display: flex;
+        box-shadow: 2px 2px black;
+        margin-bottom: 10px;
+
+        border: 2px solid black;
+
+        label {
+            margin: 2px;
+            color: black;
+            font-size: 20px;
+            width: 140%;
+        }
+
+        input[type="text"] {
+            /* height: 100px; */
+            font-family: inherit;
+            font-size: 20px;
+            width: 100%;
+            text-align: right;
+        }
+    }
+}
