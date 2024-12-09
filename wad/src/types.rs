@@ -113,7 +113,11 @@ impl TextureName {
 
     pub fn set_name(&mut self, s: impl AsRef<str> + Into<String>) -> eyre::Result<()> {
         if s.as_ref().len() >= 16 {
-            return Err(eyre!("Max length for name is 15 characters."));
+            return Err(eyre!("max length for name is 15 characters."));
+        }
+
+        if s.as_ref().contains(" ") {
+            return Err(eyre!("name should not contain empty space"));
         }
 
         self.0[..s.as_ref().len()].copy_from_slice(s.as_ref().as_bytes());
