@@ -43,11 +43,26 @@ fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: RgbaImage) -> Rgb
     let bigger_side = if width >= height { width } else { height };
     let q = bigger_side as f32 / MAX_GOLDSRC_TEXTURE_SIZE as f32;
 
+    let make_multiple_of_16 = |(width, height): (u32, u32)| {
+        let (need_width, need_height) = (16 - width % 16, 16 - height % 16);
+
+        (
+            (width + need_width).min(MAX_GOLDSRC_TEXTURE_SIZE),
+            (height + need_height).min(MAX_GOLDSRC_TEXTURE_SIZE),
+        )
+    };
+
     if q <= 1. {
-        img
+        // make sure that is is multiple of 16
+        let (new_width, new_height) = make_multiple_of_16((width, height));
+
+        // good enough? i guess?
+        imageops::resize(&img, new_width, new_height, imageops::FilterType::Lanczos3)
     } else {
         let (width, height) = (width as f32 / q, height as f32 / q);
         let (width, height) = (width.round() as u32, height.round() as u32);
+        let (width, height) = make_multiple_of_16((width, height));
+
         imageops::resize(
             &img,
             width,
