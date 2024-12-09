@@ -1010,17 +1010,19 @@ impl WaddyGui {
             if ui.button("Import").clicked() {
                 // TODO this is not consistent with drag and drop behavior
                 // this does not filter out file extension
-                if let Some(path) = rfd::FileDialog::new()
+                if let Some(paths) = rfd::FileDialog::new()
                     .add_filter("Image", IMAGE_FORMATS)
-                    .pick_file()
+                    .pick_files()
                 {
-                    if let Err(err) = self.instances[instance_index]
-                        .waddy
-                        .add_texture_from_path(path)
-                    {
-                        println!("{}", err);
-                    } else {
-                        self.update_after_add_image(ui, instance_index);
+                    for path in &paths {
+                        if let Err(err) = self.instances[instance_index]
+                            .waddy
+                            .add_texture_from_path(path)
+                        {
+                            println!("{}", err);
+                        } else {
+                            self.update_after_add_image(ui, instance_index);
+                        }
                     }
                 }
 
@@ -1099,11 +1101,14 @@ impl WaddyGui {
 
     fn menu_save(&mut self, instance_index: usize) {
         if let Some(path) = &self.instances[instance_index].path {
-            self.persistent_storage
-                .lock()
-                .unwrap()
-                .push_waddy_recent_wads(path.to_str().unwrap())
-                .expect(PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR);
+            // drop
+            {
+                self.persistent_storage
+                    .lock()
+                    .unwrap()
+                    .push_waddy_recent_wads(path.to_str().unwrap())
+                    .expect(PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR);
+            }
 
             // TODO TOAST TOAST
             if let Err(err) = self.instances[instance_index]
@@ -1130,11 +1135,14 @@ impl WaddyGui {
             })
             .save_file()
         {
-            self.persistent_storage
-                .lock()
-                .unwrap()
-                .push_waddy_recent_wads(path.to_str().unwrap())
-                .expect(PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR);
+            // drop
+            {
+                self.persistent_storage
+                    .lock()
+                    .unwrap()
+                    .push_waddy_recent_wads(path.to_str().unwrap())
+                    .expect(PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR);
+            }
 
             // TODO TOAST TOAST
             if let Err(err) = self.instances[instance_index]
@@ -1232,6 +1240,8 @@ impl WaddyGui {
             };
 
             if let Some(to_remove) = to_remove {
+                // persistent_storage is guaranteed to be dropped when mutex is called again
+
                 mutex
                     .lock()
                     .unwrap()
@@ -1264,7 +1274,7 @@ impl TabProgram for WaddyGui {
                     };
 
                     ctx.show_viewport_immediate(
-                        egui::ViewportId::from_hash_of(&instance_name),
+                        egui::ViewportId::from_hash_of(instance_index.to_string()),
                         egui::ViewportBuilder::default()
                             .with_title(instance_name)
                             .with_inner_size(
