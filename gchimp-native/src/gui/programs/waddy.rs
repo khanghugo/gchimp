@@ -490,6 +490,8 @@ impl WaddyGui {
                                 || widget.lost_focus()
                                 || !widget.has_focus()
                     {
+                        // cancelling editting
+
                         let current_tile =
                             &mut self.instances[instance_index].texture_tiles[texture_tile_index];
 
@@ -498,12 +500,19 @@ impl WaddyGui {
                         current_tile.in_rename = false;
                         current_tile.name_mut().clone_from(&prev_name);
                     } else if ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        // submitting editting
+
                         let current_instance = &mut self.instances[instance_index];
                         let current_tile = &mut current_instance.texture_tiles[texture_tile_index];
 
                         // this is the only case where the name is changed successfully
                         current_tile.in_rename = false;
 
+                        // make changes
+                        // then check the changes
+                        // then undo the changes
+                        // seems stupid, but whatever
+                        // I guess this means we can handle stuffs here without touching wad library
                         if let Err(err) = current_instance
                             .waddy
                             .rename_texture(texture_tile_index, current_tile.name().clone())
@@ -516,6 +525,12 @@ impl WaddyGui {
                             current_tile.name_mut().clone_from(&prev_name);
                         } else if current_tile.name().len() >= 16 {
                             println!("Texture name is too long");
+
+                            let prev_name = current_tile.prev_name.clone();
+
+                            current_tile.name_mut().clone_from(&prev_name);
+                        } else if current_tile.name().contains(" ") {
+                            println!("Texture should not have space in its name");
 
                             let prev_name = current_tile.prev_name.clone();
 
