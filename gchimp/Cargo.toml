@@ -14,6 +14,7 @@ wad = { path = "../wad" }
 bsp = { path = "../bsp" }
 dem = "0.2.0"
 vtf = { version = "0.1.0", path = "../vtf" }
+mdl = { version = "0.3.0", path = "../mdl" }
 
 # dependencies
 glam = "0.27.0"

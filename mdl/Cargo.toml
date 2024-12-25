@@ -1,0 +1,11 @@
+[package]
+name = "mdl"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bitflags = "2.6.0"
+eyre = "0.6.12"
+glam = "0.29.2"
+nom = "7.1.3"

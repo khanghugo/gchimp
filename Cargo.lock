@@ -1727,6 +1727,7 @@ dependencies = [
  "image",
  "lazy_static",
  "map",
+ "mdl",
  "ndarray",
  "nom 7.1.3",
  "qc",
@@ -1852,6 +1853,12 @@ name = "glam"
 version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "779ae4bf7e8421cf91c0b3b64e7e8b40b862fba4d393f59150042de7c4965a94"
+
+[[package]]
+name = "glam"
+version = "0.29.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc46dd3ec48fdd8e693a98d2b8bafae273a2d54c1de02a2a7e3d57d501f39677"
 
 [[package]]
 name = "glow"
@@ -2567,6 +2574,16 @@ checksum = "8ea1f30cedd69f0a2954655f7188c6a834246d2bcf1e315e2ac40c4b24dc9519"
 dependencies = [
  "cfg-if",
  "rayon",
+]
+
+[[package]]
+name = "mdl"
+version = "0.3.0"
+dependencies = [
+ "bitflags 2.6.0",
+ "eyre",
+ "glam 0.29.2",
+ "nom 7.1.3",
 ]
 
 [[package]]
