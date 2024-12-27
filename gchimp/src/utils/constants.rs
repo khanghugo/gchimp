@@ -52,7 +52,8 @@ pub const SPRITE_ENTITIES: &[&str] = &["env_sprite", "env_beam", "env_glow", "en
 pub struct NoRenderTexture;
 
 lazy_static! {
-    static ref NO_RENDER_TEXTURE_UPPER: Vec<String> = NO_RENDER_TEXTURE.iter().map(|t| t.to_uppercase()).collect();
+    static ref NO_RENDER_TEXTURE_UPPER: Vec<String> =
+        NO_RENDER_TEXTURE.iter().map(|t| t.to_uppercase()).collect();
 }
 
 impl NoRenderTexture {
