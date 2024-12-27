@@ -28,6 +28,8 @@ impl SimpleWadEntry {
 
 #[derive(Clone, Default)]
 /// Just WAD(s) data indexed by texture name
+///
+/// HashMap of (texture name, { wad file index, dimensions })
 pub struct SimpleWad(HashMap<String, SimpleWadEntry>);
 
 impl From<&[&Wad]> for SimpleWad {
@@ -115,6 +117,20 @@ impl SimpleWad {
             },
         );
     }
+
+    pub fn uppercase(self) -> Self {
+        let mut res = Self::new();
+
+        self.0.into_iter().for_each(|(key, value)| {
+            res.insert(
+                key.to_uppercase(),
+                value.wad_file_index(),
+                value.dimensions(),
+            );
+        });
+
+        res
+    }
 }
 
 /// Exports a WAD texture from given name to an indexed bitmap
@@ -126,7 +142,10 @@ pub fn export_texture(
     let res = wad
         .entries
         .iter()
-        .find(|entry| entry.texture_name() == texture_name)
+        .find(|entry| {
+            let entry_texture_name = entry.texture_name();
+            entry_texture_name == texture_name || entry_texture_name.to_uppercase() == texture_name
+        })
         .map(|entry| match &entry.file_entry {
             FileEntry::Qpic(_) => unimplemented!(),
             FileEntry::MipTex(miptex) => {
