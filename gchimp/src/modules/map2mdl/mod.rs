@@ -23,12 +23,10 @@ use crate::{
     err,
     utils::{
         constants::{
-            CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE,
-            ORIGIN_TEXTURE,
+            NoRenderTexture, CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, ORIGIN_TEXTURE
         },
         map_stuffs::{
-            brush_from_mins_maxs, entity_to_triangulated_smd, map_to_triangulated_smd,
-            textures_used_in_entity, textures_used_in_map,
+            brush_from_mins_maxs, convert_used_texture_to_uppercase, entity_to_triangulated_smd, map_to_triangulated_smd, textures_used_in_entity, textures_used_in_map
         },
         misc::parse_triplet,
         smd_stuffs::{
@@ -87,6 +85,10 @@ pub struct Map2MdlOptions {
     pub marked_entity: bool,
     /// Model is flatshade
     pub flatshade: bool,
+    /// For .map exported from Hammer or jack, they all are upper case
+    ///
+    /// This option is to forcefully make sure every texture in the WAD and .map are both the same
+    pub uppercase: bool,
 }
 
 impl Default for Map2MdlOptions {
@@ -100,6 +102,7 @@ impl Default for Map2MdlOptions {
             #[cfg(target_os = "linux")]
             wineprefix: None,
             flatshade: true,
+            uppercase: false,
         }
     }
 }
@@ -196,6 +199,11 @@ impl Map2Mdl {
         self
     }
 
+    pub fn uppercase(&mut self, v: bool) -> &mut Self {
+        self.options.uppercase = v;
+        self
+    }
+
     pub fn sync(&mut self, v: Map2MdlSync) -> &mut Self {
         self.sync = v.into();
         self
@@ -253,7 +261,7 @@ impl Map2Mdl {
         // exclude triangles
         smd_triangles
             .iter()
-            .filter(|tri| !NO_RENDER_TEXTURE.contains(&tri.material.as_str()))
+            .filter(|tri| !NoRenderTexture.contains(&tri.material.as_str()))
             .for_each(|tri| {
                 let new_tri = tri.clone();
 
@@ -379,7 +387,7 @@ impl Map2Mdl {
                         );
                     }
 
-                    if flatshade && !NO_RENDER_TEXTURE.contains(&texture.as_str()) {
+                    if flatshade && !NoRenderTexture.contains(&texture.as_str()) {
                         new_qc.add_texrendermode(curr_tex.as_str(), qc::RenderMode::FlatShade);
                     }
                 });
@@ -446,7 +454,7 @@ impl Map2Mdl {
 
             if let Some(err) = textures_used
                 .par_iter()
-                .filter(|tex| !NO_RENDER_TEXTURE.contains(&tex.as_str()))
+                .filter(|tex| !NoRenderTexture.contains(&tex.as_str()))
                 .map(|tex| {
                     // textures will be exported inside studiomdl folder if convert entity
                     let out_path_file = if let Some(map) = &self.map {
@@ -630,6 +638,31 @@ impl Map2Mdl {
             textures_used_in_entity(entity)
         } else {
             unreachable!()
+        };
+
+        let (simple_wads, textures_used_in_map, mut map_file) = if self.options.uppercase {
+            self.log("Uppercase is used. Converting \"\"\"everything\"\"\" into uppercase.");
+
+            // pretty inefficient to convert textures_used_in_map to upper case after finding it from lower case
+            // but whatever
+
+            let map_file = match map_file {
+                Some(map) => {
+                    Some(convert_used_texture_to_uppercase(map))
+                },
+                None => None,
+            };
+
+            (
+                simple_wads.uppercase(),
+                textures_used_in_map
+                    .into_iter()
+                    .map(|key| key.to_uppercase())
+                    .collect(),
+                map_file
+            )
+        } else {
+            (simple_wads, textures_used_in_map, map_file)
         };
 
         let textures_missing = textures_used_in_map

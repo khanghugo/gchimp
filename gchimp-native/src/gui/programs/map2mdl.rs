@@ -51,6 +51,7 @@ impl Map2MdlGui {
             move_to_origin,
             marked_entity,
             flatshade,
+            uppercase,
             ..
         } = self.options;
         let entity = self.entity.clone();
@@ -68,6 +69,7 @@ impl Map2MdlGui {
                 .studiomdl(PathBuf::from(&studiomdl).as_path())
                 .marked_entity(marked_entity)
                 .flatshade(flatshade)
+                .uppercase(uppercase)
                 .sync(sync.clone());
 
             if use_entity {
@@ -80,7 +82,9 @@ impl Map2MdlGui {
             binding.wineprefix(wineprefix.as_ref().unwrap());
 
             if let Err(err) = binding.work() {
-                *sync.stdout().lock().unwrap() = err.to_string();
+                let mut lock = sync.stdout().lock().unwrap();
+                *lock += "\n";
+                *lock += err.to_string().as_str();
             } else {
                 let mut ok_text = "OK".to_string();
 
@@ -145,6 +149,9 @@ impl TabProgram for Map2MdlGui {
         ui.horizontal(|ui| {
             ui.checkbox(&mut self.options.auto_pickup_wad, "Auto pickup WADs").on_hover_text("Look for WAD files from \"wad\" key in the map file or worldbrush entity");
             ui.checkbox(&mut self.options.export_texture, "Export textures").on_hover_text("Export textures into the map file folder OR studiomdl.exe folder if converting entity");
+            ui.checkbox(&mut self.options.uppercase, "Uppercase texture").on_hover_text("\
+For .map exported from .jmf/rmf, the texture used inside source map file does not match WAD file.
+This option is to coerce every texture in this process to be upper case.")
         });
 
         ui.horizontal(|ui| {
