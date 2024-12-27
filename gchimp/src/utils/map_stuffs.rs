@@ -442,6 +442,20 @@ pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush 
     }
 }
 
+pub fn convert_used_texture_to_uppercase(mut map: Map) -> Map {
+    map.entities.iter_mut().for_each(|entity| {
+        entity.brushes.as_mut().map(|brushes| {
+            brushes.iter_mut().for_each(|brush| {
+                brush.planes.iter_mut().for_each(|plane| {
+                    plane.texture_name = plane.texture_name.to_uppercase();
+                });
+            });
+        });
+    });
+
+    map
+}
+
 #[cfg(test)]
 mod test {
     use map::Attributes;
