@@ -8,10 +8,10 @@ use std::{f64::consts::PI, path::PathBuf, str::from_utf8};
 
 use ndarray::prelude::*;
 
-use crate::utils::{
+use crate::{err, utils::{
     constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
     img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
-};
+}};
 
 #[cfg(target_arch = "x86_64")]
 use crate::utils::run_bin::run_studiomdl;
@@ -159,34 +159,14 @@ impl SkyModBuilder {
             ));
         }
 
-        for (index, texture) in textures.iter().enumerate() {
-            let (width, height) = texture.dimensions();
+        let texture0_dimensions = textures[0].dimensions();
 
-            if width != height {
-                return Err(eyre!(
-                    "Does not support textures with mismatched size {}x{}: {}",
-                    width,
-                    height,
-                    self.textures[index]
-                ));
-            } else if width % MIN_TEXTURE_SIZE != 0 {
-                return Err(eyre!(
-                    "Does not support textures with size not multiple of {} ({}): {}",
-                    MIN_TEXTURE_SIZE,
-                    width,
-                    self.textures[index]
-                ));
-            }
+        if !textures.iter().all(|texture| texture.dimensions() == texture0_dimensions) {
+            return err!("not all textures have the same dimensions (expect {}x{}", texture0_dimensions.0, texture0_dimensions.1);
         }
 
-        let side = textures[0].dimensions().0;
-        let same_dimension_all_texture = textures
-            .iter()
-            .fold(true, |acc, e| e.dimensions().0 == side && acc);
-        if !same_dimension_all_texture {
-            return Err(eyre!(
-                "Does not support individual texture with different dimension from another"
-            ));
+        if !textures.iter().all(|texture| texture.dimensions().0 == texture.dimensions().1) {
+            return err!("not all textures are squares");
         }
 
         let texture_per_side = (self.options.texture_per_face as f32).sqrt().floor() as u32;
