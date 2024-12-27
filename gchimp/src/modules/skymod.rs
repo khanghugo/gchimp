@@ -8,10 +8,13 @@ use std::{f64::consts::PI, path::PathBuf, str::from_utf8};
 
 use ndarray::prelude::*;
 
-use crate::{err, utils::{
-    constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
-    img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
-}};
+use crate::{
+    err,
+    utils::{
+        constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
+        img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
+    },
+};
 
 #[cfg(target_arch = "x86_64")]
 use crate::utils::run_bin::run_studiomdl;
@@ -161,11 +164,21 @@ impl SkyModBuilder {
 
         let texture0_dimensions = textures[0].dimensions();
 
-        if !textures.iter().all(|texture| texture.dimensions() == texture0_dimensions) {
-            return err!("not all textures have the same dimensions (expect {}x{}", texture0_dimensions.0, texture0_dimensions.1);
+        if !textures
+            .iter()
+            .all(|texture| texture.dimensions() == texture0_dimensions)
+        {
+            return err!(
+                "not all textures have the same dimensions (expect {}x{}",
+                texture0_dimensions.0,
+                texture0_dimensions.1
+            );
         }
 
-        if !textures.iter().all(|texture| texture.dimensions().0 == texture.dimensions().1) {
+        if !textures
+            .iter()
+            .all(|texture| texture.dimensions().0 == texture.dimensions().1)
+        {
             return err!("not all textures are squares");
         }
 
