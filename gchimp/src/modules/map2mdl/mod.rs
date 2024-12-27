@@ -23,11 +23,14 @@ use crate::{
     err,
     utils::{
         constants::{
-            NoRenderTexture, CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, ORIGIN_TEXTURE
+            NoRenderTexture, CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT,
+            ORIGIN_TEXTURE,
         },
         map_stuffs::{
-            brush_from_mins_maxs, convert_used_texture_to_uppercase, entity_to_triangulated_smd, map_to_triangulated_smd, textures_used_in_entity, textures_used_in_map
+            brush_from_mins_maxs, convert_used_texture_to_uppercase, entity_to_triangulated_smd,
+            map_to_triangulated_smd, textures_used_in_entity, textures_used_in_map,
         },
+        mdl_stuffs::handle_studiomdl_output,
         misc::parse_triplet,
         smd_stuffs::{
             add_bitmap_extension_to_texture, find_centroid, find_centroid_from_triangles,
@@ -504,7 +507,7 @@ impl Map2Mdl {
             return err!("Cannot parse map file: {}", err);
         }
 
-        let mut map_file = if let Some(map_file) = map_file {
+        let map_file = if let Some(map_file) = map_file {
             self.log("Converting map");
             map_file.ok()
         } else {
@@ -647,9 +650,7 @@ impl Map2Mdl {
             // but whatever
 
             let map_file = match map_file {
-                Some(map) => {
-                    Some(convert_used_texture_to_uppercase(map))
-                },
+                Some(map) => Some(convert_used_texture_to_uppercase(map)),
                 None => None,
             };
 
@@ -659,7 +660,7 @@ impl Map2Mdl {
                     .into_iter()
                     .map(|key| key.to_uppercase())
                     .collect(),
-                map_file
+                map_file,
             )
         } else {
             (simple_wads, textures_used_in_map, map_file)
@@ -913,7 +914,29 @@ However, it will still turn {} into model displaying entities such as cycler_spr
 
                             // way to pass more data... for now
                             match res {
-                                Ok(_) => Ok((model_count, maybe_target_origin)),
+                                Ok(processes_output) => {
+                                    // some error handling stuffs for studiomdl step
+                                    if let Some(handles) = processes_output {
+                                        let errs: Vec<_> = handles
+                                            .into_iter()
+                                            .map(|handle| {
+                                                let result = handle.join();
+                                                handle_studiomdl_output(result, None)
+                                            })
+                                            .filter_map(|res| res.err())
+                                            .collect();
+
+                                        errs.iter().for_each(|err| {
+                                            self.log(err.to_string().as_str());
+                                        });
+
+                                        if !errs.is_empty() {
+                                            return err!("cannot compile mdl");
+                                        }
+                                    }
+
+                                    Ok((model_count, maybe_target_origin))
+                                }
                                 Err(err) => err!(
                                     "Cannot convert from triangles for {} with output {}: {}",
                                     MAP2MDL_ENTITY_NAME,
@@ -1112,7 +1135,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
 
                 let output_path = self.map.as_ref().unwrap();
 
-                self.convert_from_triangles(
+                let handles = self.convert_from_triangles(
                     &smd_triangles,
                     &textures_used_in_map,
                     ConvertFromTrianglesOptions {
@@ -1127,6 +1150,26 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                         flatshade: self.options.flatshade,
                     },
                 )?;
+
+                // studiomdl errors
+                if let Some(handles) = handles {
+                    let errs: Vec<_> = handles
+                        .into_iter()
+                        .map(|handle| {
+                            let result = handle.join();
+                            handle_studiomdl_output(result, None)
+                        })
+                        .filter_map(|res| res.err())
+                        .collect();
+
+                    errs.iter().for_each(|err| {
+                        self.log(err.to_string().as_str());
+                    });
+
+                    if !errs.is_empty() {
+                        return err!("cannot compile mdl");
+                    }
+                }
             }
         } else if let Some(entity) = &entity_entity {
             self.log("Converting entity");
@@ -1145,7 +1188,8 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                 .with_file_name("map2mdl.mdl");
 
             self.log("Creating model");
-            self.convert_from_triangles(
+
+            let handles = self.convert_from_triangles(
                 &smd_triangles,
                 &textures_used_in_map,
                 ConvertFromTrianglesOptions {
@@ -1158,6 +1202,26 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     flatshade: self.options.flatshade,
                 },
             )?;
+
+            // studiomdl errors
+            if let Some(handles) = handles {
+                let errs: Vec<_> = handles
+                    .into_iter()
+                    .map(|handle| {
+                        let result = handle.join();
+                        handle_studiomdl_output(result, None)
+                    })
+                    .filter_map(|res| res.err())
+                    .collect();
+
+                errs.iter().for_each(|err| {
+                    self.log(err.to_string().as_str());
+                });
+
+                if !errs.is_empty() {
+                    return err!("cannot compile mdl");
+                }
+            }
         } else {
             unreachable!()
         };
