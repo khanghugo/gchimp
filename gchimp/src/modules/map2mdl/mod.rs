@@ -278,7 +278,13 @@ impl Map2Mdl {
             .iter()
             .filter(|tri| !NoRenderTexture.contains(tri.material.as_str()))
             .for_each(|tri| {
-                let new_tri = tri.clone();
+                let mut new_tri = tri.clone();
+
+                if self.options.reverse_normal {
+                    new_tri.vertices.iter_mut().for_each(|vertex| {
+                        vertex.norm *= -1.;
+                    });
+                }
 
                 main_smd.add_triangle(new_tri);
 
@@ -286,11 +292,8 @@ impl Map2Mdl {
                     let mut new_tri = tri.clone();
 
                     new_tri.vertices.iter_mut().for_each(|vertex| {
-                        // by default, the normal must be flipped
-                        // because the normal from the .map file is reverse
-                        if !self.options.reverse_normal {
-                            vertex.norm *= -1.;
-                        }
+                        // reverse normal just to be safe
+                        vertex.norm *= -1.;
                     });
 
                     new_tri.vertices.swap(0, 1);
