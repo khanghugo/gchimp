@@ -52,6 +52,7 @@ impl Map2MdlGui {
             marked_entity,
             flatshade,
             uppercase,
+            reverse_normal,
             ..
         } = self.options;
         let entity = self.entity.clone();
@@ -70,6 +71,7 @@ impl Map2MdlGui {
                 .marked_entity(marked_entity)
                 .flatshade(flatshade)
                 .uppercase(uppercase)
+                .reverse_normal(reverse_normal)
                 .sync(sync.clone());
 
             if use_entity {
@@ -167,6 +169,11 @@ This option is to coerce every texture in this process to be upper case.")
                 .on_hover_text("The center of the model is the origin");
             ui.checkbox(&mut self.options.flatshade, "Flatshade")
                 .on_hover_text("Model is flatshade");
+        });
+
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.options.reverse_normal, "Reverse normal")
+                .on_hover_text("Reverses every vertex normals");
         });
 
         ui.separator();

@@ -79,9 +79,11 @@ pub struct Map2MdlOptions {
     ///
     /// ORIGIN brush will only work if this is enabled.
     pub move_to_origin: bool,
-    studiomdl: Option<PathBuf>,
+
+    pub studiomdl: Option<PathBuf>,
     #[cfg(target_os = "linux")]
-    wineprefix: Option<String>,
+    pub wineprefix: Option<String>,
+
     /// Only converts [`GCHIMP_MAP2MDL_ENTITY_NAME`] entity
     ///
     /// Not only this will creates a new model but potentially a new .map file
@@ -92,6 +94,10 @@ pub struct Map2MdlOptions {
     ///
     /// This option is to forcefully make sure every texture in the WAD and .map are both the same
     pub uppercase: bool,
+    /// Reverses the normal of each vertex
+    /// 
+    /// A cool usecase for this would be reflection of the scene.
+    pub reverse_normal: bool,
 }
 
 impl Default for Map2MdlOptions {
@@ -106,6 +112,7 @@ impl Default for Map2MdlOptions {
             wineprefix: None,
             flatshade: true,
             uppercase: false,
+            reverse_normal: false,
         }
     }
 }
@@ -207,6 +214,11 @@ impl Map2Mdl {
         self
     }
 
+    pub fn reverse_normal(&mut self, v: bool) -> &mut Self {
+        self.options.reverse_normal = v;
+        self
+    }
+
     pub fn sync(&mut self, v: Map2MdlSync) -> &mut Self {
         self.sync = v.into();
         self
@@ -273,9 +285,12 @@ impl Map2Mdl {
                 if is_content_water && use_special_texture {
                     let mut new_tri = tri.clone();
 
-                    // flip the normal because it appears from the other side
                     new_tri.vertices.iter_mut().for_each(|vertex| {
-                        vertex.norm *= -1.;
+                        // by default, the normal must be flipped
+                        // because the normal from the .map file is reverse
+                        if !self.options.reverse_normal {
+                            vertex.norm *= -1.;
+                        }
                     });
 
                     new_tri.vertices.swap(0, 1);
