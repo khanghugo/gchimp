@@ -21,6 +21,12 @@ pub struct ResMakeOptions {
 
 impl Default for ResMakeOptions {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ResMakeOptions {
+    pub fn new() -> Self {
         Self { wad_check: false }
     }
 }
@@ -37,17 +43,17 @@ pub struct ResMake {
 
 impl Default for ResMake {
     fn default() -> Self {
-        Self {
-            bsp_file: Default::default(),
-            root_folder: Default::default(),
-            options: Default::default(),
-        }
+        Self::new()
     }
 }
 
 impl ResMake {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            bsp_file: None,
+            root_folder: None,
+            options: ResMakeOptions::default(),
+        }
     }
 
     pub fn bsp_file(&mut self, path: impl AsRef<Path> + Into<PathBuf>) -> &mut Self {
@@ -123,7 +129,7 @@ impl ResMake {
     }
 
     fn generate_wad_table(&self) -> eyre::Result<WadTable> {
-        let root_folder = if let Some(_) = &self.bsp_file {
+        let root_folder = if self.bsp_file.is_some() {
             self.check_bsp_file()?;
             self.check_bsp_file_parent()?
         } else if let Some(root_folder) = &self.root_folder {
@@ -132,9 +138,7 @@ impl ResMake {
             return err!("no folder set");
         };
 
-        let res = generate_wad_table(&root_folder);
-
-        res
+        generate_wad_table(&root_folder)
     }
 
     pub fn _get_resmake_single_bsp_string(&self) -> eyre::Result<String> {
@@ -212,7 +216,7 @@ fn find_wad_file_from_wad_table(wad_table: &WadTable, tex: &str) -> eyre::Result
         }
     }
 
-    return err!("cannot find texture `{}` from wad table", tex);
+    err!("cannot find texture `{}` from wad table", tex)
 }
 
 fn generate_wad_table(gamemod_dir: &Path) -> eyre::Result<WadTable> {
@@ -220,7 +224,7 @@ fn generate_wad_table(gamemod_dir: &Path) -> eyre::Result<WadTable> {
 
     let mut wad_table = WadTable::new();
 
-    let huh = fs::read_dir(&root_folder)?;
+    let huh = fs::read_dir(root_folder)?;
 
     huh.filter_map(|read_dir| read_dir.ok())
         .map(|entry| entry.path())
@@ -318,7 +322,7 @@ pub fn resmake_single_bsp(
             if SOUND_ENTITIES.contains(&classname.as_str()) {
                 if let Some(message) = entity.get("message") {
                     if message.ends_with(".wav") {
-                        used_sounds.insert(&message);
+                        used_sounds.insert(message);
                     }
                 }
             }
@@ -348,7 +352,7 @@ pub fn resmake_single_bsp(
     // entity 0 is worldbrush and we can get the skybox from there
     let entity0 = &bsp.entities[0];
 
-    let has_detail_textures = if let Some(classname) = entity0.get("classname") {
+    let _has_detail_textures = if let Some(classname) = entity0.get("classname") {
         if classname != "worldspawn" {
             return err!("first entity is not a worldbrush entity");
         }
@@ -434,12 +438,12 @@ pub fn resmake_single_bsp(
                 if let Some(model) = entity.get("model") {
                     // some of sprite entities are used for displaying model so this check is to make sure
                     if model.ends_with(".spr") {
-                        used_sprites.insert(&model);
+                        used_sprites.insert(model);
                     }
                 }
                 // env_beam
                 else if let Some(texture) = entity.get("texture") {
-                    used_sprites.insert(&texture);
+                    used_sprites.insert(texture);
                 }
             }
         }
@@ -486,7 +490,7 @@ pub fn resmake_single_bsp(
     // }
 
     // .wad
-    let external_textures = need_external_wad(&bsp);
+    let external_textures = need_external_wad(bsp);
 
     if !external_textures.is_empty() && options.wad_check {
         if let Some(wad_table) = wad_table {

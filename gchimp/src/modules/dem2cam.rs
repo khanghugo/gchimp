@@ -33,6 +33,12 @@ pub struct Exporter {
     data: CamIO,
 }
 
+impl Default for Exporter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Exporter {
     pub fn new() -> Self {
         Self {
@@ -107,6 +113,12 @@ pub struct Dem2CamOptions {
 
 impl Default for Dem2CamOptions {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Dem2CamOptions {
+    pub fn new() -> Self {
         Self {
             frametime: None,
             rotation: None,

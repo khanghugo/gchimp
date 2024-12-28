@@ -19,7 +19,7 @@ mod simen;
 mod surf_gateway;
 
 pub fn get_ghost_demo(filename: &str, demo: &Demo) -> eyre::Result<GhostInfo> {
-    demo_ghost_parse(filename, &demo)
+    demo_ghost_parse(filename, demo)
 }
 
 pub fn get_ghost(filename: &str) -> eyre::Result<GhostInfo> {

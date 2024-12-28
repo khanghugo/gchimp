@@ -95,7 +95,7 @@ pub struct Map2MdlOptions {
     /// This option is to forcefully make sure every texture in the WAD and .map are both the same
     pub uppercase: bool,
     /// Reverses the normal of each vertex
-    /// 
+    ///
     /// A cool usecase for this would be reflection of the scene.
     pub reverse_normal: bool,
 }
@@ -276,7 +276,7 @@ impl Map2Mdl {
         // exclude triangles
         smd_triangles
             .iter()
-            .filter(|tri| !NoRenderTexture.contains(&tri.material.as_str()))
+            .filter(|tri| !NoRenderTexture.contains(tri.material.as_str()))
             .for_each(|tri| {
                 let new_tri = tri.clone();
 
@@ -405,7 +405,7 @@ impl Map2Mdl {
                         );
                     }
 
-                    if flatshade && !NoRenderTexture.contains(&texture.as_str()) {
+                    if flatshade && !NoRenderTexture.contains(texture.as_str()) {
                         new_qc.add_texrendermode(curr_tex.as_str(), qc::RenderMode::FlatShade);
                     }
                 });
@@ -472,7 +472,7 @@ impl Map2Mdl {
 
             if let Some(err) = textures_used
                 .par_iter()
-                .filter(|tex| !NoRenderTexture.contains(&tex.as_str()))
+                .filter(|tex| !NoRenderTexture.contains(tex.as_str()))
                 .map(|tex| {
                     // textures will be exported inside studiomdl folder if convert entity
                     let out_path_file = if let Some(map) = &self.map {
@@ -664,10 +664,7 @@ impl Map2Mdl {
             // pretty inefficient to convert textures_used_in_map to upper case after finding it from lower case
             // but whatever
 
-            let map_file = match map_file {
-                Some(map) => Some(convert_used_texture_to_uppercase(map)),
-                None => None,
-            };
+            let map_file = map_file.map(convert_used_texture_to_uppercase);
 
             (
                 simple_wads.uppercase(),
