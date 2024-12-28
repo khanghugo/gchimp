@@ -1,3 +1,4 @@
+use eyre::eyre;
 use nom::{
     bytes::complete::take,
     combinator::{fail, map},
@@ -240,43 +241,48 @@ pub fn parse_wad(i: &[u8]) -> IResult<Wad> {
 
     let file_entries = directory_entries
         .iter()
-        .filter_map(|directory_entry| {
+        .enumerate()
+        .map(|(entry_index, directory_entry)| {
             // the actual WAD data is from the beginning of the file, not the beginning of the directory entry
             let file_entry_start = &file_start[directory_entry.entry_offset as usize..];
 
-            let file_entry = match directory_entry.file_type {
-                0x42 => FileEntry::Qpic(
-                    parse_qpic(file_entry_start)
-                        .ok()
-                        .expect("cannot parse qpic")
-                        .1,
-                ),
-                0x43 | 0x40 => FileEntry::MipTex(
-                    parse_miptex(file_entry_start)
-                        .ok()
-                        .expect("cannot parse miptex")
-                        .1,
-                ),
-                0x45 | 0x46 => FileEntry::Font(
-                    parse_font(file_entry_start)
-                        .ok()
-                        .expect("cannot parse font")
-                        .1,
-                ),
+            match directory_entry.file_type {
+                0x42 => {
+                    let Ok((_, res)) = parse_qpic(file_entry_start) else {
+                        return Err(eyre!("cannot parse qpic (entry {entry_index})"));
+                    };
+
+                    Ok(FileEntry::Qpic(res))
+                }
+                0x43 | 0x40 => {
+                    let Ok((_, res)) = parse_miptex(file_entry_start) else {
+                        return Err(eyre!("cannot parse miptex (entry {entry_index})"));
+                    };
+
+                    Ok(FileEntry::MipTex(res))
+                }
+                0x45 | 0x46 => {
+                    let Ok((_, res)) = parse_font(file_entry_start) else {
+                        return Err(eyre!("cannot parse font (entry {entry_index})"));
+                    };
+                    Ok(FileEntry::Font(res))
+                }
                 _ => unreachable!(""),
-            };
-
-            Some(file_entry)
+            }
         })
-        .collect::<Vec<FileEntry>>();
+        .collect::<Vec<eyre::Result<FileEntry>>>();
 
-    if file_entries.len() != directory_entries.len() {
-        let err_str = "Failed parsing texture data.";
+    let err_str = file_entries
+        .iter()
+        .filter_map(|e| e.as_ref().err())
+        .fold(String::new(), |acc, e| format!("{acc}{e}\n"));
 
-        println!("{}", err_str);
-
-        return context(err_str, fail)(b"");
+    // second clause is just to make sure
+    if !err_str.is_empty() && file_entries.iter().any(|e| e.is_err()) {
+        return context(err_str.leak(), fail)(b"");
     }
+
+    let file_entries: Vec<FileEntry> = file_entries.into_iter().filter_map(|e| e.ok()).collect();
 
     let entries = directory_entries
         .into_iter()
