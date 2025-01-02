@@ -8,11 +8,14 @@ use smd::{Smd, Triangle, Vertex};
 
 use eyre::eyre;
 
-use crate::utils::{
-    constants::{EPSILON, STUDIOMDL_ERROR_PATTERN},
-    img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
-    simple_calculs::{Matrix2x2, Plane3D, Polygon3D},
-    smd_stuffs::{maybe_split_smd, textures_used_in_triangles},
+use crate::{
+    err,
+    utils::{
+        constants::{EPSILON, STUDIOMDL_ERROR_PATTERN},
+        img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
+        simple_calculs::{Matrix2x2, Plane3D, Polygon3D},
+        smd_stuffs::{maybe_split_smd, textures_used_in_triangles},
+    },
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -162,6 +165,17 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
             })
             .collect::<Vec<DVec2>>()
     };
+
+    // check if uv is unwrapped properly
+    if smd.triangles.iter().any(|triangle| {
+        let is_outside = |x| x > 1. || x < 0.;
+        triangle
+            .vertices
+            .iter()
+            .any(|vertex| is_outside(vertex.uv.x) || is_outside(vertex.uv.y))
+    }) {
+        return err!("mesh uv is outside [0, 1]");
+    }
 
     // split all triangles inside `triangles` until it's empty
     // fairly simple algorithm, not very optimized
