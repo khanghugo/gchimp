@@ -9,6 +9,7 @@ mod map2mdl;
 mod resmake;
 mod rotate_prop_static;
 mod s2g;
+mod smd_compile;
 mod split_model;
 mod texture_scale;
 
@@ -63,6 +64,7 @@ pub fn cli() -> CliRes {
         &split_model::SplitModel,
         &loop_wave::LoopWave,
         &resmake::ResMake,
+        &smd_compile::SmdCompile,
     ];
 
     let help = || {
