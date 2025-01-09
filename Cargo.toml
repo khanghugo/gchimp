@@ -5,3 +5,6 @@ members = ["map", "smd", "qc" , "wad", "bsp", "byte_writer", "vtf", "gchimp", "g
 authors = [ "Lê Hàn Minh Khang (Khang Le) <mkhangle20@gmail.com>" ]
 version = "0.3.0"
 edition = "2021"
+
+[profile.release]
+strip = true
