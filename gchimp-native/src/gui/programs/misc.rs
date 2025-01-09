@@ -115,12 +115,23 @@ impl Misc {
             ui.end_row();
         });
 
-        ui.checkbox(&mut self.resmake_options.wad_check, "Check WAD")
-            .on_hover_text(
-                "\
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.resmake_options.wad_check, "Check WAD")
+                .on_hover_text(
+                    "\
 Whether to include external WAD in .res if found.
 Should only be used when BSP file is inside a proper folder structure.",
+                );
+
+            ui.checkbox(
+                &mut self.resmake_options.include_default_resource,
+                "Include default resource",
+            )
+            .on_hover_text(
+                "\
+Whether to include resource files from base game.",
             );
+        });
 
         ui.horizontal(|ui| {
             if ui.button("Run").clicked() {
@@ -166,10 +177,19 @@ Should only be used when BSP file is inside a proper folder structure.",
         let bsp = self.bsp.clone();
         let bsp_path = PathBuf::from(bsp);
         let status = self.resmake_status.clone();
+        let ResMakeOptions {
+            wad_check,
+            include_default_resource: exclude_default_resource,
+        } = self.resmake_options;
         "Running".clone_into(&mut status.lock().unwrap());
 
         thread::spawn(move || {
             let mut resmake = ResMake::new();
+
+            resmake
+                .wad_check(wad_check)
+                .exclude_default_resource(exclude_default_resource);
+
             resmake.bsp_file(bsp_path);
 
             if let Err(err) = resmake.single_bsp() {

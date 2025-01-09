@@ -18,8 +18,10 @@ use crate::{
 };
 
 pub struct ResMakeOptions {
-    /// Wheter to includes external WAD inside .res
+    /// Whether to include external WAD inside .res
     pub wad_check: bool,
+    /// Whether to include default resource inside base game
+    pub include_default_resource: bool,
 }
 
 impl Default for ResMakeOptions {
@@ -30,7 +32,10 @@ impl Default for ResMakeOptions {
 
 impl ResMakeOptions {
     pub fn new() -> Self {
-        Self { wad_check: false }
+        Self {
+            wad_check: false,
+            include_default_resource: false,
+        }
     }
 }
 
@@ -73,6 +78,12 @@ impl ResMake {
 
     pub fn wad_check(&mut self, v: bool) -> &mut Self {
         self.options.wad_check = v;
+
+        self
+    }
+
+    pub fn exclude_default_resource(&mut self, v: bool) -> &mut Self {
+        self.options.include_default_resource = v;
 
         self
     }
@@ -270,6 +281,19 @@ fn resmake_header(entry_count: i32) -> String {
     )
 }
 
+#[inline]
+fn filter_helper<T>(i: HashSet<T>, include_default: bool) -> Vec<T>
+where
+    T: Into<String> + AsRef<str> + Ord,
+{
+    let mut i = i
+        .into_iter()
+        .filter(|s| include_default || !DefaultResource.is_default_resource(s))
+        .collect::<Vec<_>>();
+    i.sort();
+    i
+}
+
 /// Should not be used directly because this does not have any checks
 pub fn resmake_single_bsp(
     bsp: &Bsp,
@@ -300,11 +324,7 @@ pub fn resmake_single_bsp(
             }
         }
 
-        let mut used_models = used_models
-            .into_iter()
-            .filter(|s| !DefaultResource.is_default_resource(s))
-            .collect::<Vec<_>>();
-        used_models.sort();
+        let used_models = filter_helper(used_models, options.include_default_resource);
 
         if !used_models.is_empty() {
             res_file += "\n";
@@ -338,11 +358,7 @@ pub fn resmake_single_bsp(
             }
         }
 
-        let mut used_sounds = used_sounds
-            .into_iter()
-            .filter(|s| !DefaultResource.is_default_resource(s))
-            .collect::<Vec<_>>();
-        used_sounds.sort();
+        let used_sounds = filter_helper(used_sounds, options.include_default_resource);
 
         if !used_sounds.is_empty() {
             res_file += "\n";
@@ -423,11 +439,7 @@ pub fn resmake_single_bsp(
             }
         }
 
-        let mut used_gfx = used_gfx
-            .into_iter()
-            .filter(|s| !DefaultResource.is_default_resource(s))
-            .collect::<Vec<_>>();
-        used_gfx.sort();
+        let used_gfx = filter_helper(used_gfx, options.include_default_resource);
 
         if !used_gfx.is_empty() {
             res_file += "\n";
@@ -466,18 +478,11 @@ pub fn resmake_single_bsp(
             }
         }
 
-        let mut used_sprites = used_sprites
-            .into_iter()
-            .filter(|s| !DefaultResource.is_default_resource(s))
-            .collect::<Vec<_>>();
-        used_sprites.sort();
+        let used_sprites = filter_helper(used_sprites, options.include_default_resource);
 
         if !used_sprites.is_empty() {
             res_file += "\n";
             res_file += "// sprites\n";
-
-            let mut used_sprites = used_sprites.into_iter().collect::<Vec<_>>();
-            used_sprites.sort();
 
             for used_sprite in used_sprites {
                 res_file += used_sprite;
@@ -525,11 +530,7 @@ pub fn resmake_single_bsp(
                     used_wads.insert(x);
                 }
 
-                let mut used_wads = used_wads
-                    .into_iter()
-                    .filter(|s| !DefaultResource.is_default_resource(s))
-                    .collect::<Vec<_>>();
-                used_wads.sort();
+                let used_wads = filter_helper(used_wads, options.include_default_resource);
 
                 if !used_wads.is_empty() {
                     res_file += "\n";
@@ -550,8 +551,13 @@ pub fn resmake_single_bsp(
             }
         }
     }
+
     // add header when everything is done
     res_file.insert_str(0, resmake_header(entry_count).as_str());
+
+    if entry_count == 0 {
+        res_file += "\n// res file is empty\n"
+    }
 
     Ok(res_file)
 }
