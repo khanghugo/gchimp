@@ -11,7 +11,10 @@ use wad::types::Wad;
 
 use crate::{
     err,
-    utils::constants::{MODEL_ENTITIES, SOUND_ENTITIES, SPRITE_ENTITIES},
+    utils::{
+        constants::{MODEL_ENTITIES, SOUND_ENTITIES, SPRITE_ENTITIES},
+        misc::DefaultResource,
+    },
 };
 
 pub struct ResMakeOptions {
@@ -280,190 +283,210 @@ pub fn resmake_single_bsp(
 
     let mut entry_count = 0;
 
-    // models
-    // "model": "models/.../.../models.mdl"
-    let mut used_models = HashSet::<&str>::new();
+    {
+        // models
+        // "model": "models/.../.../models.mdl"
+        let mut used_models = HashSet::<&str>::new();
 
-    for entity in &bsp.entities {
-        if let Some(classname) = entity.get("classname") {
-            if MODEL_ENTITIES.contains(&classname.as_str()) {
-                if let Some(model) = entity.get("model") {
-                    if model.ends_with(".mdl") {
-                        used_models.insert(model);
+        for entity in &bsp.entities {
+            if let Some(classname) = entity.get("classname") {
+                if MODEL_ENTITIES.contains(&classname.as_str()) {
+                    if let Some(model) = entity.get("model") {
+                        if model.ends_with(".mdl") {
+                            used_models.insert(model);
+                        }
                     }
                 }
             }
         }
-    }
 
-    if !used_models.is_empty() {
-        res_file += "\n";
-        res_file += "// models \n";
-
-        let mut used_models = used_models.into_iter().collect::<Vec<_>>();
+        let mut used_models = used_models
+            .into_iter()
+            .filter(|s| !DefaultResource.is_default_resource(s))
+            .collect::<Vec<_>>();
         used_models.sort();
 
-        for used_model in used_models {
-            res_file += used_model;
+        if !used_models.is_empty() {
             res_file += "\n";
+            res_file += "// models \n";
 
-            entry_count += 1;
-        }
-    }
-
-    // sound
-    // "message": "audio.wav"
-    // prefix for folder "sounds" is not included.
-    // so we need to include it
-    let mut used_sounds = HashSet::<&str>::new();
-
-    for entity in &bsp.entities {
-        if let Some(classname) = entity.get("classname") {
-            if SOUND_ENTITIES.contains(&classname.as_str()) {
-                if let Some(message) = entity.get("message") {
-                    if message.ends_with(".wav") {
-                        used_sounds.insert(message);
-                    }
-                }
-            }
-        }
-    }
-
-    if !used_sounds.is_empty() {
-        res_file += "\n";
-        res_file += "// sound\n";
-
-        let mut used_sounds = used_sounds.into_iter().collect::<Vec<_>>();
-        used_sounds.sort();
-
-        for used_sound in used_sounds {
-            res_file += format!("sound/{}", used_sound).as_str();
-            res_file += "\n";
-
-            entry_count += 1;
-        }
-    }
-
-    // gfx
-    // skybox and detail textures
-    res_file += "\n";
-    res_file += "// gfx\n";
-
-    // entity 0 is worldbrush and we can get the skybox from there
-    let entity0 = &bsp.entities[0];
-
-    let _has_detail_textures = if let Some(classname) = entity0.get("classname") {
-        if classname != "worldspawn" {
-            return err!("first entity is not a worldbrush entity");
-        }
-
-        let skyname = entity0
-            .get("skyname")
-            .map(|skyname| skyname.to_string())
-            .unwrap_or("desert".to_string());
-
-        let base_skyname = format!("gfx/env/{}", skyname);
-
-        // skybox
-        ["bk", "dn", "ft", "lf", "rt", "up"]
-            .iter()
-            .for_each(|suffix| {
-                res_file += format!("{}{}.tga\n", base_skyname, suffix).as_str();
-
-                entry_count += 1;
-            });
-
-        // detail texture
-        let detail_texture_file_path = bsp_path.with_file_name(format!("{}_detail.txt", bsp_name));
-
-        if detail_texture_file_path.exists() {
-            let mut used_detail_textures = HashSet::<String>::new();
-
-            let mut detail_texture_file = match OpenOptions::new()
-                .read(true)
-                .open(&detail_texture_file_path)
-            {
-                Ok(a) => a,
-                Err(err) => {
-                    return err!(
-                        "cannot open detail texture file `{}` for bsp file `{}`: {err}",
-                        detail_texture_file_path.display(),
-                        bsp_path.display()
-                    )
-                }
-            };
-
-            let mut s = String::new();
-            detail_texture_file.read_to_string(&mut s)?;
-
-            let base_detail_textures = "gfx";
-            res_file += "\n";
-
-            s.lines().for_each(|line| {
-                if let Some(detail_texture) = line.split_ascii_whitespace().nth(1) {
-                    if !detail_texture.is_empty() {
-                        used_detail_textures
-                            .insert(format!("{}/{}.tga", base_detail_textures, detail_texture));
-                    }
-                }
-            });
-
-            let mut used_detail_textures = used_detail_textures.into_iter().collect::<Vec<_>>();
-            used_detail_textures.sort();
-
-            for used_detail_texture in used_detail_textures {
-                res_file += used_detail_texture.as_str();
+            for used_model in used_models {
+                res_file += used_model;
                 res_file += "\n";
 
                 entry_count += 1;
             }
-
-            true
-        } else {
-            false
         }
-    } else {
-        false
-    };
+    }
 
-    // sprites
-    // "model": "sprites/.../.../sprite.spr"
-    let mut used_sprites = HashSet::<&str>::new();
+    {
+        // sound
+        // "message": "audio.wav"
+        // prefix for folder "sounds" is not included.
+        // so we need to include it
+        let mut used_sounds = HashSet::<&str>::new();
 
-    for entity in &bsp.entities {
-        if let Some(classname) = entity.get("classname") {
-            if SPRITE_ENTITIES.contains(&classname.as_str()) {
-                // env_sprite
-                // env_glow
-                if let Some(model) = entity.get("model") {
-                    // some of sprite entities are used for displaying model so this check is to make sure
-                    if model.ends_with(".spr") {
-                        used_sprites.insert(model);
+        for entity in &bsp.entities {
+            if let Some(classname) = entity.get("classname") {
+                if SOUND_ENTITIES.contains(&classname.as_str()) {
+                    if let Some(message) = entity.get("message") {
+                        if message.ends_with(".wav") {
+                            used_sounds.insert(message);
+                        }
                     }
                 }
-                // env_beam
-                else if let Some(texture) = entity.get("texture") {
-                    used_sprites.insert(texture);
-                }
+            }
+        }
+
+        let mut used_sounds = used_sounds
+            .into_iter()
+            .filter(|s| !DefaultResource.is_default_resource(s))
+            .collect::<Vec<_>>();
+        used_sounds.sort();
+
+        if !used_sounds.is_empty() {
+            res_file += "\n";
+            res_file += "// sound\n";
+
+            for used_sound in used_sounds {
+                res_file += format!("sound/{}", used_sound).as_str();
+                res_file += "\n";
+
+                entry_count += 1;
             }
         }
     }
 
-    if !used_sprites.is_empty() {
-        res_file += "\n";
-        res_file += "// sprites\n";
+    {
+        // gfx
+        // skybox and detail textures
 
-        let mut used_sprites = used_sprites.into_iter().collect::<Vec<_>>();
-        used_sprites.sort();
+        // entity 0 is worldbrush and we can get the skybox from there
+        let entity0 = &bsp.entities[0];
+        let mut used_gfx = HashSet::<String>::new();
 
-        for used_sprite in used_sprites {
-            res_file += used_sprite;
+        if let Some(classname) = entity0.get("classname") {
+            if classname != "worldspawn" {
+                return err!("first entity is not a worldbrush entity");
+            }
+
+            let skyname = entity0
+                .get("skyname")
+                .map(|skyname| skyname.to_string())
+                .unwrap_or("desert".to_string());
+
+            let base_skyname = format!("gfx/env/{}", skyname);
+
+            // skybox
+            ["bk", "dn", "ft", "lf", "rt", "up"]
+                .iter()
+                .for_each(|suffix| {
+                    let sky_part = format!("{}{}.tga", base_skyname, suffix);
+
+                    used_gfx.insert(sky_part);
+                });
+
+            // detail texture
+            let detail_texture_file_path =
+                bsp_path.with_file_name(format!("{}_detail.txt", bsp_name));
+
+            if detail_texture_file_path.exists() {
+                let mut detail_texture_file = match OpenOptions::new()
+                    .read(true)
+                    .open(&detail_texture_file_path)
+                {
+                    Ok(a) => a,
+                    Err(err) => {
+                        return err!(
+                            "cannot open detail texture file `{}` for bsp file `{}`: {err}",
+                            detail_texture_file_path.display(),
+                            bsp_path.display()
+                        )
+                    }
+                };
+
+                let mut s = String::new();
+                detail_texture_file.read_to_string(&mut s)?;
+
+                let base_detail_textures = "gfx";
+
+                s.lines().for_each(|line| {
+                    if let Some(detail_texture) = line.split_ascii_whitespace().nth(1) {
+                        let detail_file =
+                            format!("{}/{}.tga", base_detail_textures, detail_texture);
+
+                        if !detail_texture.is_empty() {
+                            used_gfx.insert(detail_file);
+                        }
+                    }
+                });
+            }
+        }
+
+        let mut used_gfx = used_gfx
+            .into_iter()
+            .filter(|s| !DefaultResource.is_default_resource(s))
+            .collect::<Vec<_>>();
+        used_gfx.sort();
+
+        if !used_gfx.is_empty() {
             res_file += "\n";
+            res_file += "// gfx\n";
 
-            entry_count += 1;
+            for used_gfx_singular in used_gfx {
+                res_file += used_gfx_singular.as_str();
+                res_file += "\n";
+
+                entry_count += 1;
+            }
         }
     }
 
+    {
+        // sprites
+        // "model": "sprites/.../.../sprite.spr"
+        let mut used_sprites = HashSet::<&str>::new();
+
+        for entity in &bsp.entities {
+            if let Some(classname) = entity.get("classname") {
+                if SPRITE_ENTITIES.contains(&classname.as_str()) {
+                    // env_sprite
+                    // env_glow
+                    if let Some(model) = entity.get("model") {
+                        // some of sprite entities are used for displaying model so this check is to make sure
+                        if model.ends_with(".spr") {
+                            used_sprites.insert(model);
+                        }
+                    }
+                    // env_beam
+                    else if let Some(texture) = entity.get("texture") {
+                        used_sprites.insert(texture);
+                    }
+                }
+            }
+        }
+
+        let mut used_sprites = used_sprites
+            .into_iter()
+            .filter(|s| !DefaultResource.is_default_resource(s))
+            .collect::<Vec<_>>();
+        used_sprites.sort();
+
+        if !used_sprites.is_empty() {
+            res_file += "\n";
+            res_file += "// sprites\n";
+
+            let mut used_sprites = used_sprites.into_iter().collect::<Vec<_>>();
+            used_sprites.sort();
+
+            for used_sprite in used_sprites {
+                res_file += used_sprite;
+                res_file += "\n";
+
+                entry_count += 1;
+            }
+        }
+    }
     // no need to add .bsp and .res because they are no needed
     // {
     //     // maps
@@ -490,37 +513,43 @@ pub fn resmake_single_bsp(
     // }
 
     // .wad
-    let external_textures = need_external_wad(bsp);
+    {
+        let external_textures = need_external_wad(bsp);
 
-    if !external_textures.is_empty() && options.wad_check {
-        if let Some(wad_table) = wad_table {
-            let mut used_wads = HashSet::<String>::new();
+        if !external_textures.is_empty() && options.wad_check {
+            if let Some(wad_table) = wad_table {
+                let mut used_wads = HashSet::<String>::new();
 
-            for used_texture in external_textures {
-                let x = find_wad_file_from_wad_table(wad_table, used_texture.as_str())?;
-                used_wads.insert(x);
+                for used_texture in external_textures {
+                    let x = find_wad_file_from_wad_table(wad_table, used_texture.as_str())?;
+                    used_wads.insert(x);
+                }
+
+                let mut used_wads = used_wads
+                    .into_iter()
+                    .filter(|s| !DefaultResource.is_default_resource(s))
+                    .collect::<Vec<_>>();
+                used_wads.sort();
+
+                if !used_wads.is_empty() {
+                    res_file += "\n";
+                    res_file += "// wads\n";
+
+                    for used_wad in used_wads {
+                        res_file += used_wad.as_str();
+                        res_file += "\n";
+
+                        entry_count += 1;
+                    }
+                }
+            } else {
+                return err!(
+                    "bsp file `{}` needs external wad but none supplied",
+                    bsp_path.display()
+                );
             }
-
-            res_file += "\n";
-            res_file += "// wads\n";
-
-            let mut used_wads = used_wads.into_iter().collect::<Vec<_>>();
-            used_wads.sort();
-
-            for used_wad in used_wads {
-                res_file += used_wad.as_str();
-                res_file += "\n";
-
-                entry_count += 1;
-            }
-        } else {
-            return err!(
-                "bsp file `{}` needs external wad but none supplied",
-                bsp_path.display()
-            );
         }
     }
-
     // add header when everything is done
     res_file.insert_str(0, resmake_header(entry_count).as_str());
 
