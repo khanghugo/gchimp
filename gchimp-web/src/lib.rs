@@ -35,16 +35,16 @@ pub fn resmake(bsp_bytes: Vec<u8>, filename: &str) -> Result<String, JsValue> {
 
     let bsp_path = Path::new(filename);
 
+    let options = ResMakeOptions {
+        res: true,
+        zip: false,
+        wad_check: false,
+        include_default_resource: false,
+        zip_ignore_missing: false,
+    };
+
     // does not include default resource by default
-    match resmake_single_bsp(
-        &bsp,
-        bsp_path,
-        None,
-        &ResMakeOptions {
-            wad_check: false,
-            include_default_resource: false,
-        },
-    ) {
+    match resmake_single_bsp(&bsp, bsp_path, None, &options) {
         Err(err) => Err(JsValue::from_str(err.to_string().as_str())),
         Ok(ok) => Ok(ok),
     }
