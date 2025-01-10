@@ -53,6 +53,9 @@ impl Waddy {
         let bsp = Bsp::from_file(path)?;
         let textures = bsp.textures;
 
+        // TODO maybe one day I will change this at wad write level
+        res.wad.header.num_dirs = textures.len() as i32;
+
         res.wad.entries = textures
             .into_iter()
             .map(|texture| {
