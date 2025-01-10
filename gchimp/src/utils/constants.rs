@@ -11,20 +11,21 @@ lazy_static! {
         .unwrap_or(1500);
 }
 
-pub static MAX_SMD_PER_MODEL: usize = 32;
+pub const MAX_SMD_PER_MODEL: usize = 32;
+pub const MAX_SMD_VERTEX: usize = 2048;
 
-pub static STUDIOMDL_ERROR_PATTERN: &str = "************ ERROR ************";
-pub static MAX_GOLDSRC_MODEL_TEXTURE_COUNT: usize = 64;
+pub const STUDIOMDL_ERROR_PATTERN: &str = "************ ERROR ************";
+pub const MAX_GOLDSRC_MODEL_TEXTURE_COUNT: usize = 64;
 
-pub static PALETTE_PAD_COLOR: [u8; 3] = [0, 0, 0];
-pub static PALETTE_TRANSPARENT_COLOR: [u8; 3] = [0, 255, 0];
-pub static PALETTE_TRANSPARENT_COLOR2: [u8; 3] = [0, 0, 255];
+pub const PALETTE_PAD_COLOR: [u8; 3] = [0, 0, 0];
+pub const PALETTE_TRANSPARENT_COLOR: [u8; 3] = [0, 255, 0];
+pub const PALETTE_TRANSPARENT_COLOR2: [u8; 3] = [0, 0, 255];
 
-pub static ORIGIN_TEXTURE: &str = "ORIGIN";
-pub static CLIP_TEXTURE: &str = "CLIP";
-pub static CONTENTWATER_TEXTURE: &str = "CONTENTWATER";
+pub const ORIGIN_TEXTURE: &str = "ORIGIN";
+pub const CLIP_TEXTURE: &str = "CLIP";
+pub const CONTENTWATER_TEXTURE: &str = "CONTENTWATER";
 
-pub static NO_RENDER_TEXTURE: &[&str] = &[
+pub const NO_RENDER_TEXTURE: &[&str] = &[
     "NULL",
     "HINT",
     "AAATRIGGER",
@@ -34,11 +35,11 @@ pub static NO_RENDER_TEXTURE: &[&str] = &[
     CLIP_TEXTURE,
     CONTENTWATER_TEXTURE,
 ];
-pub static TRENCHBROOM_EMPTY_TEXTURE: &str = "__TB_empty";
+pub const TRENCHBROOM_EMPTY_TEXTURE: &str = "__TB_empty";
 
-pub static TEXTURE_PREFIXES: &[&str] = &["{", "!", "+", "-", "~"];
+pub const TEXTURE_PREFIXES: &[&str] = &["{", "!", "+", "-", "~"];
 
-pub static EPSILON: f64 = 0.0000001;
+pub const EPSILON: f64 = 0.0000001;
 
 pub const MODEL_ENTITIES: &[&str] = &["cycler", "cycler_sprite", "env_sprite"];
 pub const SOUND_ENTITIES: &[&str] = &[
