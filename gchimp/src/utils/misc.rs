@@ -64,9 +64,11 @@ pub struct DefaultResource;
 
 impl DefaultResource {
     pub fn is_default_resource(&self, s: impl AsRef<str>) -> bool {
-        DEFAULT_RESOURCES
-            .iter()
-            .any(|resource| resource.lines().any(|line| line.ends_with(s.as_ref())))
+        DEFAULT_RESOURCES.iter().any(|resource| {
+            resource
+                .lines()
+                .any(|line| line.ends_with(s.as_ref()))
+        })
     }
 }
 
