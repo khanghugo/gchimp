@@ -116,7 +116,11 @@ impl Misc {
         });
 
         ui.horizontal(|ui| {
-            ui.checkbox(&mut self.resmake_options.wad_check, "Check WAD")
+            ui.checkbox(&mut self.resmake_options.res, "RES")
+                .on_hover_text("Creates RES");
+            ui.checkbox(&mut self.resmake_options.zip, "ZIP")
+                .on_hover_text("Creates ZIP");
+            ui.checkbox(&mut self.resmake_options.wad_check, "WAD")
                 .on_hover_text(
                     "\
 Whether to include external WAD in .res if found.
@@ -125,11 +129,20 @@ Should only be used when BSP file is inside a proper folder structure.",
 
             ui.checkbox(
                 &mut self.resmake_options.include_default_resource,
-                "Include default resource",
+                "Default res",
             )
             .on_hover_text(
                 "\
 Whether to include resource files from base game.",
+            );
+
+            ui.checkbox(
+                &mut self.resmake_options.zip_ignore_missing,
+                "Ignore missing",
+            )
+            .on_hover_text(
+                "\
+Ignore errors when encounter missing resource.",
             );
         });
 
@@ -179,7 +192,10 @@ Whether to include resource files from base game.",
         let status = self.resmake_status.clone();
         let ResMakeOptions {
             wad_check,
-            include_default_resource: exclude_default_resource,
+            include_default_resource,
+            res,
+            zip,
+            zip_ignore_missing,
         } = self.resmake_options;
         "Running".clone_into(&mut status.lock().unwrap());
 
@@ -188,11 +204,14 @@ Whether to include resource files from base game.",
 
             resmake
                 .wad_check(wad_check)
-                .exclude_default_resource(exclude_default_resource);
+                .include_default_resource(include_default_resource)
+                .res(res)
+                .zip(zip)
+                .zip_ignore_missing(zip_ignore_missing);
 
             resmake.bsp_file(bsp_path);
 
-            if let Err(err) = resmake.single_bsp() {
+            if let Err(err) = resmake.run() {
                 err.to_string().clone_into(&mut status.lock().unwrap());
             } else {
                 "Done".clone_into(&mut status.lock().unwrap());

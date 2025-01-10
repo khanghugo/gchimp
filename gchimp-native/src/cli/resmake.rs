@@ -40,9 +40,15 @@ impl Cli for ResMake {
 
         let mut resmake = ResMakeModule::new();
 
-        resmake.bsp_file(path).wad_check(wad_check);
+        resmake
+            .bsp_file(path)
+            .wad_check(wad_check)
+            .include_default_resource(false)
+            .zip(true)
+            .res(true)
+            .zip_ignore_missing(true);
 
-        match resmake.single_bsp() {
+        match resmake.run() {
             Ok(_) => CliRes::Ok,
             Err(err) => {
                 println!("{}", err);
