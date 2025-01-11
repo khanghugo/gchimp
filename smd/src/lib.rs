@@ -154,14 +154,8 @@ impl Smd {
         Self::from(&text)
     }
 
-    pub fn write(&self, path: impl AsRef<Path> + Into<PathBuf>) -> io::Result<()> {
-        let file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(path)?;
-
-        let mut file = BufWriter::new(file);
+    pub fn write_to_string(&self) -> eyre::Result<String> {
+        let mut file = BufWriter::new(vec![]);
 
         file.write_all(format!("version {}\n", self.version).as_bytes())?;
 
@@ -234,6 +228,27 @@ impl Smd {
             }
             file.write_all("end\n".as_bytes())?;
         }
+
+        file.flush()?;
+
+        let out = file.into_inner()?;
+        let out = String::from_utf8(out)?;
+
+        Ok(out)
+    }
+
+    pub fn write(&self, path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(path)?;
+
+        let mut file = BufWriter::new(file);
+
+        let res_str = self.write_to_string()?;
+
+        file.write_all(res_str.as_bytes())?;
 
         file.flush()?;
 
