@@ -1,14 +1,21 @@
-use std::path::Path;
+use std::{path::Path, str::from_utf8};
 
+use smd::Smd;
+use utils::{zip_files, WasmFile};
 use wasm_bindgen::prelude::*;
 
 use bsp::Bsp;
-use gchimp::modules::{
-    bsp2wad::bsp2wad_bytes,
-    dem2cam::{Dem2CamOptions, _dem2cam_string},
-    loop_wave::loop_wave_from_wave_bytes as _loop_wave,
-    resmake::{resmake_single_bsp, ResMakeOptions},
+use gchimp::{
+    modules::{
+        bsp2wad::bsp2wad_bytes,
+        dem2cam::{Dem2CamOptions, _dem2cam_string},
+        loop_wave::loop_wave_from_wave_bytes as _loop_wave,
+        resmake::{resmake_single_bsp, ResMakeOptions},
+    },
+    utils::smd_stuffs::maybe_split_smd,
 };
+
+mod utils;
 
 #[wasm_bindgen]
 pub fn loop_wave(wave_bytes: Vec<u8>) -> Result<Vec<u8>, JsValue> {
@@ -87,4 +94,31 @@ pub fn bsp2wad(bsp_bytes: Vec<u8>) -> Result<Vec<u8>, JsValue> {
         Err(err) => Err(JsValue::from_str(err.to_string().as_str())),
         Ok(ok) => Ok(ok),
     }
+}
+
+/// `smd_name` should not have .smd suffix for convenience
+#[wasm_bindgen]
+pub fn split_smd(_smd_string: Vec<u8>, smd_name: String) -> Result<Vec<u8>, JsValue> {
+    std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+
+    let smd_string = from_utf8(&_smd_string).unwrap();
+
+    let Ok(smd) = Smd::from(&smd_string) else {
+        return Err(JsValue::from_str("cannot parse smd"));
+    };
+
+    let smds = maybe_split_smd(&smd);
+
+    let files: Vec<WasmFile> = smds
+        .into_iter()
+        .enumerate()
+        .map(|(index, smd)| WasmFile {
+            name: format!("{smd_name}_{index}.smd"),
+            bytes: smd.write_to_string().unwrap().into_bytes(),
+        })
+        .collect();
+
+    let bytes = zip_files(files);
+
+    Ok(bytes)
 }

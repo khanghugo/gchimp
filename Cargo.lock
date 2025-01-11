@@ -1792,9 +1792,11 @@ dependencies = [
  "console_error_panic_hook",
  "dem 0.2.0",
  "gchimp",
+ "smd",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+ "zip",
 ]
 
 [[package]]

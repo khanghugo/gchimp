@@ -5,6 +5,7 @@ import styles from "./page.module.css";
 import { ResMake } from "@/programs/resmake";
 import { Dem2Cam } from "@/programs/dem2cam";
 import { Bsp2Wad } from "@/programs/bsp2wad";
+import { SmdSplit } from "@/programs/smd_split";
 
 export const Main = () => {
     return <main className={styles.main}>
@@ -13,6 +14,7 @@ export const Main = () => {
             <ResMake />
             <Dem2Cam />
             <Bsp2Wad />
+            <SmdSplit />
         </div>
     </main>
 }
