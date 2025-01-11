@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use glam::DVec3;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -6,7 +6,7 @@ use smd::{Smd, Triangle};
 
 use crate::err;
 
-use super::{constants::MAX_SMD_TRIANGLE, misc::remove_texture_prefix};
+use super::{constants::MAX_SMD_VERTEX, misc::remove_texture_prefix};
 
 pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
     maybe_split_smd(smd)
@@ -35,9 +35,15 @@ pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
         .collect()
 }
 
+// poorman's hash function
+#[inline]
+fn vertex_hash(vertex: &smd::Vertex) -> String {
+    let pos = vertex.pos;
+    let norm = vertex.norm;
+    format!("{}{}{}{}{}{}", pos.x, pos.y, pos.z, norm.x, norm.y, norm.z)
+}
+
 /// Splits one SMD to multiple SMD if number of vertices exceeds the limit.
-///
-/// Funnily enough, it will be based of the triangle count because I am not sure waht I am doing.
 pub fn maybe_split_smd(smd: &Smd) -> Vec<Smd> {
     let mut res: Vec<Smd> = vec![];
 
@@ -48,22 +54,62 @@ pub fn maybe_split_smd(smd: &Smd) -> Vec<Smd> {
         return res;
     }
 
-    let old_triangles = &smd.triangles;
+    let mut vertex_list: HashMap<String, smd::Vertex> = HashMap::new();
 
-    let needed_smd = old_triangles.len() / *MAX_SMD_TRIANGLE + 1;
+    for triangle in &smd.triangles {
+        for vertex in &triangle.vertices {
+            vertex_list.insert(vertex_hash(vertex), vertex.to_owned());
+        }
+    }
 
-    (0..needed_smd)
-        .map(|index| Smd {
+    let mut triangle_list = smd.triangles.clone();
+
+    // the strategy is
+    // traverse by triangle
+    // test whether adding all of the vertex of the current triangle to the current mesh
+    // will exceed the vertex count or not
+    // if it does, make new mesh
+    // if it does not, repeat
+    // brought to you by DeepSeek
+
+    let mut res: Vec<Smd> = vec![];
+
+    while !triangle_list.is_empty() {
+        // triangle cannot repeat
+        let mut curr_smd_triangles: Vec<Triangle> = vec![];
+        // vertex can repeat
+        let mut curr_smd_vertices: HashSet<String> = HashSet::new();
+
+        while let Some(curr_triangle) = triangle_list.pop() {
+            let vert0_hash = vertex_hash(&curr_triangle.vertices[0]);
+            let vert1_hash = vertex_hash(&curr_triangle.vertices[1]);
+            let vert2_hash = vertex_hash(&curr_triangle.vertices[2]);
+
+            curr_smd_vertices.insert(vert0_hash);
+            curr_smd_vertices.insert(vert1_hash);
+            curr_smd_vertices.insert(vert2_hash);
+
+            if curr_smd_vertices.len() > MAX_SMD_VERTEX {
+                // if after adding those 3 vertices and the vertex count is exceeded
+                // return the triangle back to the list and we are done with the current smd
+                triangle_list.push(curr_triangle);
+                break;
+            }
+
+            curr_smd_triangles.push(curr_triangle);
+        }
+
+        let new_smd = Smd {
             nodes: smd.nodes.clone(),
             skeleton: smd.skeleton.clone(),
-            triangles: old_triangles
-                .chunks(*MAX_SMD_TRIANGLE)
-                .nth(index)
-                .unwrap()
-                .to_vec(),
+            triangles: curr_smd_triangles,
             ..Default::default()
-        })
-        .collect()
+        };
+
+        res.push(new_smd);
+    }
+
+    res
 }
 
 pub fn find_centroid(smd: &Smd) -> Option<DVec3> {
