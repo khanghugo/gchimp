@@ -2,14 +2,14 @@ use lazy_static::lazy_static;
 
 pub static MAX_GOLDSRC_TEXTURE_SIZE: u32 = 512;
 
-// divided by 2 just to be safe
-// divided by 2 again because what the fuck
-// ok fuck this, use variable MAX_SMD_TRIANGLE so that it can be configurable
-lazy_static! {
-    pub static ref MAX_SMD_TRIANGLE: usize = std::env::var("MAX_SMD_TRIANGLE")
-        .map(|v| v.parse::<usize>().unwrap_or(1500))
-        .unwrap_or(1500);
-}
+// // divided by 2 just to be safe
+// // divided by 2 again because what the fuck
+// // ok fuck this, use variable MAX_SMD_TRIANGLE so that it can be configurable
+// lazy_static! {
+//     pub static ref MAX_SMD_TRIANGLE: usize = std::env::var("MAX_SMD_TRIANGLE")
+//         .map(|v| v.parse::<usize>().unwrap_or(1500))
+//         .unwrap_or(1500);
+// }
 
 pub const MAX_SMD_PER_MODEL: usize = 32;
 pub const MAX_SMD_VERTEX: usize = 2048;
