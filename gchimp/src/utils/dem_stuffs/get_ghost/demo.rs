@@ -99,7 +99,7 @@ pub fn demo_ghost_parse(filename: &str, demo: &Demo) -> eyre::Result<GhostInfo> 
                 });
 
                 if let Some(delta_packet_entities) = delta_packet_entities {
-                    if delta_packet_entities.entity_states.first().is_some()
+                    if !delta_packet_entities.entity_states.is_empty()
                         && delta_packet_entities.entity_states[0].delta.is_some()
                     {
                         let delta = &delta_packet_entities.entity_states[0]

@@ -283,7 +283,7 @@ fn quoted_text(i: &str) -> IResult<&str> {
 
 fn in_block<'a, T>(
     s: &'a str,
-    f: impl FnMut(&'a str) -> IResult<T>,
+    f: impl FnMut(&'a str) -> IResult<'a, T>,
 ) -> impl FnMut(&'a str) -> IResult<'a, T> {
     terminated(
         preceded(tuple((space0, tag(s), multispace0)), f),
@@ -303,7 +303,7 @@ fn dvec2(i: &str) -> IResult<DVec2> {
 
 // Between space and end line.
 fn between_space_and_endline<'a, T>(
-    f: impl FnMut(&'a str) -> IResult<T>,
+    f: impl FnMut(&'a str) -> IResult<'a, T>,
 ) -> impl FnMut(&'a str) -> IResult<'a, T> {
     terminated(preceded(multispace0, f), multispace0)
 }

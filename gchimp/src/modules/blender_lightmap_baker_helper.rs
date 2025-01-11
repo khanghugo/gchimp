@@ -168,7 +168,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
     // check if uv is unwrapped properly
     if smd.triangles.iter().any(|triangle| {
-        let is_outside = |x| x > 1. || x < 0.;
+        let is_outside = |x| !(0. ..=1.).contains(&x);
         triangle
             .vertices
             .iter()

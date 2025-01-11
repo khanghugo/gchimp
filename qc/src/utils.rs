@@ -130,7 +130,7 @@ pub fn take_until_unbalanced(
 }
 
 pub fn between_braces<'a, T>(
-    f: impl FnMut(&'a str) -> IResult<T>,
+    f: impl FnMut(&'a str) -> IResult<'a, T>,
 ) -> impl FnMut(&'a str) -> IResult<'a, T> {
     // Look ahead approach to avoid using name_string / between_space
     // between_space is very bad for things like this.
@@ -147,7 +147,9 @@ pub fn between_braces<'a, T>(
     )
 }
 
-pub fn line<'a, T>(f: impl FnMut(&'a str) -> IResult<T>) -> impl FnMut(&'a str) -> IResult<'a, T> {
+pub fn line<'a, T>(
+    f: impl FnMut(&'a str) -> IResult<'a, T>,
+) -> impl FnMut(&'a str) -> IResult<'a, T> {
     // Take a line separated by either \r\n or just \n by looking ahead.
     map_parser(
         preceded(

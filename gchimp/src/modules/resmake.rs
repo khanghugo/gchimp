@@ -702,11 +702,7 @@ impl FindResource {
         let sound = filter_default(sound);
         let gfx = filter_default(gfx);
         let sprites = filter_default(sprites);
-        let wads = if let Some(wads) = wads {
-            Some(filter_default(wads))
-        } else {
-            None
-        };
+        let wads = wads.map(filter_default);
 
         Self {
             bsp_name,
@@ -736,11 +732,7 @@ impl FindResource {
         let sound = sort(sound);
         let gfx = sort(gfx);
         let sprites = sort(sprites);
-        let wads = if let Some(wads) = wads {
-            Some(sort(wads))
-        } else {
-            None
-        };
+        let wads = wads.map(sort);
 
         Self {
             bsp_name,
@@ -824,9 +816,9 @@ fn resmake_zip_res(
     let root_path = bsp_path.parent().unwrap().parent().unwrap();
 
     // group all files in one
-    let all_files = vec![models, sound, gfx, sprites].concat();
+    let all_files = [models, sound, gfx, sprites].concat();
     let mut all_files = if let Some(wads) = wads {
-        vec![all_files, wads].concat()
+        [all_files, wads].concat()
     } else {
         all_files
     };

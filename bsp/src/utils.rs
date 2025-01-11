@@ -58,7 +58,7 @@ fn take_until_unbalanced(
 /// This takes in a &str so remember to convert
 // this is the same function in Qc module
 pub fn between_braces<'a, T>(
-    f: impl FnMut(&'a str) -> SResult<T>,
+    f: impl FnMut(&'a str) -> SResult<'a, T>,
 ) -> impl FnMut(&'a str) -> SResult<'a, T> {
     map_parser(
         preceded(

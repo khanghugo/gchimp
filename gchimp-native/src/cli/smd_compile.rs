@@ -20,10 +20,7 @@ impl Cli for SmdCompile {
             return CliRes::Err;
         }
 
-        let smd_paths = args
-            .iter()
-            .map(|path| PathBuf::from(path))
-            .collect::<Vec<PathBuf>>();
+        let smd_paths = args.iter().map(PathBuf::from).collect::<Vec<PathBuf>>();
 
         if let Err(what) = smd_compile(&smd_paths) {
             println!("{}", what);
@@ -145,7 +142,7 @@ pub fn smd_compile(smd_paths: &[PathBuf]) -> eyre::Result<()> {
 
     let handle = handle.join();
 
-    let _res = handle_studiomdl_output(handle, None)?;
+    handle_studiomdl_output(handle, None)?;
 
     Ok(())
 }

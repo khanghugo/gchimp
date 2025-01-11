@@ -331,12 +331,9 @@ pub fn eight_bpp_transparent_img(
 
     let mut new_palette = palette.to_vec();
     let mut new_img = img.to_vec();
-    let palette_count = new_palette.len();
 
     // pad palette
-    for _ in 0..(256 - palette_count) {
-        new_palette.push(PALETTE_PAD_COLOR);
-    }
+    new_palette.resize(256, PALETTE_PAD_COLOR);
 
     // change the final color of the palette to a rare color
     new_palette[255] = PALETTE_TRANSPARENT_COLOR;

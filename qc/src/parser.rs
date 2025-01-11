@@ -18,16 +18,16 @@ use crate::utils::{
 
 fn command<'a, T>(
     s: &'a str,
-    f: impl FnMut(&'a str) -> IResult<T>,
+    f: impl FnMut(&'a str) -> IResult<'a, T>,
 ) -> impl FnMut(&'a str) -> IResult<'a, T> {
     preceded(tuple((multispace0, tag(s), multispace0)), f)
 }
 
 fn qc_command<'a, T>(
     s: &'a str,
-    f: impl FnMut(&'a str) -> IResult<T>,
+    f: impl FnMut(&'a str) -> IResult<'a, T>,
     qc: impl Fn(T) -> QcCommand,
-) -> impl FnMut(&'a str) -> CResult {
+) -> impl FnMut(&'a str) -> CResult<'a> {
     map(terminated(command(s, f), multispace0), qc)
 }
 
@@ -105,9 +105,9 @@ fn parse_body(i: &str) -> CResult {
 
 fn sequence_option<'a, T>(
     s: &'a str,
-    f: impl FnMut(&'a str) -> IResult<T>,
+    f: impl FnMut(&'a str) -> IResult<'a, T>,
     cm: impl Fn(T) -> SequenceOption,
-) -> impl FnMut(&'a str) -> IResult<SequenceOption> {
+) -> impl FnMut(&'a str) -> IResult<'a, SequenceOption> {
     map(terminated(command(s, f), multispace0), cm)
 }
 
@@ -304,9 +304,9 @@ fn parse_define_bone(i: &str) -> CResult {
 
 fn collision_model_option<'a, T>(
     s: &'a str,
-    f: impl FnMut(&'a str) -> IResult<T>,
+    f: impl FnMut(&'a str) -> IResult<'a, T>,
     cm: impl Fn(T) -> CollisionModelOption,
-) -> impl FnMut(&'a str) -> IResult<CollisionModelOption> {
+) -> impl FnMut(&'a str) -> IResult<'a, CollisionModelOption> {
     map(terminated(command(s, f), multispace0), cm)
 }
 

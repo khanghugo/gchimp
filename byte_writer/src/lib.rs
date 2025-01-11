@@ -74,7 +74,9 @@ impl ByteWriter {
     // hopefully ascii :DDDDDDDDD
     pub fn append_string(&mut self, s: &str) {
         self.data.extend(s.as_bytes());
-        self.offset(s.as_bytes().len())
+        // using len() directly on &str
+        // if this is broken, blame rust
+        self.offset(s.len())
     }
 
     pub fn append_f32(&mut self, i: f32) {

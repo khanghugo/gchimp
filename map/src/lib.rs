@@ -200,7 +200,7 @@ pub fn double(i: &str) -> IResult<f64> {
 }
 
 fn between_line_bracket<'a, T>(
-    f: impl FnMut(&'a str) -> IResult<T>,
+    f: impl FnMut(&'a str) -> IResult<'a, T>,
 ) -> impl FnMut(&'a str) -> IResult<'a, T> {
     terminated(
         preceded(tuple((space0, tag("{"), multispace0)), f),

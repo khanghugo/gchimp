@@ -216,7 +216,7 @@ impl Matrix2x2<f64> {
     pub fn solve_cramer(&self, r: [f64; 2]) -> eyre::Result<[f64; 2]> {
         let denominator = self.determinant();
 
-        if denominator <= EPSILON && denominator >= -EPSILON {
+        if (-EPSILON..=EPSILON).contains(&denominator) {
             return Err(eyre!("Determinant is 0."));
         }
 
@@ -473,7 +473,7 @@ impl Plane3D {
     ) -> eyre::Result<Point3D> {
         let denom = self.normal().dot(plane2.normal().cross(plane3.normal()));
 
-        if denom <= EPSILON && denom >= -EPSILON {
+        if (-EPSILON..=EPSILON).contains(&denom) {
             return err!("No intersection between three planes.");
         }
 
@@ -486,7 +486,7 @@ impl Plane3D {
     pub fn intersect_with_line(&self, rhs: Line3D) -> eyre::Result<Point3D> {
         let t_part = self.normal().dot(rhs.direction);
 
-        if t_part <= EPSILON && t_part >= -EPSILON {
+        if (-EPSILON..=EPSILON).contains(&t_part) {
             return Err(eyre!(
                 "Cannot find intersection between a plane and a line."
             ));
@@ -916,7 +916,7 @@ impl Triangle3D {
     }
 
     pub fn get_triangle(&self) -> &Vec<Point3D> {
-        return self.0.vertices();
+        self.0.vertices()
     }
 
     pub fn normal(&self) -> Point3D {
