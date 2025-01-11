@@ -576,7 +576,7 @@ pub fn resmake_single_bsp(
             res_file += "// sound\n";
 
             for used_sound in used_sounds {
-                res_file += format!("sound/{}", used_sound).as_str();
+                res_file += used_sound.as_str();
                 res_file += "\n";
 
                 entry_count += 1;
