@@ -89,3 +89,4 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/') && matrix.rust == 'stable' && matrix.configuration == 'release' && !matrix.cross
       with:
         files: gchimp-${{ runner.os }}.7z
+        draft: true
