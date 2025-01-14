@@ -46,6 +46,10 @@ fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: RgbaImage) -> Rgb
     let make_multiple_of_16 = |(width, height): (u32, u32)| {
         let (need_width, need_height) = (16 - width % 16, 16 - height % 16);
 
+        // if image is already multiple of 16, don't go up
+        let need_width = if need_width == 16 { 0 } else { need_width };
+        let need_height = if need_height == 16 { 0 } else { need_height };
+
         (
             (width + need_width).min(MAX_GOLDSRC_TEXTURE_SIZE),
             (height + need_height).min(MAX_GOLDSRC_TEXTURE_SIZE),
@@ -80,7 +84,7 @@ fn rgba8_to_rgb8(img: RgbaImage) -> eyre::Result<RgbImage> {
     let buf = img
         .par_chunks_exact(4)
         .flat_map(|p| {
-            let should_replace = p[3] == 0;
+            let should_replace = p[3] <= 64;
 
             if should_replace {
                 [
