@@ -205,6 +205,10 @@ pub fn parse_wad(i: &[u8]) -> IResult<Wad> {
 
     let (_, header) = parse_header(i)?;
 
+    if header.magic != "WAD3".as_bytes() {
+        return context("wad file is not WAD3", fail)(&[]);
+    }
+
     let dir_start = &i[(header.dir_offset as usize)..];
     let (_, directory_entries) = count(parse_directory_entry, header.num_dirs as usize)(dir_start)?;
 
