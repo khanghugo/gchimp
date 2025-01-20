@@ -84,7 +84,7 @@ fn rgba8_to_rgb8(img: RgbaImage) -> eyre::Result<RgbImage> {
     let buf = img
         .par_chunks_exact(4)
         .flat_map(|p| {
-            let should_replace = p[3] <= 64;
+            let should_replace = p[3] == 0;
 
             if should_replace {
                 [
