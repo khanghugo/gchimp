@@ -20,7 +20,7 @@ impl Cli for LoopWave {
         }
 
         let wav_path = PathBuf::from(&args[0]);
-        if let Err(err) = loop_wave(wav_path) {
+        if let Err(err) = loop_wave(wav_path, true) {
             println!("{}", err);
             return CliRes::Err;
         }

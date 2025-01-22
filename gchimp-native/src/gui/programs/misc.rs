@@ -20,6 +20,7 @@ pub struct Misc {
     bsp: String,
     resmake_options: ResMakeOptions,
     split_model_status: Arc<Mutex<String>>,
+    loop_wave_loop: bool,
     loop_wave_status: Arc<Mutex<String>>,
     resmake_status: Arc<Mutex<String>>,
 }
@@ -34,6 +35,7 @@ impl Default for Misc {
             split_model_status: Arc::new(Mutex::new(String::from("Idle"))),
             loop_wave_status: Arc::new(Mutex::new(String::from("Idle"))),
             resmake_status: Arc::new(Mutex::new(String::from("Idle"))),
+            loop_wave_loop: true,
         }
     }
 }
@@ -84,6 +86,11 @@ impl Misc {
                     }
                 }
             }
+            ui.end_row();
+
+            ui.checkbox(&mut self.loop_wave_loop, "Loop")
+                .on_hover_text("Loop the wave");
+
             ui.end_row();
 
             if ui.button("Run").clicked() {
@@ -175,10 +182,11 @@ Ignore errors when encounter missing resource.",
         let wav = self.wav.clone();
         let wav_path = PathBuf::from(wav);
         let status = self.loop_wave_status.clone();
+        let loop_ = self.loop_wave_loop;
         "Running".clone_into(&mut status.lock().unwrap());
 
         thread::spawn(move || {
-            if let Err(err) = loop_wave(wav_path) {
+            if let Err(err) = loop_wave(wav_path, loop_) {
                 err.to_string().clone_into(&mut status.lock().unwrap());
             } else {
                 "Done".clone_into(&mut status.lock().unwrap());

@@ -8,7 +8,7 @@ use cuet::{ChunkWriter, CuePoint};
 
 use crate::err;
 
-pub fn loop_wave(wav_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
+pub fn loop_wave(wav_path: impl AsRef<Path> + Into<PathBuf>, loop_: bool) -> eyre::Result<()> {
     if !wav_path.as_ref().exists() {
         return err!("{} does not exist", wav_path.as_ref().display());
     }
@@ -25,7 +25,7 @@ pub fn loop_wave(wav_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()>
     let mut bytes = vec![];
     file.read_to_end(&mut bytes)?;
 
-    let bytes = loop_wave_from_wave_bytes(bytes)?;
+    let bytes = loop_wave_from_wave_bytes(bytes, loop_)?;
 
     let file_name = wav_path.as_ref().file_stem().unwrap().to_str().unwrap();
     let out_path = wav_path
@@ -77,15 +77,17 @@ fn make_pcm16u_mono_and_22050(bytes: Vec<u8>) -> eyre::Result<Vec<u8>> {
     Ok(res_bytes)
 }
 
-pub fn loop_wave_from_wave_bytes(bytes: Vec<u8>) -> eyre::Result<Vec<u8>> {
+pub fn loop_wave_from_wave_bytes(bytes: Vec<u8>, loop_: bool) -> eyre::Result<Vec<u8>> {
     let mut bytes = make_pcm16u_mono_and_22050(bytes)?;
 
-    let cue = CuePoint::from_sample_offset(1, 1);
-    let cues = [cue];
-
-    let write_cursor = io::Cursor::new(&mut bytes);
-    let mut writer = ChunkWriter::new(write_cursor).unwrap();
-    writer.append_cue_chunk(cues.as_slice())?;
+    if loop_ {
+        let cue = CuePoint::from_sample_offset(1, 1);
+        let cues = [cue];
+    
+        let write_cursor = io::Cursor::new(&mut bytes);
+        let mut writer = ChunkWriter::new(write_cursor).unwrap();
+        writer.append_cue_chunk(cues.as_slice())?;
+    }
 
     Ok(bytes)
 }
@@ -99,18 +101,18 @@ mod test {
     #[test]
     fn run() {
         let path = PathBuf::from("/home/khang/gchimp/examples/loop_wave/bhit_flesh-1.wav");
-        loop_wave(path).unwrap();
+        loop_wave(path, true).unwrap();
     }
 
     #[test]
     fn run_32bit() {
         let path = PathBuf::from("/home/khang/gchimp/examples/loop_wave/birds_32bit.wav");
-        loop_wave(path).unwrap();
+        loop_wave(path, true).unwrap();
     }
 
     #[test]
     fn run_8bit() {
         let path = PathBuf::from("/home/khang/gchimp/examples/loop_wave/eightbits.wav");
-        loop_wave(path).unwrap();
+        loop_wave(path, true).unwrap();
     }
 }
