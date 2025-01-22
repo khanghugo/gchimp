@@ -1,0 +1,20 @@
+.labelled-checkbox {
+    display: flex;
+    box-shadow: 2px 2px black;
+    margin-bottom: 10px;
+
+    border: 2px solid black;
+
+    label {
+        margin: 2px;
+        color: black;
+        font-size: 20px;
+        width: 140%;
+    }
+
+    input[type="checkbox"] {
+        width: min-content;
+        margin-left: 12px;
+        margin-right: 12px;
+    }
+}
