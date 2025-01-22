@@ -4,12 +4,14 @@ import { GchimpProgram } from "..";
 import "./styles.css";
 import { loop_wave } from "gchimp-web";
 import { UploadButton } from "@/components/upload-button";
+import { LabelledCheckBox } from "@/components/labelled-checkbox";
 
 export const WaveLoop = () => {
     const [name, setName] = useState<string | undefined>(undefined);
     const [file, setFile] = useState<File | null>(null);
     // const [status, setStatus] = useState<string>("Status: Idle");
     const [output, setOutput] = useState<Uint8Array | null>(null);
+    const [loop, setLoop] = useState<boolean>(true);
 
     const submitButton = createRef<HTMLInputElement>();
 
@@ -21,7 +23,7 @@ export const WaveLoop = () => {
         const reader = new FileReader();
 
         reader.onload = (e) => {
-            const res = loop_wave(new Uint8Array(e.target?.result as ArrayBuffer));
+            const res = loop_wave(new Uint8Array(e.target?.result as ArrayBuffer), loop);
             setOutput(res);
         };
 
@@ -86,8 +88,15 @@ export const WaveLoop = () => {
         file, submitButton, name
     ]);
 
+    useEffect(() => {
+        setName(undefined);
+        setFile(null);
+        setOutput(null);
+    }, [loop]);
+
     return <GchimpProgram name="Wave Loop" className={`wave-loop`} onDrop={onDrop} >
         <form onSubmit={async (e) => runWaveLoop(e)}>
+            <LabelledCheckBox label="Loop" id="should-loop" checked={loop} onChange={e => setLoop(e.target.checked)} />
             <UploadButton label={"Select or Drop WAV"} id={"wave-loop-path"} onChange={(e) => changeFile(e)} fileName={name} />
             <div>
                 <input type="submit" ref={submitButton} />
