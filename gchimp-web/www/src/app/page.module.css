@@ -62,6 +62,7 @@
   align-items: start;
   justify-content: center;
   gap: 32px;
+  flex-wrap: wrap;
 }
 
 .ctas {
