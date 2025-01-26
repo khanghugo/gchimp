@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bitflags = "2.5.0"
+common = { version = "0.3.2", path = "../common" }
 eyre = "0.6.12"
 glam = "0.27.0"
 nom = "7.1.3"
