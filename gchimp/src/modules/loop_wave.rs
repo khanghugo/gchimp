@@ -83,7 +83,7 @@ pub fn loop_wave_from_wave_bytes(bytes: Vec<u8>, loop_: bool) -> eyre::Result<Ve
     if loop_ {
         let cue = CuePoint::from_sample_offset(1, 1);
         let cues = [cue];
-    
+
         let write_cursor = io::Cursor::new(&mut bytes);
         let mut writer = ChunkWriter::new(write_cursor).unwrap();
         writer.append_cue_chunk(cues.as_slice())?;
