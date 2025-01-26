@@ -42,11 +42,7 @@ fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: RgbaImage) -> Rgb
     let q = bigger_side as f32 / MAX_GOLDSRC_TEXTURE_SIZE as f32;
 
     let make_multiple_of_16 = |(width, height): (u32, u32)| {
-        let (need_width, need_height) = (16 - width % 16, 16 - height % 16);
-
-        // if image is already multiple of 16, don't go up
-        let need_width = if need_width == 16 { 0 } else { need_width };
-        let need_height = if need_height == 16 { 0 } else { need_height };
+        let (need_width, need_height) = ((16 - width % 16) % 16, (16 - height % 16) % 16);
 
         (
             (width + need_width).min(MAX_GOLDSRC_TEXTURE_SIZE),
