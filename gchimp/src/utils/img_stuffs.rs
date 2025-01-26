@@ -315,15 +315,19 @@ fn get_a_color_that_does_not_exist(palette: &[[u8; 3]], count: usize) -> [u8; 3]
     // count to help with getting multiple colors
     let mut local_count = 0;
 
-    for r in 0..=255u8 {
-        for g in 0..=255u8 {
-            for b in 0..=255u8 {
-                if !palette.contains(&[r, g, b]) {
-                    if local_count == count {
-                        return [r, g, b];
-                    }
+    for base in 0..=255u8 {
+        for r in 0..=1 {
+            for g in 0..=1 {
+                for b in 0..=1 {
+                    let curr_color = [base + r, base + g, base + b];
 
-                    local_count += 1;
+                    if !palette.contains(&curr_color) {
+                        if local_count == count {
+                            return curr_color;
+                        }
+
+                        local_count += 1;
+                    }
                 }
             }
         }
