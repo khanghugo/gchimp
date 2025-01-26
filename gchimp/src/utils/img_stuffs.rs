@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::OpenOptions,
     io::{BufReader, BufWriter, Cursor, Write},
     path::{Path, PathBuf},
@@ -14,8 +14,6 @@ use rayon::prelude::*;
 use vtf::Vtf;
 
 use crate::utils::constants::MAX_GOLDSRC_TEXTURE_SIZE;
-
-use super::constants::{PALETTE_PAD_COLOR, PALETTE_TRANSPARENT_COLOR, PALETTE_TRANSPARENT_COLOR2};
 
 use crate::err;
 
@@ -77,10 +75,24 @@ fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: RgbaImage) -> Rgb
     }
 }
 
+fn get_palette_from_rgbaimage(img: &RgbaImage) -> Vec<[u8; 3]> {
+    let mut hash_set = HashSet::<[u8; 3]>::new();
+
+    img.pixels().for_each(|pixel| {
+        hash_set.insert([pixel.0[0], pixel.0[1], pixel.0[2]]);
+    });
+
+    hash_set.into_iter().collect()
+}
+
 // if alpha is 0, then replace it with transparent color
 // otherwise, linearly blend the pixel
 fn rgba8_to_rgb8(img: RgbaImage) -> eyre::Result<RgbImage> {
     let (width, height) = img.dimensions();
+
+    let palette = get_palette_from_rgbaimage(&img);
+    let transparent_color = get_a_color_that_does_not_exist(&palette, 10);
+
     let buf = img
         .par_chunks_exact(4)
         .flat_map(|p| {
@@ -88,9 +100,9 @@ fn rgba8_to_rgb8(img: RgbaImage) -> eyre::Result<RgbImage> {
 
             if should_replace {
                 [
-                    PALETTE_TRANSPARENT_COLOR2[0],
-                    PALETTE_TRANSPARENT_COLOR2[1],
-                    PALETTE_TRANSPARENT_COLOR2[2],
+                    transparent_color[0],
+                    transparent_color[1],
+                    transparent_color[2],
                 ]
             } else {
                 let opacity = p[3] as f32 / 255.;
@@ -299,6 +311,28 @@ pub fn tile_and_resize(img: &RgbaImage, scalar: u32) -> RgbaImage {
     imageops::resize(&res, width, height, imageops::FilterType::Lanczos3)
 }
 
+fn get_a_color_that_does_not_exist(palette: &[[u8; 3]], count: usize) -> [u8; 3] {
+    // count to help with getting multiple colors
+    let mut local_count = 0;
+
+    for r in 0..=255u8 {
+        for g in 0..=255u8 {
+            for b in 0..=255u8 {
+                if !palette.contains(&[r, g, b]) {
+                    if local_count == count {
+                        return [r, g, b];
+                    }
+
+                    local_count += 1;
+                }
+            }
+        }
+    }
+
+    // it is not possible for this to happen
+    unreachable!()
+}
+
 // threshold is between 0 and 1
 // if the percentage of the most used color is over the threshold, mark the color transparent
 pub fn eight_bpp_transparent_img(
@@ -337,10 +371,12 @@ pub fn eight_bpp_transparent_img(
     let mut new_img = img.to_vec();
 
     // pad palette
-    new_palette.resize(256, PALETTE_PAD_COLOR);
+    let pad_color = get_a_color_that_does_not_exist(palette, 0);
+    new_palette.resize(256, pad_color);
 
-    // change the final color of the palette to a rare color
-    new_palette[255] = PALETTE_TRANSPARENT_COLOR;
+    // change the final color of the palette to a color that is not in the palette
+    let transparent_color = get_a_color_that_does_not_exist(palette, 1);
+    new_palette[255] = transparent_color;
 
     // swap the most used color (index) with 255
     for pixel in new_img.iter_mut() {

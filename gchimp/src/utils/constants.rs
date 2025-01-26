@@ -17,10 +17,6 @@ pub const MAX_SMD_VERTEX: usize = 2048;
 pub const STUDIOMDL_ERROR_PATTERN: &str = "************ ERROR ************";
 pub const MAX_GOLDSRC_MODEL_TEXTURE_COUNT: usize = 64;
 
-pub const PALETTE_PAD_COLOR: [u8; 3] = [0, 0, 0];
-pub const PALETTE_TRANSPARENT_COLOR: [u8; 3] = [0, 255, 0];
-pub const PALETTE_TRANSPARENT_COLOR2: [u8; 3] = [0, 0, 255];
-
 pub const ORIGIN_TEXTURE: &str = "ORIGIN";
 pub const CLIP_TEXTURE: &str = "CLIP";
 pub const CONTENTWATER_TEXTURE: &str = "CONTENTWATER";
