@@ -205,7 +205,6 @@ impl ResMake {
 
     pub fn run(&self) -> eyre::Result<()> {
         self.check_bsp_file()?;
-        self.check_bsp_file_parent()?;
 
         let wad_table = if self.options.wad_check {
             Some(self.generate_wad_table()?)
@@ -231,6 +230,8 @@ impl ResMake {
         }
 
         if self.options.zip {
+            self.check_bsp_file_parent()?;
+
             let res_bytes = resmake_zip_res(&bsp, bsp_path, wad_table.as_ref(), &self.options)?;
 
             let out_path = bsp_path.with_extension("zip");
