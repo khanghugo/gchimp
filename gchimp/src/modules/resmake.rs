@@ -215,6 +215,10 @@ impl ResMake {
         let bsp_path = self.bsp_file.as_ref().unwrap();
         let bsp = Bsp::from_file(bsp_path)?;
 
+        if self.options.wad_check {
+            self.check_bsp_file_parent()?;
+        }
+
         if self.options.res {
             let res_string = resmake_single_bsp(&bsp, bsp_path, wad_table.as_ref(), &self.options)?;
 
