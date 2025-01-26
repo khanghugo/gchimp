@@ -311,7 +311,8 @@ fn get_a_color_that_does_not_exist(palette: &[[u8; 3]], count: usize) -> [u8; 3]
     // count to help with getting multiple colors
     let mut local_count = 0;
 
-    for base in 0..=255u8 {
+    // not 255 inclusive so it does not exceed 255 when adding
+    for base in 0..255u8 {
         for r in 0..=1 {
             for g in 0..=1 {
                 for b in 0..=1 {
