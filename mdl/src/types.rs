@@ -5,9 +5,15 @@ pub const VEC3_T_SIZE: usize = 3 * 4;
 
 pub struct Mdl {
     pub header: Header,
-    pub sequences: Vec<SequenceDescription>,
+    pub sequences: Vec<SequenceHeader>,
     pub textures: Vec<Texture>,
     pub bodyparts: Vec<Bodypart>,
+    pub bones: Vec<Bone>,
+    pub bone_controllers: Vec<BoneController>,
+    pub hitboxes: Vec<Hitbox>,
+    pub sequence_groups: Vec<SequenceGroup>,
+    pub skin_families: SkinFamilies,
+    pub attachments: Vec<Attachment>,
 }
 
 pub struct Header {
@@ -49,7 +55,7 @@ pub struct Header {
     pub transition_index: i32,
 }
 
-pub struct SequenceDescription {
+pub struct SequenceHeader {
     pub label: [u8; 32],
     pub fps: f32,
     pub flags: i32,
@@ -201,4 +207,46 @@ pub struct Trivert {
     pub header: TrivertHeader,
     pub vertex: Vec3,
     pub normal: Vec3,
+}
+
+pub struct Bone {
+    pub name: [u8; 32],
+    pub parent: i32,
+    pub flags: i32,
+    pub bone_controller: [i32; 6],
+    pub value: [f32; 6],
+    pub scale: [f32; 6],
+}
+
+pub struct BoneController {
+    pub bone: i32,
+    pub type_: i32,
+    pub start: f32,
+    pub end: f32,
+    pub rest: i32,
+    pub index: i32,
+}
+
+pub struct Hitbox {
+    pub bone: i32,
+    pub group: i32,
+    pub bbmin: Vec3,
+    pub bbmax: Vec3,
+}
+
+pub struct SequenceGroup {
+    pub label: [u8; 32],
+    pub name: [u8; 64],
+    pub unused1: i32,
+    pub unused2: i32,
+}
+
+pub type SkinFamilies = Vec<Vec<i16>>;
+
+pub struct Attachment {
+    pub name: [u8; 32],
+    pub type_: i32,
+    pub bone: i32,
+    pub org: Vec3,
+    pub vectors: [Vec3; 3],
 }

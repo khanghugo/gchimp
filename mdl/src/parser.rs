@@ -11,9 +11,9 @@ use nom::{
 
 use crate::{
     nom_helpers::{vec3, IResult},
-    types::{Header, Mdl, SequenceDescription, Texture, TextureFlag, TextureHeader},
-    Bodypart, BodypartHeader, Mesh, MeshHeader, Model, ModelHeader, Trivert, TrivertHeader,
-    PALETTE_COUNT, VEC3_T_SIZE,
+    types::{Header, Mdl, SequenceHeader, Texture, TextureFlag, TextureHeader},
+    Attachment, Bodypart, BodypartHeader, Bone, BoneController, Hitbox, Mesh, MeshHeader, Model,
+    ModelHeader, SequenceGroup, SkinFamilies, Trivert, TrivertHeader, PALETTE_COUNT, VEC3_T_SIZE,
 };
 
 impl Mdl {
@@ -47,6 +47,18 @@ fn parse_mdl(i: &[u8]) -> IResult<Mdl> {
 
     let (_, bodyparts) = parse_bodyparts(start, &mdl_header)?;
 
+    let (_, bones) = parse_bones(start, &mdl_header)?;
+
+    let (_, bone_controllers) = parse_bone_controllers(start, &mdl_header)?;
+
+    let (_, hitboxes) = parse_hitboxes(start, &mdl_header)?;
+
+    let (_, sequence_groups) = parse_sequence_groups(start, &mdl_header)?;
+
+    let (_, skin_families) = parse_skin_families(start, &mdl_header)?;
+
+    let (_, attachments) = parse_attachments(start, &mdl_header)?;
+
     Ok((
         i,
         Mdl {
@@ -54,6 +66,12 @@ fn parse_mdl(i: &[u8]) -> IResult<Mdl> {
             sequences: sequence_descriptions,
             textures,
             bodyparts,
+            bones,
+            bone_controllers,
+            hitboxes,
+            sequence_groups,
+            skin_families,
+            attachments,
         },
     ))
 }
@@ -152,7 +170,7 @@ fn parse_header(i: &[u8]) -> IResult<Header> {
     )(i)
 }
 
-fn parse_sequence_description(i: &[u8]) -> IResult<SequenceDescription> {
+fn parse_sequence_description(i: &[u8]) -> IResult<SequenceHeader> {
     map(
         tuple((
             tuple((
@@ -213,7 +231,7 @@ fn parse_sequence_description(i: &[u8]) -> IResult<SequenceDescription> {
                 blend_parent,
             ),
             (seq_group, entry_node, exit_node, node_flags, next_seq),
-        )| SequenceDescription {
+        )| SequenceHeader {
             label: from_fn(|i| label[i]),
             fps,
             flags,
@@ -468,4 +486,118 @@ fn parse_bodyparts<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<
     let parser = |i| parse_bodypart(i, start);
 
     count(parser, mdl_header.num_bodyparts as usize)(&start[mdl_header.bodypart_index as usize..])
+}
+
+fn parse_bone(i: &[u8]) -> IResult<Bone> {
+    map(
+        tuple((
+            count(le_u8, 32),
+            le_i32,
+            le_i32,
+            count(le_i32, 6),
+            count(le_f32, 6),
+            count(le_f32, 6),
+        )),
+        |(name, parent, flags, bone_controller, value, scale)| Bone {
+            name: from_fn(|i| name[i]),
+            parent,
+            flags,
+            bone_controller: from_fn(|i| bone_controller[i]),
+            value: from_fn(|i| value[i]),
+            scale: from_fn(|i| scale[i]),
+        },
+    )(i)
+}
+
+fn parse_bones<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<Bone>> {
+    count(parse_bone, mdl_header.num_bones as usize)(&start[mdl_header.bone_index as usize..])
+}
+
+fn parse_bone_controller(i: &[u8]) -> IResult<BoneController> {
+    map(
+        tuple((le_i32, le_i32, le_f32, le_f32, le_i32, le_i32)),
+        |(bone, type_, start, end, rest, index)| BoneController {
+            bone,
+            type_,
+            start,
+            end,
+            rest,
+            index,
+        },
+    )(i)
+}
+
+fn parse_bone_controllers<'a>(
+    start: &'a [u8],
+    mdl_header: &Header,
+) -> IResult<'a, Vec<BoneController>> {
+    count(
+        parse_bone_controller,
+        mdl_header.num_bone_controllers as usize,
+    )(&start[mdl_header.bone_controller_index as usize..])
+}
+
+pub fn parse_hitbox(i: &[u8]) -> IResult<Hitbox> {
+    map(
+        tuple((le_i32, le_i32, vec3, vec3)),
+        |(bone, group, bbmin, bbmax)| Hitbox {
+            bone,
+            group,
+            bbmin,
+            bbmax,
+        },
+    )(i)
+}
+
+pub fn parse_hitboxes<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<Hitbox>> {
+    count(parse_hitbox, mdl_header.num_hitboxes as usize)(
+        &start[mdl_header.hitbox_index as usize..],
+    )
+}
+
+pub fn parse_sequence_group(i: &[u8]) -> IResult<SequenceGroup> {
+    map(
+        tuple((count(le_u8, 32), count(le_u8, 64), le_i32, le_i32)),
+        |(label, name, unused1, unused2)| SequenceGroup {
+            label: from_fn(|i| label[i]),
+            name: from_fn(|i| name[i]),
+            unused1,
+            unused2,
+        },
+    )(i)
+}
+
+pub fn parse_sequence_groups<'a>(
+    start: &'a [u8],
+    mdl_header: &Header,
+) -> IResult<'a, Vec<SequenceGroup>> {
+    count(parse_sequence_group, mdl_header.num_seq as usize)(
+        &start[mdl_header.seq_group_index as usize..],
+    )
+}
+
+pub fn parse_skin_families<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, SkinFamilies> {
+    count(
+        count(le_i16, mdl_header.num_skin_ref as usize),
+        mdl_header.num_skin_families as usize,
+    )(&start[mdl_header.skin_index as usize..])
+}
+
+pub fn parse_attachment(i: &[u8]) -> IResult<Attachment> {
+    map(
+        tuple((count(le_u8, 32), le_i32, le_i32, vec3, count(vec3, 3))),
+        |(name, type_, bone, org, vectors)| Attachment {
+            name: from_fn(|i| name[i]),
+            type_,
+            bone,
+            org,
+            vectors: from_fn(|i| vectors[i]),
+        },
+    )(i)
+}
+
+pub fn parse_attachments<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<Attachment>> {
+    count(parse_attachment, mdl_header.num_attachments as usize)(
+        &start[mdl_header.attachment_index as usize..],
+    )
 }
