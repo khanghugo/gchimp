@@ -7,7 +7,7 @@ use std::{
 use eframe::egui;
 
 use gchimp::modules::blender_lightmap_baker_helper::{
-    blender_lightmap_baker_helper, BLBHOptions, BLBH, BLBH_DEFAULT_UV_SHRINK_FACTOR,
+    blender_lightmap_baker_helper, BLBHOptions, BLBH, BLBH_DEFAULT_UV_CLAMP_FACTOR,
 };
 
 use crate::{
@@ -21,8 +21,8 @@ pub struct BLBHGui {
     smd_path: String,
     texture_path: String,
     options: BLBHOptions,
-    shrink_value: String,
-    check_shrink_value: bool,
+    clamp_value: String,
+    check_clamp_value: bool,
     // origin: String,
     status: Arc<Mutex<String>>,
 }
@@ -34,8 +34,8 @@ impl BLBHGui {
             smd_path: Default::default(),
             texture_path: Default::default(),
             options: BLBHOptions::default(),
-            shrink_value: BLBH_DEFAULT_UV_SHRINK_FACTOR.to_string(),
-            check_shrink_value: false,
+            clamp_value: BLBH_DEFAULT_UV_CLAMP_FACTOR.to_string(),
+            check_clamp_value: false,
             // origin: "0 0 0".to_string(),
             status: Arc::new(Mutex::new("Idle".to_string())),
         }
@@ -158,33 +158,33 @@ impl TabProgram for BLBHGui {
         });
 
         ui.horizontal(|ui| {
-            ui.label("UV Shrink");
+            ui.label("UV Clamp");
             // only check value if lost focus
-            let text_editor = egui::TextEdit::singleline(&mut self.shrink_value).desired_width(80.);
+            let text_editor = egui::TextEdit::singleline(&mut self.clamp_value).desired_width(80.);
 
             let text_editor_ui = ui.add(text_editor).on_hover_text(
                 "\
-UV coordinate from centroid will scale by this value. \n\
-If your texture has weird seams, consider lowering this number. \n\
-For best results, change this value by 1/512.",
+There is a problem with the edge where it is repeatedly filtered.
+With this option, the polygon UV will not sample the edge by avoiding the edge.
+By default, it will \"shrink\" the UV in by 1 pixel wherever applicable.",
             );
 
             if text_editor_ui.has_focus() {
-                self.check_shrink_value = true;
+                self.check_clamp_value = true;
             }
 
-            if text_editor_ui.lost_focus() && self.check_shrink_value {
+            if text_editor_ui.lost_focus() && self.check_clamp_value {
                 let shrink_value = self
-                    .shrink_value
+                    .clamp_value
                     .parse::<f32>()
-                    .unwrap_or(BLBH_DEFAULT_UV_SHRINK_FACTOR);
-                self.shrink_value = shrink_value.to_string();
-                self.options.uv_shrink_factor = shrink_value;
-                self.check_shrink_value = false;
+                    .unwrap_or(BLBH_DEFAULT_UV_CLAMP_FACTOR);
+                self.clamp_value = shrink_value.to_string();
+                self.options.uv_clamp_factor = shrink_value;
+                self.check_clamp_value = false;
             }
 
             if ui.button("Default").clicked() {
-                self.shrink_value = BLBH_DEFAULT_UV_SHRINK_FACTOR.to_string()
+                self.clamp_value = BLBH_DEFAULT_UV_CLAMP_FACTOR.to_string()
             }
 
             // origin

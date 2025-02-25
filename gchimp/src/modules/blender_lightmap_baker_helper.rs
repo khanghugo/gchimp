@@ -33,7 +33,7 @@ pub struct BLBHOptions {
     pub convert_smd: bool,
     pub compile_model: bool,
     pub flat_shade: bool,
-    pub uv_shrink_factor: f32,
+    pub uv_clamp_factor: f32,
     // pub origin: DVec3,
     pub studiomdl: String,
     #[cfg(target_os = "linux")]
@@ -47,7 +47,7 @@ impl Default for BLBHOptions {
             convert_smd: true,
             compile_model: true,
             flat_shade: true,
-            uv_shrink_factor: BLBH_DEFAULT_UV_SHRINK_FACTOR,
+            uv_clamp_factor: BLBH_DEFAULT_UV_CLAMP_FACTOR,
             // origin: DVec3::ZERO,
             studiomdl: Default::default(),
             #[cfg(target_os = "linux")]
@@ -56,8 +56,7 @@ impl Default for BLBHOptions {
     }
 }
 
-// shrink by 2 pixels inward
-pub const BLBH_DEFAULT_UV_SHRINK_FACTOR: f32 = 0.99609375;
+pub const BLBH_DEFAULT_UV_CLAMP_FACTOR: f32 = 0.001953125;
 
 const MINIMUM_SIZE: u32 = 512;
 
@@ -150,18 +149,43 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
         DVec2::new(u, v)
     };
 
-    // each vertex needs to shrink inward by 2 pixels so there's no seam
+    // ~~each vertex needs to shrink inward by 2 pixels so there's no seam
     // if not, the texture would repeat and that means texture filtering
     // the shitty thing here would be that the color difference might just be a seam
-    // but at least it isn't scaled up to a pixel
-    let shrink_uvs = |uvs: Vec<DVec2>| {
-        let centroid = uvs.iter().fold(DVec2::ZERO, |acc, &e| acc + e) / 3.;
+    // but at least it isn't scaled up to a pixel~~
+    // UPDATE:
+    // the original problem is that the edge is touching the seam. so at first i did it by shrinking UV
+    // of every vertices
+    // it seems stupid because it is. Now the better solution is to clamp the UV
+    // we know that the issue is only at the edge, so clamp it so that they don't touch the edges
+    let clamp_uvs = |uvs: Vec<DVec2>| {
+        // old dumb code
+        // let centroid = uvs.iter().fold(DVec2::ZERO, |acc, &e| acc + e) / 3.;
+
+        // uvs.iter()
+        //     .map(|&uv| {
+        //         let vector = uv - centroid;
+        //         let vector = vector * options.uv_shrink_factor as f64;
+        //         vector + centroid
+        //     })
+        //     .collect::<Vec<DVec2>>()
 
         uvs.iter()
-            .map(|&uv| {
-                let vector = uv - centroid;
-                let vector = vector * options.uv_shrink_factor as f64;
-                vector + centroid
+            .map(|uv| {
+                let u = uv.x;
+                let v = uv.y;
+
+                // uv_shrink factor should be small enough
+                let u = u.clamp(
+                    0. + blbh.options.uv_clamp_factor as f64,
+                    1. - blbh.options.uv_clamp_factor as f64,
+                );
+                let v = v.clamp(
+                    0. + blbh.options.uv_clamp_factor as f64,
+                    1. - blbh.options.uv_clamp_factor as f64,
+                );
+
+                [u, v].into()
             })
             .collect::<Vec<DVec2>>()
     };
@@ -405,7 +429,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                     ];
 
                     // scale the triangle so there's no seam
-                    let uvs = shrink_uvs(uvs);
+                    let uvs = clamp_uvs(uvs);
 
                     let v0 = Vertex {
                         parent: original_sin.parent,
@@ -562,7 +586,7 @@ mod test {
             compile_model: true,
             flat_shade: true,
             // origin: DVec3::ZERO,
-            uv_shrink_factor: BLBH_DEFAULT_UV_SHRINK_FACTOR,
+            uv_clamp_factor: BLBH_DEFAULT_UV_CLAMP_FACTOR,
             studiomdl: String::from("/home/khang/gchimp/dist/studiomdl.exe"),
             #[cfg(target_os = "linux")]
             wineprefix: String::from("/home/khang/.local/share/wineprefixes/wine32/"),
