@@ -922,6 +922,7 @@ impl WaddyGui {
             .wad()
             .entries
             .iter()
+            .filter(|entry| entry.directory_entry.entry_offset != 0)
             .enumerate()
             .filter_map(|(index, entry)| {
                 if let FileEntry::MipTex(miptex) = &entry.file_entry {
