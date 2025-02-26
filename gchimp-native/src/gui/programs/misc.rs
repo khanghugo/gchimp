@@ -154,6 +154,17 @@ Ignore errors when encounter missing resource.",
         });
 
         ui.horizontal(|ui| {
+            ui.checkbox(
+                &mut self.resmake_options.create_linked_wad,
+                "Create linked WAD",
+            )
+            .on_hover_text(
+                "\
+If there are external WADs found, this option will create a new WAD file containing only used texture derived from those WAD files.",
+            );
+        });
+
+        ui.horizontal(|ui| {
             if ui.button("Run").clicked() {
                 self.run_resmake()
             }
@@ -204,6 +215,7 @@ Ignore errors when encounter missing resource.",
             res,
             zip,
             zip_ignore_missing,
+            create_linked_wad,
         } = self.resmake_options;
         "Running".clone_into(&mut status.lock().unwrap());
 
@@ -215,7 +227,8 @@ Ignore errors when encounter missing resource.",
                 .include_default_resource(include_default_resource)
                 .res(res)
                 .zip(zip)
-                .zip_ignore_missing(zip_ignore_missing);
+                .zip_ignore_missing(zip_ignore_missing)
+                .create_linked_wad(create_linked_wad);
 
             resmake.bsp_file(bsp_path);
 
@@ -262,6 +275,9 @@ impl TabProgram for Misc {
                 }
             }
         });
+
+        // runs in continuous mode
+        ctx.request_repaint();
 
         // Make it non drag-able
         egui_tiles::UiResponse::None

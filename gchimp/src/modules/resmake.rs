@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     fs::{self, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -29,6 +29,8 @@ pub struct ResMakeOptions {
     pub include_default_resource: bool,
     /// Wheter to ignore errors when resource is not found
     pub zip_ignore_missing: bool,
+    /// Whether to creates one new linked WAD with textures from external WADs
+    pub create_linked_wad: bool,
 }
 
 impl Default for ResMakeOptions {
@@ -45,11 +47,14 @@ impl ResMakeOptions {
             wad_check: false,
             include_default_resource: false,
             zip_ignore_missing: true,
+            create_linked_wad: false,
         }
     }
 }
 
 // need to be a vector so we can sort it by wad file name
+// (wad file name, set of textures)
+// wad file name is just the file name, not including the path
 type WadTable = Vec<(String, HashSet<String>)>;
 
 pub struct ResMake {
@@ -112,6 +117,12 @@ impl ResMake {
 
     pub fn zip_ignore_missing(&mut self, v: bool) -> &mut Self {
         self.options.zip_ignore_missing = v;
+
+        self
+    }
+
+    pub fn create_linked_wad(&mut self, v: bool) -> &mut Self {
+        self.options.create_linked_wad = v;
 
         self
     }
@@ -520,6 +531,46 @@ fn get_wads(
     Ok(used_wads)
 }
 
+/// Returns the WAD path starting from gamemod dir
+fn create_linked_wad(
+    bsp_path: &Path,
+    external_textures: &[String],
+    wad_table: &WadTable,
+) -> eyre::Result<String> {
+    let mut wad = Wad::new();
+    let mut wad_file_table: HashMap<String, Wad> = HashMap::new();
+
+    let game_mod = bsp_path.parent().unwrap().parent().unwrap();
+
+    for used_texture in external_textures {
+        let x = find_wad_file_from_wad_table(wad_table, used_texture.as_str())?;
+
+        let wad_entry = wad_file_table
+            .entry(x.clone())
+            .or_insert(Wad::from_file(game_mod.join(x))?);
+
+        wad_entry
+            .entries
+            .iter()
+            .find(|texture_entry| {
+                texture_entry.texture_name().as_str() == used_texture
+                    || texture_entry.texture_name_standard().as_str() == used_texture
+            })
+            .map(|entry| {
+                wad.entries.push(entry.clone());
+                wad.header.num_dirs += 1;
+            });
+    }
+
+    let bsp_name = bsp_path.file_stem().unwrap().to_str().unwrap();
+    let wad_name = [bsp_name, ".wad"].concat();
+    let out_wad_path = game_mod.join(&wad_name);
+
+    wad.write_to_file(out_wad_path)?;
+
+    Ok(wad_name)
+}
+
 /// Should not be used directly because this does not have any checks
 pub fn resmake_single_bsp(
     bsp: &Bsp,
@@ -543,6 +594,7 @@ pub fn resmake_single_bsp(
         has_detailed_textures: _x,
         sprites,
         wads,
+        external_textures,
     } = resources.sort_resource();
 
     let mut res_file = String::new();
@@ -649,10 +701,21 @@ pub fn resmake_single_bsp(
 
     // .wad
     {
-        if let Some(used_wads) = wads {
-            if !used_wads.is_empty() {
+        if !wads.is_empty() {
+            res_file += "\n";
+            res_file += "// wads\n";
+
+            // if zip and then create linked wad then just use the linked wad instead of external wads
+            if options.zip && options.create_linked_wad {
+                // wad_table surely has some values here because of the find_resource function
+                let wad_path = create_linked_wad(bsp_path, &external_textures, wad_table.unwrap())?;
+
+                res_file += wad_path.as_str();
                 res_file += "\n";
-                res_file += "// wads\n";
+
+                entry_count += 1;
+            } else {
+                let used_wads = wads;
 
                 for used_wad in used_wads {
                     res_file += used_wad.as_str();
@@ -685,7 +748,8 @@ struct FindResource {
     gfx: ResourceList,
     has_detailed_textures: bool,
     sprites: ResourceList,
-    wads: Option<ResourceList>,
+    wads: ResourceList,
+    external_textures: ResourceList,
 }
 
 impl FindResource {
@@ -699,13 +763,14 @@ impl FindResource {
             has_detailed_textures,
             sprites,
             wads,
+            external_textures,
         } = self;
 
         let models = filter_default(models);
         let sound = filter_default(sound);
         let gfx = filter_default(gfx);
         let sprites = filter_default(sprites);
-        let wads = wads.map(filter_default);
+        let wads = filter_default(wads);
 
         Self {
             bsp_name,
@@ -716,6 +781,7 @@ impl FindResource {
             has_detailed_textures,
             sprites,
             wads,
+            external_textures,
         }
     }
 
@@ -729,13 +795,14 @@ impl FindResource {
             has_detailed_textures,
             sprites,
             wads,
+            external_textures,
         } = self;
 
         let models = sort(models);
         let sound = sort(sound);
         let gfx = sort(gfx);
         let sprites = sort(sprites);
-        let wads = wads.map(sort);
+        let wads = sort(wads);
 
         Self {
             bsp_name,
@@ -746,6 +813,7 @@ impl FindResource {
             has_detailed_textures,
             sprites,
             wads,
+            external_textures,
         }
     }
 }
@@ -768,15 +836,20 @@ fn find_resource(
     } = get_gfx(bsp, bsp_path, bsp_name)?;
     let sprites = get_sprites(bsp);
 
-    let wads = {
+    let (wads, external_textures) = {
         let external_textures = need_external_wad(bsp);
 
         if wad_check && !external_textures.is_empty() && wad_table.is_some() {
-            Some(to_vec(get_wads(&external_textures, wad_table.unwrap())?))
+            (
+                to_vec(get_wads(&external_textures, wad_table.unwrap())?),
+                external_textures,
+            )
         } else {
-            None
+            (vec![], external_textures)
         }
     };
+
+    let external_textures = to_vec(external_textures);
 
     Ok(FindResource {
         bsp_name: bsp_name.to_string(),
@@ -787,6 +860,7 @@ fn find_resource(
         has_detailed_textures,
         sprites: to_vec(sprites),
         wads,
+        external_textures,
     })
 }
 
@@ -794,10 +868,10 @@ fn resmake_zip_res(
     bsp: &Bsp,
     bsp_path: &Path,
     wad_table: Option<&WadTable>,
-    resmake_options: &ResMakeOptions,
+    options: &ResMakeOptions,
 ) -> eyre::Result<Vec<u8>> {
-    let resources = find_resource(bsp, bsp_path, wad_table, resmake_options.wad_check)?;
-    let resources = if resmake_options.include_default_resource {
+    let resources = find_resource(bsp, bsp_path, wad_table, options.wad_check)?;
+    let resources = if options.include_default_resource {
         resources
     } else {
         resources.filter_default_resource()
@@ -812,6 +886,7 @@ fn resmake_zip_res(
         has_detailed_textures: _x,
         sprites,
         wads,
+        external_textures: _,
     } = resources.sort_resource();
 
     // path/to/hl/cstrike/maps/map.bsp -> path/to/hl/cstrike
@@ -820,8 +895,15 @@ fn resmake_zip_res(
 
     // group all files in one
     let all_files = [models, sound, gfx, sprites].concat();
-    let mut all_files = if let Some(wads) = wads {
-        [all_files, wads].concat()
+    let mut all_files = if !wads.is_empty() {
+        // linked wad is already created in the .res step
+        if options.create_linked_wad {
+            let wad_path = [&bsp_name, ".wad"].concat();
+
+            [all_files, vec![wad_path]].concat()
+        } else {
+            [all_files, wads].concat()
+        }
     } else {
         all_files
     };
@@ -859,7 +941,7 @@ fn resmake_zip_res(
         let absolute_path = root_path.join(relative_path.as_str());
 
         if !absolute_path.exists() {
-            if resmake_options.zip_ignore_missing {
+            if options.zip_ignore_missing {
                 comment += "\n";
                 comment += format!("{} is missing\n", absolute_path.to_str().unwrap()).as_str();
 
@@ -937,6 +1019,7 @@ mod test {
                 include_default_resource: true,
                 zip: true,
                 zip_ignore_missing: true,
+                create_linked_wad: true,
             },
         )
         .unwrap();
