@@ -198,7 +198,7 @@ fn parse_font(i: &[u8]) -> IResult<Font> {
     ))
 }
 
-static FILE_TYPES: &[i8] = &[0x40, 0x42, 0x43, 0x45, 0x46];
+static FILE_TYPES: &[i8] = &[0x40, 0x42, 0x43, 0x44, 0x45, 0x46];
 
 pub fn parse_wad(i: &[u8]) -> IResult<Wad> {
     let file_start = i;
@@ -270,6 +270,16 @@ pub fn parse_wad(i: &[u8]) -> IResult<Wad> {
                         return Err(eyre!("cannot parse font (entry {entry_index})"));
                     };
                     Ok(FileEntry::Font(res))
+                }
+                0x44 => {
+                    // https://github.com/Ty-Matthews-VisualStudio/Wally/blob/a05d3a11ac69aa81725fc7d4c6497b0523e92657/Source/Wally/WADList.h#L18
+                    println!("found WAD2 miptex (0x44). attempting to parse anyway");
+
+                    let Ok((_, res)) = parse_miptex(file_entry_start) else {
+                        return Err(eyre!("cannot parse miptex (entry {entry_index})"));
+                    };
+
+                    Ok(FileEntry::MipTex(res))
                 }
                 _ => unreachable!(""),
             }
