@@ -95,7 +95,6 @@ impl TextureTile {
 }
 
 const BASE_IMAGE_TILE_SIZE: f32 = 96.0;
-const SUPPORTED_TEXTURE_FORMATS: &[&str] = &["png", "jpeg", "jpg", "bmp", "vtf"];
 
 const PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR: &str =
     "cannot update recently used wad for Waddy";
@@ -850,7 +849,7 @@ impl WaddyGui {
                             println!("{}", err);
                         }
                     // if an image file is dropped, we will add that to the current wad file
-                    } else if SUPPORTED_TEXTURE_FORMATS.contains(&ext.to_str().unwrap()) {
+                    } else if IMAGE_FORMATS.contains(&ext.to_str().unwrap()) {
                         if let Err(err) = self.instances[instance_index]
                             .waddy
                             .add_texture_from_path(path)
