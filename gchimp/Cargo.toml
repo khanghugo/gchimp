@@ -24,7 +24,7 @@ eyre = "0.6.12"
 toml = { version = "0.8.13", features = ["default"]}
 serde = { version = "1.0.202", features = ["derive"] }
 quantette = { version = "0.2.0", features = ["kmeans", "threads", "pipelines", "colorspaces"] }
-image = { version = "0.25.1", features = ["png"] }
+image = { version = "0.25.1", features = ["png", "tga"] }
 clap = { version = "4.5.4", features = ["derive"] }
 ndarray = "0.15.6"
 gcd = "2.3.0"
