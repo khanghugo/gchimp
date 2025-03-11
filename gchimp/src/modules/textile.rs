@@ -317,7 +317,7 @@ impl TexTileBuilder {
                 )| {
                     // with_file_name would overwrite the extension
                     // regardless, we will overwrite the extension at the end
-                    let path = if self.options.is_tiling {
+                    let path = if self.options.is_tiling && self.options.change_name {
                         let current_file_name =
                             path.file_stem().unwrap().to_str().unwrap().to_string();
                         path.with_file_name(format!(
@@ -328,7 +328,7 @@ impl TexTileBuilder {
                         path.to_path_buf()
                     };
 
-                    let path = if self.options.is_transparent {
+                    let path = if self.options.is_transparent && self.options.change_name {
                         let current_file_name =
                             path.file_stem().unwrap().to_str().unwrap().to_string();
                         path.with_file_name(format!("{{{}", current_file_name))
