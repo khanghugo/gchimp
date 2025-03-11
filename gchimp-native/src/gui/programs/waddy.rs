@@ -775,6 +775,14 @@ impl WaddyGui {
             }
         });
 
+        // CTRL+A to select all tiles
+        ui.input(|i| {
+            if i.modifiers.matches_exact(Modifiers::CTRL) && i.key_released(egui::Key::A) {
+                self.instances[instance_index].selected =
+                    (0..self.instances[instance_index].texture_tiles.len()).collect();
+            }
+        });
+
         let is_escape_pressed = ui.input(|i| i.key_released(egui::Key::Escape));
 
         // ESC to clear selected and close menu
