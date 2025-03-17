@@ -129,7 +129,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
     let width_uv = MINIMUM_SIZE as f64 / width as f64;
     let height_uv = MINIMUM_SIZE as f64 / height as f64;
 
-    let clamp_uv = |uv: DVec2, block: (u32, u32)| {
+    let find_uv = |uv: DVec2, block: (u32, u32)| {
         let min_u = block.0 as f64 * width_uv;
         let min_v = block.1 as f64 * height_uv;
 
@@ -140,54 +140,25 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
     };
 
     let wrap_uv = |uv: DVec2, block: (u32, u32)| {
-        // return uv;
-        let uv = clamp_uv(uv, block);
+        // find the uv block
+        let uv = find_uv(uv, block);
+
+        // normalize the uv based on the partitioned texture
         let u = uv[0] % width_uv;
         let v = uv[1] % height_uv;
         let u = u / width_uv;
         let v = v / height_uv;
+
+        // clamping the uv to avoid linear filtering repeating texture
+        let u = u.clamp(
+            0. + blbh.options.uv_clamp_factor as f64,
+            1. - blbh.options.uv_clamp_factor as f64,
+        );
+        let v = v.clamp(
+            0. + blbh.options.uv_clamp_factor as f64,
+            1. - blbh.options.uv_clamp_factor as f64,
+        );
         DVec2::new(u, v)
-    };
-
-    // ~~each vertex needs to shrink inward by 2 pixels so there's no seam
-    // if not, the texture would repeat and that means texture filtering
-    // the shitty thing here would be that the color difference might just be a seam
-    // but at least it isn't scaled up to a pixel~~
-    // UPDATE:
-    // the original problem is that the edge is touching the seam. so at first i did it by shrinking UV
-    // of every vertices
-    // it seems stupid because it is. Now the better solution is to clamp the UV
-    // we know that the issue is only at the edge, so clamp it so that they don't touch the edges
-    let clamp_uvs = |uvs: Vec<DVec2>| {
-        // old dumb code
-        // let centroid = uvs.iter().fold(DVec2::ZERO, |acc, &e| acc + e) / 3.;
-
-        // uvs.iter()
-        //     .map(|&uv| {
-        //         let vector = uv - centroid;
-        //         let vector = vector * options.uv_shrink_factor as f64;
-        //         vector + centroid
-        //     })
-        //     .collect::<Vec<DVec2>>()
-
-        uvs.iter()
-            .map(|uv| {
-                let u = uv.x;
-                let v = uv.y;
-
-                // uv_shrink factor should be small enough
-                let u = u.clamp(
-                    0. + blbh.options.uv_clamp_factor as f64,
-                    1. - blbh.options.uv_clamp_factor as f64,
-                );
-                let v = v.clamp(
-                    0. + blbh.options.uv_clamp_factor as f64,
-                    1. - blbh.options.uv_clamp_factor as f64,
-                );
-
-                [u, v].into()
-            })
-            .collect::<Vec<DVec2>>()
     };
 
     // check if uv is unwrapped properly
@@ -427,9 +398,6 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                         wrap_uv(world_to_uv(polygon.vertices()[1].into()), (w, h)),
                         wrap_uv(world_to_uv(polygon.vertices()[2].into()), (w, h)),
                     ];
-
-                    // scale the triangle so there's no seam
-                    let uvs = clamp_uvs(uvs);
 
                     let v0 = Vertex {
                         parent: original_sin.parent,
