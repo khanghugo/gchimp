@@ -210,7 +210,7 @@ impl TabProgram for SkyModGui {
                         .on_hover_text(
                             "\
 How many textures should each skybox face have? \n
-It should be a perfect square (such as 2, 4, 9, 16, ..) \n
+It should be a perfect square (such as 1, 4, 9, 16, ..) \n
 If a model has more than 64 textures, it will be split into smaller models",
                         );
                     ui.label("Skybox size:");

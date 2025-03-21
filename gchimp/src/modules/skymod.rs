@@ -301,12 +301,18 @@ impl SkyModBuilder {
 
                     // fix the seam, i guess?
                     // zoom everything in so that the original size is 1 pixel outward diagonally for every corner
-                    let what: f64 = -2. / MIN_TEXTURE_SIZE as f64;
+                    let what: f64 = -1. / MIN_TEXTURE_SIZE as f64;
 
-                    let vert_a_uv = array![0. - what, 0. - what].dot(&rot_mat);
-                    let vert_b_uv = array![0. - what, 1. + what].dot(&rot_mat);
-                    let vert_c_uv = array![1. + what, 1. + what].dot(&rot_mat);
-                    let vert_d_uv = array![1. + what, 0. - what].dot(&rot_mat);
+                    let mut vert_a_uv = array![0. - what, 0. - what].dot(&rot_mat);
+                    let mut vert_b_uv = array![0. - what, 1. + what].dot(&rot_mat);
+                    let mut vert_c_uv = array![1. + what, 1. + what].dot(&rot_mat);
+                    let mut vert_d_uv = array![1. + what, 0. - what].dot(&rot_mat);
+
+                    // FIXME: dont do this
+                    vert_a_uv[1] += 1.0;
+                    vert_b_uv[1] += 1.0;
+                    vert_c_uv[1] += 1.0;
+                    vert_d_uv[1] += 1.0;
 
                     let quad = array![
                         // A
