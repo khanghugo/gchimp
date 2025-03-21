@@ -278,49 +278,34 @@ Recommeded to leave it checked for uniformly lit texture.",
 
         // Collect dropped files:
         ctx.input(|i| {
-            if i.raw.dropped_files.len() == 6 {
-                let items = i.raw.dropped_files.clone();
-                let paths = items
-                    .iter()
-                    .filter_map(|e| e.path.clone())
-                    .collect::<Vec<PathBuf>>();
+            let items = i.raw.dropped_files.clone();
+            let paths = items
+                .iter()
+                .filter_map(|e| e.path.clone())
+                .collect::<Vec<PathBuf>>();
 
-                if paths.len() != 6 {
-                    return;
-                }
+            paths.iter().for_each(|path| {
+                if let Some(idx) = file_name_to_index(
+                    path.file_stem()
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .to_lowercase()
+                        .as_str(),
+                ) {
+                    self.texture_paths[idx as usize] = path.display().to_string();
 
-                let is_valid = paths.iter().all(|p| {
-                    let a = p.file_stem().unwrap().to_str().unwrap().to_lowercase();
-                    SKY_TEXTURE_SUFFIX.iter().any(|suffix| a.ends_with(suffix))
-                });
-
-                if !is_valid {
-                    return;
-                }
-
-                paths.iter().for_each(|path| {
-                    if let Some(idx) = file_name_to_index(
-                        path.file_stem()
-                            .unwrap()
-                            .to_str()
-                            .unwrap()
-                            .to_lowercase()
-                            .as_str(),
-                    ) {
-                        self.texture_paths[idx as usize] = path.display().to_string();
-
-                        if let Some(handle) = &self.texture_handles[idx as usize] {
-                            drop(handle.clone())
-                        }
-
-                        self.texture_handles[idx as usize] = None;
-
-                        let skybox_name = path.file_stem().unwrap().to_str().unwrap();
-                        let skybox_name = &skybox_name[..skybox_name.len() - 2];
-                        self.options.output_name = skybox_name.to_string();
+                    if let Some(handle) = &self.texture_handles[idx as usize] {
+                        drop(handle.clone())
                     }
-                });
-            }
+
+                    self.texture_handles[idx as usize] = None;
+
+                    let skybox_name = path.file_stem().unwrap().to_str().unwrap();
+                    let skybox_name = &skybox_name[..skybox_name.len() - 2];
+                    self.options.output_name = skybox_name.to_string();
+                }
+            });
         });
 
         // make it continuous
