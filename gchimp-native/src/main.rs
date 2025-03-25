@@ -3,6 +3,7 @@
 mod cli;
 mod config;
 mod gui;
+mod gui2;
 mod persistent_storage;
 
 use std::process::ExitCode;
@@ -14,13 +15,27 @@ fn main() -> ExitCode {
     let err_exit = ExitCode::from(1);
     let ok_exit = ExitCode::from(0);
 
-    match cli_res {
-        cli::CliRes::NoCli => match gui::gui() {
-            Ok(_) => ok_exit,
-            Err(_) => err_exit,
-        },
-        cli::CliRes::Ok => ok_exit,
-        cli::CliRes::Err => err_exit,
+    let a = 1;
+    // env -u WAYLAND_DISPLAY cargo run --release
+
+    if a == 1 {
+        match cli_res {
+            cli::CliRes::NoCli => match gui::gui() {
+                Ok(_) => ok_exit,
+                Err(_) => err_exit,
+            },
+            cli::CliRes::Ok => ok_exit,
+            cli::CliRes::Err => err_exit,
+        }
+    } else {
+        match cli_res {
+            cli::CliRes::NoCli => match gui2::gchimp_native_run() {
+                Ok(_) => ok_exit,
+                Err(_) => err_exit,
+            },
+            cli::CliRes::Ok => ok_exit,
+            cli::CliRes::Err => err_exit,
+        }
     }
 }
 
