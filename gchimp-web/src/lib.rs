@@ -49,6 +49,7 @@ pub fn resmake(bsp_bytes: Vec<u8>, filename: &str) -> Result<String, JsValue> {
         include_default_resource: false,
         zip_ignore_missing: false,
         create_linked_wad: false,
+        skip_created_res: false,
     };
 
     // does not include default resource by default

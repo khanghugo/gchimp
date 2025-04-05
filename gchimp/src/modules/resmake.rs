@@ -3,12 +3,16 @@ use std::{
     fs::{self, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
 };
 
 use bsp::Bsp;
 use chrono::Local;
+use eyre::OptionExt;
 use wad::types::Wad;
 use zip::{write::SimpleFileOptions, ZipWriter};
+
+use rayon::prelude::*;
 
 use crate::{
     err,
@@ -31,6 +35,8 @@ pub struct ResMakeOptions {
     pub zip_ignore_missing: bool,
     /// Whether to creates one new linked WAD with textures from external WADs
     pub create_linked_wad: bool,
+    /// Whether to skip making resources for BSP that already has RES
+    pub skip_created_res: bool,
 }
 
 impl Default for ResMakeOptions {
@@ -48,6 +54,7 @@ impl ResMakeOptions {
             include_default_resource: false,
             zip_ignore_missing: true,
             create_linked_wad: false,
+            skip_created_res: false,
         }
     }
 }
@@ -59,7 +66,8 @@ type WadTable = Vec<(String, HashSet<String>)>;
 
 pub struct ResMake {
     bsp_file: Option<PathBuf>,
-    // If this is set to gamemod folder, it will do mass ResMake
+    // For mass processing
+    bsp_folder: Option<PathBuf>,
     root_folder: Option<PathBuf>,
     options: ResMakeOptions,
 }
@@ -74,6 +82,7 @@ impl ResMake {
     pub fn new() -> Self {
         Self {
             bsp_file: None,
+            bsp_folder: None,
             root_folder: None,
             options: ResMakeOptions::default(),
         }
@@ -85,8 +94,20 @@ impl ResMake {
         self
     }
 
+    pub fn bsp_folder(&mut self, path: impl AsRef<Path> + Into<PathBuf>) -> &mut Self {
+        self.bsp_folder = Some(path.into());
+
+        self
+    }
+
     pub fn root_folder(&mut self, path: impl AsRef<Path> + Into<PathBuf>) -> &mut Self {
         self.root_folder = Some(path.into());
+
+        self
+    }
+
+    pub fn skip_created_res(&mut self, v: bool) -> &mut Self {
+        self.options.skip_created_res = v;
 
         self
     }
@@ -217,6 +238,19 @@ impl ResMake {
     pub fn run(&self) -> eyre::Result<()> {
         self.check_bsp_file()?;
 
+        let bsp_path = self.bsp_file.as_ref().unwrap();
+
+        let res_exists = bsp_path.with_extension("res").exists();
+        let skip_created_res = if res_exists {
+            self.options.skip_created_res
+        } else {
+            false
+        };
+
+        if skip_created_res {
+            return Ok(());
+        }
+
         if self.options.wad_check || self.options.zip {
             self.check_bsp_file_parent()?;
         }
@@ -227,7 +261,6 @@ impl ResMake {
             None
         };
 
-        let bsp_path = self.bsp_file.as_ref().unwrap();
         let bsp = Bsp::from_file(bsp_path)?;
 
         if self.options.res {
@@ -257,6 +290,132 @@ impl ResMake {
             file.write_all(&res_bytes)?;
             file.flush()?;
         }
+
+        Ok(())
+    }
+
+    pub fn run_folder(&self) -> eyre::Result<()> {
+        let Some(bsp_folder) = &self.bsp_folder else {
+            return err!("no bsp folder given for mass processing");
+        };
+
+        if !bsp_folder.is_dir() {
+            return err!("given path `{}` is not a folder", bsp_folder.display());
+        }
+
+        let bsp_folder_name = bsp_folder
+            .file_name()
+            .ok_or_eyre("given path does not have a name")?;
+
+        if bsp_folder_name != "maps" {
+            return err!("given path is not a `maps` folder");
+        }
+
+        let gamemod_dir = bsp_folder
+            .parent()
+            .ok_or_eyre("`maps` folder does not have a parent, should this happen?")?;
+
+        let wad_table = if self.options.wad_check {
+            generate_wad_table(gamemod_dir).ok()
+        } else {
+            None
+        };
+
+        let bsp_paths: Vec<PathBuf> = std::fs::read_dir(bsp_folder)?
+            .filter_map(|entry| {
+                let entry = entry.ok()?;
+                let entry_path = entry.path();
+
+                if !entry_path.is_file() {
+                    return None;
+                }
+
+                let extension = entry_path.extension()?;
+
+                if extension == "bsp" {
+                    return Some(entry_path);
+                }
+
+                None
+            })
+            .collect();
+
+        let counter = Arc::new(Mutex::new(0u32));
+
+        let finish_processing = |skip: bool| {
+            let _ = counter.lock().map(|mut v| {
+                *v = *v + 1;
+                println!(
+                    "{} processing {}/{}",
+                    if skip { "Skip" } else { "Finish" },
+                    *v,
+                    bsp_paths.len()
+                );
+            });
+        };
+
+        let multithread = std::env::var("GCHIMP_RESMAKE_MULTITHREAD").is_ok();
+
+        let good_fucking_god_rust_you_are_so_good_at_inference = |bsp_path: &PathBuf| {
+            let res_exists = bsp_path.with_extension("res").exists();
+            let skip_created_res = if res_exists {
+                self.options.skip_created_res
+            } else {
+                false
+            };
+
+            if skip_created_res {
+                finish_processing(true);
+                return Ok(());
+            }
+
+            let bsp = Bsp::from_file(bsp_path)?;
+
+            if self.options.res {
+                let res_string =
+                    resmake_single_bsp(&bsp, bsp_path, wad_table.as_ref(), &self.options)?;
+
+                let out_path = bsp_path.with_extension("res");
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .truncate(true)
+                    .write(true)
+                    .open(out_path)?;
+
+                file.write_all(res_string.as_bytes())?;
+                file.flush()?;
+            }
+
+            if self.options.zip {
+                let res_bytes = resmake_zip_res(&bsp, bsp_path, wad_table.as_ref(), &self.options)?;
+
+                let out_path = bsp_path.with_extension("zip");
+                let mut file = OpenOptions::new()
+                    .create(true)
+                    .truncate(true)
+                    .write(true)
+                    .open(out_path)?;
+
+                file.write_all(&res_bytes)?;
+                file.flush()?;
+            }
+
+            finish_processing(false);
+
+            Ok(())
+        };
+
+        if multithread {
+            bsp_paths
+                .par_iter()
+                .map(|bsp_path| good_fucking_god_rust_you_are_so_good_at_inference(bsp_path))
+                .collect::<eyre::Result<Vec<_>>>()?;
+        } else {
+            bsp_paths
+                .iter()
+                .map(|bsp_path| good_fucking_god_rust_you_are_so_good_at_inference(bsp_path))
+                .collect::<eyre::Result<Vec<_>>>()?;
+        };
 
         Ok(())
     }
@@ -1020,8 +1179,24 @@ mod test {
                 zip: true,
                 zip_ignore_missing: true,
                 create_linked_wad: true,
+                skip_created_res: true,
             },
         )
         .unwrap();
+    }
+
+    #[test]
+    fn run_mass1() {
+        let path = PathBuf::from("/WD1/half-life/valve/maps/");
+        let mut binding = ResMake::new();
+        let resmake = binding
+            .bsp_folder(path)
+            .zip(true)
+            .wad_check(true)
+            .res(true)
+            .include_default_resource(true)
+            .create_linked_wad(true);
+
+        resmake.run_folder().unwrap();
     }
 }
