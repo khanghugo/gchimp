@@ -17,6 +17,7 @@ use crate::{
         LUMP_LEAVES, LUMP_LIGHTING, LUMP_MARKSURFACES, LUMP_MODELS, LUMP_NODES, LUMP_PLANES,
         LUMP_SURFEDGES, LUMP_TEXINFO, LUMP_TEXTURES, LUMP_VERTICES, LUMP_VISIBILITY, MAX_MAP_HULLS,
     },
+    error::{BspEntitiesError, BspError},
     types::{
         Bsp, ClipNode, Edge, Entity, Face, IResult, Leaf, LightMap, LumpHeader, MarkSurface, Model,
         Node, Plane, SResult, SurfEdge, TexInfo, Texture, Vertex,
@@ -48,22 +49,14 @@ fn parse_entity(i: &str) -> SResult<Entity> {
 }
 
 // hacky stuffs to avoid parsing bytes :DD
-fn parse_entities(i: &[u8]) -> IResult<Vec<Entity>> {
-    let s = from_utf8(i);
+fn parse_entities(i: &[u8]) -> Result<Vec<Entity>, BspEntitiesError> {
+    // HOLY FUCKING RETARD
+    let s = String::from_utf8_lossy(i).replace(std::char::REPLACEMENT_CHARACTER, "");
 
-    if s.is_err() {
-        return context("Cannot interpret entity as utf8", fail)(i);
-    }
+    let (_, res) =
+        many0(between_braces(parse_entity))(s.as_str()).map_err(|_| BspEntitiesError::Parse)?;
 
-    let parse_res = many0(between_braces(parse_entity))(s.unwrap());
-
-    if parse_res.is_err() {
-        return context("Cannot parse entities", fail)(i);
-    }
-
-    let (i, res) = parse_res.unwrap();
-
-    Ok((i.as_bytes(), res))
+    Ok(res)
 }
 
 fn parse_plane(i: &[u8]) -> IResult<Plane> {
@@ -284,57 +277,64 @@ fn parse_models(i: &[u8]) -> IResult<Vec<Model>> {
     all_consuming(many0(parse_model))(i)
 }
 
-pub fn parse_bsp(i: &[u8]) -> IResult<Bsp> {
-    let (beginning, version) = le_i32(i)?;
+type FUCKOFF<'a> = nom::Err<nom::error::Error<&'a [u8]>>;
+
+pub fn parse_bsp(i: &[u8]) -> Result<Bsp, BspError> {
+    let (beginning, version) = le_i32(i).map_err(|_: FUCKOFF| BspError::NomParsingError)?;
 
     if version != BSP_VERSION {
-        return context(
-            format!("Bsp Version is not 30: {}", BSP_VERSION).leak(),
-            fail,
-        )(i);
+        return BspError::BspVersion { version }.to_result();
     }
 
-    let (_, lumps) = count(parse_lump_header, HEADER_LUMPS)(beginning)?;
+    let (_, lumps) =
+        count(parse_lump_header, HEADER_LUMPS)(beginning).map_err(|_| BspError::NomParsingError)?;
 
     let lump_section = |idx: usize| {
         &i[(lumps[idx].offset as usize)..((lumps[idx].offset + lumps[idx].length) as usize)]
     };
 
-    let (_, entities) = parse_entities(lump_section(LUMP_ENTITIES))?;
-    let (_, planes) = parse_planes(lump_section(LUMP_PLANES))?;
-    let (_, textures) = parse_textures(lump_section(LUMP_TEXTURES))?;
-    let (_, vertices) = parse_vertices(lump_section(LUMP_VERTICES))?;
-    // TODO
-    let (_, visibility) = rest(lump_section(LUMP_VISIBILITY))?;
-    let (_, nodes) = parse_nodes(lump_section(LUMP_NODES))?;
-    let (_, texinfo) = parse_texinfo(lump_section(LUMP_TEXINFO))?;
-    let (_, faces) = parse_faces(lump_section(LUMP_FACES))?;
-    let (_, lightmap) = parse_lightmap(lump_section(LUMP_LIGHTING))?;
-    let (_, clipnodes) = parse_clipnodes(lump_section(LUMP_CLIPNODES))?;
-    let (_, leaves) = parse_leaves(lump_section(LUMP_LEAVES))?;
-    let (_, mark_surfaces) = parse_mark_surfaces(lump_section(LUMP_MARKSURFACES))?;
-    let (_, edges) = parse_edges(lump_section(LUMP_EDGES))?;
-    let (_, surf_edges) = parse_surf_edges(lump_section(LUMP_SURFEDGES))?;
-    let (_, models) = parse_models(lump_section(LUMP_MODELS))?;
+    let entities = parse_entities(lump_section(LUMP_ENTITIES))
+        .map_err(|source| BspError::ParseEntities { source })?;
+    let (_, planes) = parse_planes(lump_section(LUMP_PLANES)).map_err(|_| BspError::ParsePlanes)?;
+    let (_, textures) =
+        parse_textures(lump_section(LUMP_TEXTURES)).map_err(|_| BspError::ParseTextures)?;
+    let (_, vertices) =
+        parse_vertices(lump_section(LUMP_VERTICES)).map_err(|_| BspError::ParseVertices)?;
+    // TODO visibility
+    // let (_, visibility) =
+    //     rest(lump_section(LUMP_VISIBILITY)).map_err(|_| BspError::ParseVisibility)?;
+    let visibility = lump_section(LUMP_VISIBILITY);
+    let (_, nodes) = parse_nodes(lump_section(LUMP_NODES)).map_err(|_| BspError::ParseNodes)?;
+    let (_, texinfo) =
+        parse_texinfo(lump_section(LUMP_TEXINFO)).map_err(|_| BspError::ParseTexInfo)?;
+    let (_, faces) = parse_faces(lump_section(LUMP_FACES)).map_err(|_| BspError::ParseFaces)?;
+    let (_, lightmap) =
+        parse_lightmap(lump_section(LUMP_LIGHTING)).map_err(|_| BspError::ParseLightmap)?;
+    let (_, clipnodes) =
+        parse_clipnodes(lump_section(LUMP_CLIPNODES)).map_err(|_| BspError::ParseClipNodes)?;
+    let (_, leaves) = parse_leaves(lump_section(LUMP_LEAVES)).map_err(|_| BspError::ParseLeaves)?;
+    let (_, mark_surfaces) = parse_mark_surfaces(lump_section(LUMP_MARKSURFACES))
+        .map_err(|_| BspError::ParseMarkSurfaces)?;
+    let (_, edges) = parse_edges(lump_section(LUMP_EDGES)).map_err(|_| BspError::ParseEdges)?;
+    let (_, surf_edges) =
+        parse_surf_edges(lump_section(LUMP_SURFEDGES)).map_err(|_| BspError::ParseSurfEdges)?;
+    let (_, models) = parse_models(lump_section(LUMP_MODELS)).map_err(|_| BspError::ParseModels)?;
 
-    Ok((
-        &[],
-        Bsp {
-            entities,
-            planes,
-            textures,
-            vertices,
-            visibility: visibility.to_vec(),
-            nodes,
-            texinfo,
-            faces,
-            lightmap,
-            clipnodes,
-            leaves,
-            mark_surfaces,
-            edges,
-            surf_edges,
-            models,
-        },
-    ))
+    Ok(Bsp {
+        entities,
+        planes,
+        textures,
+        vertices,
+        visibility: visibility.to_vec(),
+        nodes,
+        texinfo,
+        faces,
+        lightmap,
+        clipnodes,
+        leaves,
+        mark_surfaces,
+        edges,
+        surf_edges,
+        models,
+    })
 }

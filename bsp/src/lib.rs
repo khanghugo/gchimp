@@ -1,4 +1,5 @@
 mod constants;
+pub mod error;
 mod parser;
 mod types;
 mod utils;
@@ -67,5 +68,11 @@ mod test {
         let bsp = Bsp::from_bytes(file).unwrap();
         let file_again = bsp.write_to_bytes();
         Bsp::from_bytes(&file_again).unwrap();
+    }
+
+    #[test]
+    fn parse_c1a3d() {
+        let file = include_bytes!("tests/c1a3d.bsp");
+        let _bsp = Bsp::from_bytes(file).unwrap();
     }
 }

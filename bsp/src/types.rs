@@ -16,6 +16,7 @@ use crate::{
         LUMP_LEAVES, LUMP_LIGHTING, LUMP_MARKSURFACES, LUMP_MODELS, LUMP_NODES, LUMP_PLANES,
         LUMP_SURFEDGES, LUMP_TEXINFO, LUMP_TEXTURES, LUMP_VERTICES, LUMP_VISIBILITY, MAX_MAP_HULLS,
     },
+    error::BspError,
     parse_bsp,
 };
 
@@ -23,8 +24,6 @@ use nom::IResult as _IResult;
 
 pub type IResult<'a, T> = _IResult<&'a [u8], T>;
 pub type SResult<'a, T> = _IResult<&'a str, T>;
-
-use eyre::eyre;
 
 #[derive(Debug)]
 pub struct LumpHeader {
@@ -242,15 +241,17 @@ pub struct Bsp {
 }
 
 impl Bsp {
-    pub fn from_bytes(bytes: &[u8]) -> eyre::Result<Self> {
-        match parse_bsp(bytes) {
-            Ok((_, res)) => Ok(res),
-            Err(err) => Err(eyre!("Cannot parse map bytesbytes: {}", err)),
-        }
+    pub fn from_bytes(bytes: &[u8]) -> Result<Bsp, BspError> {
+        parse_bsp(bytes)
     }
 
-    pub fn from_file(path: impl AsRef<Path> + AsRef<OsStr>) -> eyre::Result<Self> {
-        let bytes = std::fs::read(path)?;
+    pub fn from_file(path: impl AsRef<Path> + AsRef<OsStr>) -> Result<Bsp, BspError> {
+        let path: &Path = path.as_ref();
+
+        let bytes = std::fs::read(path).map_err(|op| BspError::IOError {
+            source: op,
+            path: path.to_path_buf(),
+        })?;
         Self::from_bytes(&bytes)
     }
 
