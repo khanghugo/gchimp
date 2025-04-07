@@ -1,10 +1,7 @@
-use std::str::from_utf8;
-
 use glam::Vec3;
 use nom::{
     character::complete::multispace0,
-    combinator::{all_consuming, fail, map, rest},
-    error::context,
+    combinator::{all_consuming, map},
     multi::{count, many0},
     number::complete::{le_f32, le_i16, le_i32, le_u16, le_u32, le_u8},
     sequence::{delimited, tuple},
