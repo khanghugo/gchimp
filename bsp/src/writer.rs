@@ -126,13 +126,14 @@ impl Bsp {
             // pad offset
             let offsets_start = writer.get_offset();
             (0..self.textures.len()).for_each(|_| {
-                writer.append_u32(0); // dummy
+                writer.append_i32(0); // dummy
             });
 
             self.textures.iter().enumerate().for_each(|(idx, texture)| {
                 let texture_offset = writer.get_offset();
 
                 // texture offset is relative to where the lump starts
+                // for embedded texture, this is still needed
                 writer.replace_with_u32(offsets_start + idx * 4, (texture_offset - offset) as u32);
 
                 texture.write(&mut writer);

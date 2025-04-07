@@ -1,26 +1,11 @@
-use std::{
-    collections::HashMap,
-    ffi::OsStr,
-    fs::OpenOptions,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::collections::HashMap;
 
-use byte_writer::ByteWriter;
 use glam::Vec3;
 use wad::types::MipTex;
 
-use crate::{
-    constants::{
-        HEADER_LUMPS, HEADER_LUMP_SIZE, LUMP_CLIPNODES, LUMP_EDGES, LUMP_ENTITIES, LUMP_FACES,
-        LUMP_LEAVES, LUMP_LIGHTING, LUMP_MARKSURFACES, LUMP_MODELS, LUMP_NODES, LUMP_PLANES,
-        LUMP_SURFEDGES, LUMP_TEXINFO, LUMP_TEXTURES, LUMP_VERTICES, LUMP_VISIBILITY, MAX_MAP_HULLS,
-    },
-    error::BspError,
-    parse_bsp,
-};
-
 use nom::IResult as _IResult;
+
+use crate::constants::MAX_MAP_HULLS;
 
 pub type IResult<'a, T> = _IResult<&'a [u8], T>;
 pub type SResult<'a, T> = _IResult<&'a str, T>;
