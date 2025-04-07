@@ -9,5 +9,5 @@ glam = "0.28.0"
 nom = "7.1.3"
 wad = { path = "../wad" }
 byte_writer = { path = "../byte_writer" }
-common = { version = "0.3.2", path = "../common" }
+common = { path = "../common" }
 thiserror = "2.0.12"
