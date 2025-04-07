@@ -272,6 +272,8 @@ impl MipTex {
 
     pub fn write(&self, writer: &mut ByteWriter) {
         let texture_name_bytes = self.texture_name.get_bytes();
+        let is_external_texture = self.mip_images.is_empty();
+
         writer.append_u8_slice(texture_name_bytes);
         writer.append_u8_slice(&vec![0u8; 16 - texture_name_bytes.len()]);
 
@@ -279,20 +281,26 @@ impl MipTex {
         writer.append_u32(self.height);
 
         // mip_offsets
-        writer.append_u32(MIPTEX_HEADER_LENGTH);
-        writer.append_u32(MIPTEX_HEADER_LENGTH + self.width * self.height);
-        writer.append_u32(
-            MIPTEX_HEADER_LENGTH + self.width * self.height + (self.width * self.height) / 4,
-        );
-        writer.append_u32(
-            MIPTEX_HEADER_LENGTH
-                + self.width * self.height
-                + (self.width * self.height) / 4
-                + (self.width * self.height) / 4 / 4,
-        );
-
-        // if no mipimages then don't write anything more
-        if self.mip_images.is_empty() {
+        if !is_external_texture {
+            // normal case when we have embedded texture
+            writer.append_u32(MIPTEX_HEADER_LENGTH);
+            writer.append_u32(MIPTEX_HEADER_LENGTH + self.width * self.height);
+            writer.append_u32(
+                MIPTEX_HEADER_LENGTH + self.width * self.height + (self.width * self.height) / 4,
+            );
+            writer.append_u32(
+                MIPTEX_HEADER_LENGTH
+                    + self.width * self.height
+                    + (self.width * self.height) / 4
+                    + (self.width * self.height) / 4 / 4,
+            );
+        } else {
+            // in this case, just write one offset number 0
+            // but due to some compatibilities with our parser, just write it 4 times
+            writer.append_u32(0);
+            writer.append_u32(0);
+            writer.append_u32(0);
+            writer.append_u32(0);
             return;
         }
 
