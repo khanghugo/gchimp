@@ -272,7 +272,6 @@ impl MipTex {
 
     pub fn write(&self, writer: &mut ByteWriter) {
         let texture_name_bytes = self.texture_name.get_bytes();
-        let is_external_texture = self.mip_images.is_empty();
 
         writer.append_u8_slice(texture_name_bytes);
         writer.append_u8_slice(&vec![0u8; 16 - texture_name_bytes.len()]);
@@ -281,7 +280,7 @@ impl MipTex {
         writer.append_u32(self.height);
 
         // mip_offsets
-        if !is_external_texture {
+        if !self.is_external() {
             // normal case when we have embedded texture
             writer.append_u32(MIPTEX_HEADER_LENGTH);
             writer.append_u32(MIPTEX_HEADER_LENGTH + self.width * self.height);
@@ -318,6 +317,10 @@ impl MipTex {
 
         // pad palette to correctly have 256 colors
         writer.append_u8_slice(&vec![0u8; (256 - self.palette.get_bytes().len()) * 3]);
+    }
+
+    pub fn is_external(&self) -> bool {
+        self.mip_offsets[0] == 0
     }
 }
 
