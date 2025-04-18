@@ -5,6 +5,7 @@ import "./styles.css";
 import { loop_wave } from "gchimp-web";
 import { UploadButton } from "@/components/upload-button";
 import { LabelledCheckBox } from "@/components/labelled-checkbox";
+import { RadioGroup } from "@/components/radio-group";
 
 export const WaveLoop = () => {
     const [name, setName] = useState<string | undefined>(undefined);
@@ -13,6 +14,11 @@ export const WaveLoop = () => {
     const [output, setOutput] = useState<Uint8Array | null>(null);
     const [loop, setLoop] = useState<boolean>(true);
     const [sixteenBit, setSixteenBit] = useState<boolean>(true);
+
+    const bitDepthOptions = [
+        { value: '8bit', label: '8 bit' },
+        { value: '16bit', label: '16 bit' },
+    ];
 
     const submitButton = createRef<HTMLInputElement>();
 
@@ -99,31 +105,13 @@ export const WaveLoop = () => {
     return <GchimpProgram name="Wave Loop" className={`wave-loop`} onDrop={onDrop} >
         <form onSubmit={async (e) => runWaveLoop(e)}>
             <LabelledCheckBox label="Loop" id="should-loop" checked={loop} onChange={e => setLoop(e.target.checked)} />
-            {/* vibe coded */}
-            <div className="form-group"> {/* Add a div for basic styling/grouping */}
-                <div> {/* Group radio buttons */}
-                    <input
-                        type="radio"
-                        id="bit-depth-8bit"
-                        name="bit-depth" // Same name for both radio buttons
-                        value="8bit"
-                        checked={!sixteenBit} // Checked when sixteenBit is false (8bit)
-                        onChange={e => setSixteenBit(e.target.value === '16bit')} // Update state based on selection
-                    />
-                    <label htmlFor="bit-depth-8bit">8 bit</label>
-                </div>
-                <div> {/* Group radio buttons */}
-                    <input
-                        type="radio"
-                        id="bit-depth-16bit"
-                        name="bit-depth" // Same name for both radio buttons
-                        value="16bit"
-                        checked={sixteenBit} // Checked when sixteenBit is true (16bit)
-                        onChange={e => setSixteenBit(e.target.value === '16bit')} // Update state based on selection
-                    />
-                    <label htmlFor="bit-depth-16bit">16 bit</label>
-                </div>
-            </div>
+            <RadioGroup
+                label="Bit Depth:" // Pass the label for the group
+                name="bit-depth" // Pass a name for the radio group
+                options={bitDepthOptions} // Pass the array of options
+                value={sixteenBit ? '16bit' : '8bit'} // Pass the current value (as string)
+                onChange={(selectedValue) => setSixteenBit(selectedValue === '16bit')} // Handle change (convert string back to boolean)
+            />
             <UploadButton label={"Select or Drop WAV"} id={"wave-loop-path"} onChange={(e) => changeFile(e)} fileName={name} />
             <div>
                 <input type="submit" ref={submitButton} />

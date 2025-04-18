@@ -1,0 +1,86 @@
+/* Styles for the RadioGroup component */
+.radio-group {
+    /* Updated class name */
+    display: flex;
+    /* Use column layout for label and radio options container */
+    flex-direction: column;
+    box-shadow: 2px 2px black;
+    /* Match checkbox shadow */
+    margin-bottom: 10px;
+    /* Match checkbox margin */
+    border: 2px solid black;
+    /* Match checkbox border */
+    padding: 10px;
+    /* Add some padding inside the box */
+}
+
+.radio-group .radio-group-label {
+    /* Updated label class name */
+    /* Style for the main group label */
+    margin: 2px;
+    /* Match checkbox label margin */
+    color: black;
+    /* Match color */
+    font-size: 20px;
+    /* Match font size */
+    width: auto;
+    /* Adjust width */
+    margin-bottom: 5px;
+    /* Space below the label */
+}
+
+.radio-group .radio-options {
+    /* Updated parent class name */
+    /* Container for the 8bit and 16bit radio options */
+    display: flex;
+    /* Arrange the options in a row */
+    align-items: center;
+    /* Vertically center options */
+    gap: 15px;
+    /* Space between the 8bit and 16bit options */
+    width: auto;
+    /* Don't force full width */
+}
+
+.radio-group .radio-option {
+    /* Updated parent class name */
+    /* Container for each radio button and its label */
+    display: flex;
+    /* Arrange radio button and label */
+    align-items: center;
+    /* Vertically center */
+    gap: 5px;
+    /* Space between radio button and label */
+    width: auto;
+    /* Don't force full width */
+}
+
+.radio-group input[type="radio"] {
+    /* Updated parent class name */
+    /* Style for the radio input itself */
+    width: min-content;
+    /* Match checkbox input width style */
+    margin-left: 12px;
+    /* Match checkbox input margin */
+    margin-right: 0;
+    /* Gap handles spacing */
+    margin-top: 0;
+    /* Remove default margin */
+    margin-bottom: 0;
+    /* Remove default margin */
+}
+
+.radio-group .radio-option label {
+    /* Updated parent class name */
+    /* Style for the label next to the radio button */
+    width: auto;
+    /* Labels shouldn't take full width */
+    cursor: pointer;
+    /* Indicate it's clickable */
+    margin: 0;
+    /* Gap handles spacing */
+    font-size: 20px;
+    /* Match font size */
+    color: black;
+    /* Match color */
+}
