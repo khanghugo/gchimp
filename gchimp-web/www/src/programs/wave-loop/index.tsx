@@ -12,6 +12,7 @@ export const WaveLoop = () => {
     // const [status, setStatus] = useState<string>("Status: Idle");
     const [output, setOutput] = useState<Uint8Array | null>(null);
     const [loop, setLoop] = useState<boolean>(true);
+    const [sixteenBit, setSixteenBit] = useState<boolean>(true);
 
     const submitButton = createRef<HTMLInputElement>();
 
@@ -23,7 +24,7 @@ export const WaveLoop = () => {
         const reader = new FileReader();
 
         reader.onload = (e) => {
-            const res = loop_wave(new Uint8Array(e.target?.result as ArrayBuffer), loop);
+            const res = loop_wave(new Uint8Array(e.target?.result as ArrayBuffer), loop, sixteenBit);
             setOutput(res);
         };
 
@@ -88,15 +89,41 @@ export const WaveLoop = () => {
         file, submitButton, name
     ]);
 
+    // when settings is changed, reset everything
     useEffect(() => {
         setName(undefined);
         setFile(null);
         setOutput(null);
-    }, [loop]);
+    }, [loop, sixteenBit]);
 
     return <GchimpProgram name="Wave Loop" className={`wave-loop`} onDrop={onDrop} >
         <form onSubmit={async (e) => runWaveLoop(e)}>
             <LabelledCheckBox label="Loop" id="should-loop" checked={loop} onChange={e => setLoop(e.target.checked)} />
+            {/* vibe coded */}
+            <div className="form-group"> {/* Add a div for basic styling/grouping */}
+                <div> {/* Group radio buttons */}
+                    <input
+                        type="radio"
+                        id="bit-depth-8bit"
+                        name="bit-depth" // Same name for both radio buttons
+                        value="8bit"
+                        checked={!sixteenBit} // Checked when sixteenBit is false (8bit)
+                        onChange={e => setSixteenBit(e.target.value === '16bit')} // Update state based on selection
+                    />
+                    <label htmlFor="bit-depth-8bit">8 bit</label>
+                </div>
+                <div> {/* Group radio buttons */}
+                    <input
+                        type="radio"
+                        id="bit-depth-16bit"
+                        name="bit-depth" // Same name for both radio buttons
+                        value="16bit"
+                        checked={sixteenBit} // Checked when sixteenBit is true (16bit)
+                        onChange={e => setSixteenBit(e.target.value === '16bit')} // Update state based on selection
+                    />
+                    <label htmlFor="bit-depth-16bit">16 bit</label>
+                </div>
+            </div>
             <UploadButton label={"Select or Drop WAV"} id={"wave-loop-path"} onChange={(e) => changeFile(e)} fileName={name} />
             <div>
                 <input type="submit" ref={submitButton} />

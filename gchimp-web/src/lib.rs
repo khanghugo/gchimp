@@ -18,10 +18,10 @@ use gchimp::{
 mod utils;
 
 #[wasm_bindgen]
-pub fn loop_wave(wave_bytes: Vec<u8>, loop_: bool) -> Result<Vec<u8>, JsValue> {
+pub fn loop_wave(wave_bytes: Vec<u8>, loop_: bool, sixteenbit: bool) -> Result<Vec<u8>, JsValue> {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
 
-    match _loop_wave(wave_bytes, loop_) {
+    match _loop_wave(wave_bytes, loop_, sixteenbit) {
         Ok(bytes) => Ok(bytes),
         Err(err) => Err(JsValue::from_str(err.to_string().as_str())),
     }

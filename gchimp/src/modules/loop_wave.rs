@@ -8,7 +8,11 @@ use cuet::{ChunkWriter, CuePoint};
 
 use crate::err;
 
-pub fn loop_wave(wav_path: impl AsRef<Path> + Into<PathBuf>, loop_: bool) -> eyre::Result<()> {
+pub fn loop_wave(
+    wav_path: impl AsRef<Path> + Into<PathBuf>,
+    loop_: bool,
+    sixteenbit: bool,
+) -> eyre::Result<()> {
     if !wav_path.as_ref().exists() {
         return err!("{} does not exist", wav_path.as_ref().display());
     }
@@ -25,7 +29,7 @@ pub fn loop_wave(wav_path: impl AsRef<Path> + Into<PathBuf>, loop_: bool) -> eyr
     let mut bytes = vec![];
     file.read_to_end(&mut bytes)?;
 
-    let bytes = loop_wave_from_wave_bytes(bytes, loop_)?;
+    let bytes = loop_wave_from_wave_bytes(bytes, loop_, sixteenbit)?;
 
     let file_name = wav_path.as_ref().file_stem().unwrap().to_str().unwrap();
     let out_path = wav_path
@@ -44,7 +48,7 @@ pub fn loop_wave(wav_path: impl AsRef<Path> + Into<PathBuf>, loop_: bool) -> eyr
     Ok(())
 }
 
-fn make_pcm16u_mono_and_22050(bytes: Vec<u8>) -> eyre::Result<Vec<u8>> {
+fn make_pcm_mono_and_22050(bytes: Vec<u8>, sixteenbit: bool) -> eyre::Result<Vec<u8>> {
     let Ok(mut wav) = wav_io::reader::Reader::from_vec(bytes) else {
         return err!("cannot read .wav bytes");
     };
@@ -64,11 +68,11 @@ fn make_pcm16u_mono_and_22050(bytes: Vec<u8>) -> eyre::Result<Vec<u8>> {
     };
 
     const BEST_SAMPLING_RATE: u32 = 22050;
-    const BEST_BIT_PER_SAMPLE: u16 = 16;
+    let bit_per_sample = if sixteenbit { 16 } else { 8 };
 
     let samples2 = wav_io::resample::linear(f32_samples, 1, header.sample_rate, BEST_SAMPLING_RATE);
 
-    let res_wav_header = wav_io::new_header(BEST_SAMPLING_RATE, BEST_BIT_PER_SAMPLE, false, true);
+    let res_wav_header = wav_io::new_header(BEST_SAMPLING_RATE, bit_per_sample, false, true);
 
     let Ok(res_bytes) = wav_io::write_to_bytes(&res_wav_header, &samples2) else {
         return err!("cannot write .wav");
@@ -77,8 +81,12 @@ fn make_pcm16u_mono_and_22050(bytes: Vec<u8>) -> eyre::Result<Vec<u8>> {
     Ok(res_bytes)
 }
 
-pub fn loop_wave_from_wave_bytes(bytes: Vec<u8>, loop_: bool) -> eyre::Result<Vec<u8>> {
-    let mut bytes = make_pcm16u_mono_and_22050(bytes)?;
+pub fn loop_wave_from_wave_bytes(
+    bytes: Vec<u8>,
+    loop_: bool,
+    sixteenbit: bool,
+) -> eyre::Result<Vec<u8>> {
+    let mut bytes = make_pcm_mono_and_22050(bytes, sixteenbit)?;
 
     if loop_ {
         let cue = CuePoint::from_sample_offset(1, 1);
@@ -101,18 +109,18 @@ mod test {
     #[test]
     fn run() {
         let path = PathBuf::from("/home/khang/gchimp/examples/loop_wave/bhit_flesh-1.wav");
-        loop_wave(path, true).unwrap();
+        loop_wave(path, true, true).unwrap();
     }
 
     #[test]
     fn run_32bit() {
         let path = PathBuf::from("/home/khang/gchimp/examples/loop_wave/birds_32bit.wav");
-        loop_wave(path, true).unwrap();
+        loop_wave(path, true, true).unwrap();
     }
 
     #[test]
     fn run_8bit() {
         let path = PathBuf::from("/home/khang/gchimp/examples/loop_wave/eightbits.wav");
-        loop_wave(path, true).unwrap();
+        loop_wave(path, true, true).unwrap();
     }
 }

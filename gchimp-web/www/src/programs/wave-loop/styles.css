@@ -24,4 +24,71 @@
     input[type="submit"] {
         display: none;
     }
+
+
+    /* vibe codede to see how good gemini 2.5 flash is */
+    /* Styles for the bit depth radio buttons, now nested */
+    .form-group {
+        margin-bottom: 10px;
+        /* Add some space below the group */
+        display: flex;
+        /* Use flexbox to arrange children in a row */
+        align-items: center;
+        /* Vertically center items */
+        gap: 15px;
+        /* Add space between the radio button groups */
+    }
+
+    /* Removed styles for the main "Bit Depth:" label */
+    /*
+    .form-group > label {
+         width: auto;
+         display: block;
+         margin-bottom: 5px;
+         font-size: 20px;
+         color: black;
+    }
+    */
+
+    /* Style the container holding each radio button and its label */
+    .form-group>div {
+        display: flex;
+        /* Use flexbox for radio button and its label */
+        align-items: center;
+        /* Vertically center radio button and label */
+        /* Removed margin-bottom as gap on parent handles spacing */
+        /* margin-bottom: 5px; */
+        gap: 5px;
+        /* Space between the radio button and its label */
+        width: auto;
+        /* Ensure radio button groups don't take full width */
+    }
+
+    /* Style the radio input itself */
+    .form-group input[type="radio"] {
+        width: min-content;
+        /* Match checkbox input width style */
+        margin-left: 12px;
+        /* Match checkbox input margin */
+        margin-right: 0;
+        /* Removed right margin, gap handles spacing */
+        margin-top: 0;
+        /* Remove default margin */
+        margin-bottom: 0;
+        /* Remove default margin */
+    }
+
+    /* Style the label next to the radio button */
+    .form-group label {
+        width: auto;
+        /* Labels shouldn't take full width */
+        cursor: pointer;
+        /* Indicate it's clickable */
+        margin: 0;
+        /* Removed margin, gap handles spacing */
+        font-size: 20px;
+        /* Match font size */
+        color: black;
+        /* Match color */
+    }
 }

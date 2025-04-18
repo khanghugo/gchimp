@@ -21,9 +21,14 @@ glam = "0.27.0"
 rayon = "1.10.0"
 rhai = "1.17.1"
 eyre = "0.6.12"
-toml = { version = "0.8.13", features = ["default"]}
+toml = { version = "0.8.13", features = ["default"] }
 serde = { version = "1.0.202", features = ["derive"] }
-quantette = { version = "0.2.0", features = ["kmeans", "threads", "pipelines", "colorspaces"] }
+quantette = { version = "0.2.0", features = [
+    "kmeans",
+    "threads",
+    "pipelines",
+    "colorspaces",
+] }
 image = { version = "0.25.1", features = ["png", "tga"] }
 clap = { version = "4.5.4", features = ["derive"] }
 ndarray = "0.15.6"

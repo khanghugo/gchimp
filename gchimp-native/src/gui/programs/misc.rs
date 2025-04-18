@@ -21,6 +21,7 @@ pub struct Misc {
     resmake_options: ResMakeOptions,
     split_model_status: Arc<Mutex<String>>,
     loop_wave_loop: bool,
+    loop_wave_16_bit: bool,
     loop_wave_status: Arc<Mutex<String>>,
     resmake_status: Arc<Mutex<String>>,
 }
@@ -36,6 +37,7 @@ impl Default for Misc {
             loop_wave_status: Arc::new(Mutex::new(String::from("Idle"))),
             resmake_status: Arc::new(Mutex::new(String::from("Idle"))),
             loop_wave_loop: true,
+            loop_wave_16_bit: true,
         }
     }
 }
@@ -90,6 +92,9 @@ impl Misc {
 
             ui.checkbox(&mut self.loop_wave_loop, "Loop")
                 .on_hover_text("Loop the wave");
+
+            ui.checkbox(&mut self.loop_wave_16_bit, "16 bit")
+                .on_hover_text("If unticked, the audio is 8 bit per sample");
 
             ui.end_row();
 
@@ -194,10 +199,11 @@ If there are external WADs found, this option will create a new WAD file contain
         let wav_path = PathBuf::from(wav);
         let status = self.loop_wave_status.clone();
         let loop_ = self.loop_wave_loop;
+        let sixteen_bit = self.loop_wave_16_bit;
         "Running".clone_into(&mut status.lock().unwrap());
 
         thread::spawn(move || {
-            if let Err(err) = loop_wave(wav_path, loop_) {
+            if let Err(err) = loop_wave(wav_path, loop_, sixteen_bit) {
                 err.to_string().clone_into(&mut status.lock().unwrap());
             } else {
                 "Done".clone_into(&mut status.lock().unwrap());
