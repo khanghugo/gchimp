@@ -4,6 +4,7 @@
 mod constants;
 mod parser;
 pub mod types;
+pub mod utils;
 
 pub use parser::{parse_miptex, parse_wad};
 

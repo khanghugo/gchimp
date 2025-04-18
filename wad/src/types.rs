@@ -425,6 +425,14 @@ impl FileEntry {
             Self::Font(font) => font.palette.get_bytes(),
         }
     }
+
+    pub fn get_mip_tex(&self) -> Option<&MipTex> {
+        if let FileEntry::MipTex(miptex) = &self {
+            return Some(miptex);
+        }
+
+        None
+    }
 }
 
 #[derive(Debug)]

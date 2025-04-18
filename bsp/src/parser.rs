@@ -78,6 +78,15 @@ fn parse_textures(i: &[u8]) -> IResult<Vec<Texture>> {
     let mut miptexes: Vec<Texture> = vec![];
 
     for offset in offsets {
+        // for some reasons, some offsets are -1
+        // let assume that -1 means it is a {BLUE
+        // https://developer.valvesoftware.com/wiki/Tool_textures_(GoldSrc)
+        if offset == -1 {
+            let fucked = wad::utils::create_blue_miptex(16, 16, "{BLUE");
+            miptexes.push(fucked);
+            continue;
+        }
+
         let (_, res) = parse_miptex(&i[(offset as usize)..])?;
 
         miptexes.push(res);

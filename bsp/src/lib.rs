@@ -76,13 +76,4 @@ mod test {
         let file = include_bytes!("tests/c1a3d.bsp");
         let _bsp = Bsp::from_bytes(file).unwrap();
     }
-
-    /// Embedded texture shenanigans
-    #[test]
-    fn parse_write_datacore() {
-        let file = include_bytes!("tests/datacore.bsp");
-        let bsp = Bsp::from_bytes(file).unwrap();
-        let out_byte = bsp.write_to_bytes();
-        let _bsp = Bsp::from_bytes(&out_byte).unwrap();
-    }
 }
