@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
 };
@@ -215,4 +216,34 @@ fn case_insensitive_file_search(path: &Path) -> Option<PathBuf> {
     }
 
     None
+}
+
+/// Only concerns about files, not directory, for now
+///
+/// Key: Normalized path as string
+///
+/// Value: Actual path
+pub type FileLookup = HashMap<String, PathBuf>;
+
+pub fn build_file_lookup(dir: &Path) -> FileLookup {
+    let mut res = FileLookup::new();
+
+    for entry in std::fs::read_dir(dir).ok().unwrap() {
+        let entry = entry.unwrap();
+        let entry_path = entry.path();
+
+        // recursion
+        if entry_path.is_dir() {
+            let another_lookup = build_file_lookup(&entry_path);
+
+            res.extend(another_lookup);
+            continue;
+        }
+
+        let entry_name_normalized = entry_path.display().to_string().to_lowercase();
+
+        res.insert(entry_name_normalized, entry_path);
+    }
+
+    return res;
 }

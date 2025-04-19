@@ -18,7 +18,7 @@ use crate::{
     err,
     utils::{
         constants::{MODEL_ENTITIES, SOUND_ENTITIES, SPRITE_ENTITIES},
-        misc::{search_game_resource, DefaultResource, COMMON_GAME_MODS},
+        misc::{build_file_lookup, DefaultResource, FileLookup, COMMON_GAME_MODS},
     },
 };
 
@@ -286,7 +286,23 @@ impl ResMake {
         }
 
         if self.options.zip {
-            let res_bytes = resmake_zip_res(&bsp, bsp_path, wad_table.as_ref(), &self.options)?;
+            let file_lookup_table = build_file_lookup(
+                bsp_path
+                    .parent()
+                    .unwrap()
+                    .parent()
+                    .unwrap()
+                    .parent()
+                    .unwrap(),
+            );
+
+            let res_bytes = resmake_zip_res(
+                &bsp,
+                bsp_path,
+                wad_table.as_ref(),
+                &self.options,
+                &file_lookup_table,
+            )?;
 
             let out_path = bsp_path.with_extension("zip");
             let mut file = OpenOptions::new()
@@ -369,6 +385,8 @@ impl ResMake {
 
         let multithread = std::env::var("GCHIMP_RESMAKE_MULTITHREAD").is_ok();
 
+        let file_lookup_table = build_file_lookup(game_dir);
+
         let good_fucking_god_rust_you_are_so_good_at_inference = |bsp_path: &PathBuf| {
             let res_exists = bsp_path.with_extension("res").exists();
             let zip_exists = bsp_path.with_extension("zip").exists();
@@ -408,7 +426,13 @@ impl ResMake {
             }
 
             if self.options.zip {
-                let res_bytes = resmake_zip_res(&bsp, bsp_path, wad_table.as_ref(), &self.options)?;
+                let res_bytes = resmake_zip_res(
+                    &bsp,
+                    bsp_path,
+                    wad_table.as_ref(),
+                    &self.options,
+                    &file_lookup_table,
+                )?;
 
                 let out_path = bsp_path.with_extension("zip");
                 let mut file = OpenOptions::new()
@@ -1074,6 +1098,7 @@ fn resmake_zip_res(
     bsp_path: &Path,
     wad_table: Option<&WadTable>,
     options: &ResMakeOptions,
+    file_lookup_table: &FileLookup,
 ) -> eyre::Result<Vec<u8>> {
     let resources = find_resource(bsp, bsp_path, wad_table, options.wad_check)?;
     let resources = if options.include_default_resource {
@@ -1147,15 +1172,31 @@ fn resmake_zip_res(
 
     // include typical resource files
     for relative_path in all_files {
-        // let absolute_path = root_path.join(relative_path.as_str());
-        // let absolute_path =
-        let Some(absolute_path) = search_game_resource(
-            gamedir_path,
-            gamemod_name,
-            Path::new(&relative_path),
-            // good fucking god im smart enough to deal with this retardation
-            false,
-        ) else {
+        // normalize relative path for easier search
+        let normalized_relative_path = relative_path.to_lowercase();
+        let absolute_path_not_normalized = gamedir_path.join(gamemod_name).join(&relative_path);
+
+        let absolute_path = file_lookup_table.iter().find_map(|(k, v)| {
+            if k.ends_with(&normalized_relative_path) {
+                Some(v)
+            } else {
+                None
+            }
+        });
+
+        let absolute_path = match absolute_path {
+            Some(x) => Some(x),
+            None => {
+                if absolute_path_not_normalized.exists() {
+                    Some(&absolute_path_not_normalized)
+                } else {
+                    None
+                }
+            }
+        };
+
+        let Some(absolute_path) = absolute_path else {
+            // if cannot find the file, try finding it again
             let message = format!("Cannot find {}", relative_path);
 
             if options.zip_ignore_missing {
@@ -1201,7 +1242,7 @@ mod test {
 
     use bsp::Bsp;
 
-    use crate::modules::resmake::ResMake;
+    use crate::{modules::resmake::ResMake, utils::misc::build_file_lookup};
 
     use super::{resmake_zip_res, ResMakeOptions};
 
@@ -1234,6 +1275,15 @@ mod test {
     fn run_zip() {
         let bsp_path = PathBuf::from("/home/khang/bxt/game_isolated/valve/maps/c0a0.bsp");
         let bsp = Bsp::from_file(&bsp_path).unwrap();
+        let file_lookup_table = build_file_lookup(
+            bsp_path
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap(),
+        );
 
         resmake_zip_res(
             &bsp,
@@ -1248,6 +1298,7 @@ mod test {
                 create_linked_wad: true,
                 skip_created_res: true,
             },
+            &file_lookup_table,
         )
         .unwrap();
     }
