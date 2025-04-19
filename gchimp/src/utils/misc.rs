@@ -97,3 +97,122 @@ macro_rules! rand_int_range {
         (rand::random::<f32>() * ($x2 - $x1) as f32 + $x1 as f32).round() as u32
     }};
 }
+
+// all copied from kdr
+const UNKNOWN_GAME_MOD: &str = "unknown";
+
+// search through the game files by switching between different game mods just to makes sure
+pub fn search_game_resource(
+    game_dir: &Path,
+    game_mod: &str,
+    relative_path: &Path,
+    case_sensitive: bool,
+) -> Option<PathBuf> {
+    let mut one_shot_path = game_dir.join(game_mod).join(relative_path);
+
+    if !case_sensitive {
+        case_insensitive_file_search(one_shot_path.as_path())
+            // need to assign like this
+            // do not exit early
+            .map(|res| one_shot_path = res);
+    }
+
+    if one_shot_path.exists() {
+        return one_shot_path.into();
+    }
+
+    let game_mods_to_check = get_game_mods_to_check(game_mod);
+
+    for game_mod_to_check in game_mods_to_check {
+        let mut new_path = game_dir.join(game_mod_to_check).join(relative_path);
+
+        if !case_sensitive {
+            case_insensitive_file_search(new_path.as_path())
+                // need to assign like this
+                // do not exit early
+                .map(|res| new_path = res);
+        }
+
+        if new_path.exists() {
+            return Some(new_path);
+        }
+    }
+
+    None
+}
+
+// must include the downloads variance because that is easier for me
+// TODO: make this inside a config file, maybe a do a lazy cell to parse the config
+// the worst to come is that we have to read a config file once multiple times wherever applicable :()
+pub const COMMON_GAME_MODS: &[&str] = &[
+    "valve", // no need for valve because it is guaranteed to be inside "get_game_mods_to_check"
+    "valve_downloads", // likewise
+    "ag",
+    "ag_downloads",
+    "cstrike",
+    "cstrike_downloads",
+];
+
+// includes the original game_mod
+// if game mod is unknown, we will check all of the game mods inside a provided list
+fn get_game_mods_to_check(game_mod: &str) -> Vec<String> {
+    let is_valve = game_mod == "valve";
+    let is_download = game_mod.ends_with("downloads");
+    let mut gamemods_to_check: Vec<String> = vec![game_mod.to_owned()]; // add our original game mod
+
+    // if someone feeds in half life maps, check for valve_downloads because why not
+    // otherwise, add valve to our list
+    if is_valve {
+        gamemods_to_check.push("valve_downloads".to_string());
+
+        // then exist early
+        return gamemods_to_check;
+    } else {
+        // check main mod and then check valve
+        // it is usually guaranteed that downloads folder is very big and longer to check. Whatever.
+        if is_download {
+            let without_download = game_mod.replace("_downloads", "");
+
+            gamemods_to_check.push(without_download);
+        } else {
+            gamemods_to_check.push(format!("{game_mod}_downloads"));
+        }
+
+        // every else needs to check in with "valve"
+        // but we add it last because we have to prioritize our game mod
+        gamemods_to_check.push("valve".to_string());
+        gamemods_to_check.push("valve_downloads".to_string());
+    }
+
+    // if gmae mod is unknown then just check all of the other gmae mods just to be safe
+    if game_mod == UNKNOWN_GAME_MOD {
+        COMMON_GAME_MODS.iter().for_each(|&game_mod| {
+            gamemods_to_check.push(game_mod.to_string());
+        });
+    }
+
+    gamemods_to_check
+}
+
+// HOLY FUCKING RETARDS
+fn case_insensitive_file_search(path: &Path) -> Option<PathBuf> {
+    let path_parent = path.parent()?;
+    let path_file_name_normalized = path.file_name()?.to_str()?.to_lowercase();
+
+    for entry in std::fs::read_dir(path_parent).ok()? {
+        let entry = entry.unwrap();
+        let entry_path = entry.path();
+
+        if !entry_path.is_file() {
+            continue;
+        }
+
+        let entry_name_normalized = entry_path.file_name()?.to_str()?.to_lowercase();
+
+        if entry_name_normalized == path_file_name_normalized {
+            return Some(entry_path);
+        }
+    }
+
+    None
+}

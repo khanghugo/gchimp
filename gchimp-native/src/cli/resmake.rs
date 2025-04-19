@@ -37,6 +37,9 @@ enum Commands {
         include_default: bool,
         /// Skips processing over .bsp(s) with created .res
         ///
+        /// If zip option is enabled, which it does by default and you cannot turn it off,
+        /// then it will only ignore if zip file is already created
+        ///
         /// Useful if you just up in some new maps and you want to update your archive without processing too much
         #[arg(long, default_value_t = false)]
         skip_created_res: bool,
