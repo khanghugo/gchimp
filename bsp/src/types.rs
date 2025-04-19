@@ -148,6 +148,7 @@ pub enum LeafContent {
     ContentsCurrentUp = -13,
     ContentsCurrentDown = -14,
     ContentsTranslucent = -15,
+    Unknown = 0,
 }
 
 impl TryFrom<i32> for LeafContent {
@@ -155,7 +156,7 @@ impl TryFrom<i32> for LeafContent {
 
     fn try_from(value: i32) -> Result<Self, Self::Error> {
         if !(-15..=-1).contains(&value) {
-            return Err("Not a valid LeafContent value");
+            return Ok(Self::Unknown);
         }
 
         Ok(match value {
