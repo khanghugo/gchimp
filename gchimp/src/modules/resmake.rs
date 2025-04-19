@@ -502,10 +502,6 @@ fn generate_wad_table(game_dir: &Path) -> eyre::Result<WadTable> {
     // vector so we can sort it
     wad_table.sort_by(|a, b| a.0.cmp(&b.0));
 
-    wad_table.iter().for_each(|(n, _)| {
-        println!("{}", n.display());
-    });
-
     Ok(wad_table)
 }
 
@@ -552,6 +548,17 @@ where
     i
 }
 
+fn help_a_friend_out(s: &str) -> &str {
+    for what in COMMON_GAME_MODS {
+        if let Some(huh) = s.strip_prefix(what) {
+            // stripping backslash
+            return &huh[1..];
+        }
+    }
+
+    return s;
+}
+
 fn get_models(bsp: &Bsp) -> HashSet<String> {
     let mut used_models = HashSet::<String>::new();
 
@@ -560,6 +567,8 @@ fn get_models(bsp: &Bsp) -> HashSet<String> {
             if MODEL_ENTITIES.contains(&classname.as_str()) {
                 if let Some(model) = entity.get("model") {
                     if model.ends_with(".mdl") {
+                        let model = help_a_friend_out(model);
+
                         used_models.insert(model.to_string());
                     }
                 }
@@ -683,11 +692,15 @@ fn get_sprites(bsp: &Bsp) -> HashSet<String> {
                 if let Some(model) = entity.get("model") {
                     // some of sprite entities are used for displaying model so this check is to make sure
                     if model.ends_with(".spr") {
+                        let model = help_a_friend_out(model);
+
                         used_sprites.insert(model.to_string());
                     }
                 }
                 // env_beam
                 else if let Some(texture) = entity.get("texture") {
+                    let texture = help_a_friend_out(texture);
+
                     used_sprites.insert(texture.to_string());
                 }
             }
