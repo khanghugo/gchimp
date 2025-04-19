@@ -383,7 +383,8 @@ impl ResMake {
             });
         };
 
-        let multithread = std::env::var("GCHIMP_RESMAKE_MULTITHREAD").is_ok();
+        // let multithread = std::env::var("GCHIMP_RESMAKE_MULTITHREAD").is_ok();
+        let multithread = true;
 
         let file_lookup_table = build_file_lookup(game_dir);
 
