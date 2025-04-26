@@ -898,143 +898,145 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                 // due to some rust stuff, this cannot be done in parallel (first)
                 self.log(format!("Creating {} models", marked_entities.len()).as_str());
 
-                let (map2mdl_ok, map2mdl_err): (Vec<eyre::Result<(usize, Option<_>)>>, _) =
-                    marked_entities
-                        .iter()
-                        .zip(ok.clone().into_iter()) // safe to assume this is all in order?
-                        .map(|((_, entity), mut smd_triangles)| {
-                            // this output path will contain the .mdl extension
-                            let output_path = output_base_path
-                                .join(entity.attributes.get(MAP2MDL_ATTR_OUTPUT).unwrap());
-                            let resource_path = self.map.as_ref().unwrap();
+                type PartitionRes = Vec<eyre::Result<(usize, Option<[f64; 3]>)>>;
 
-                            let mut textures_used_in_smd =
-                                textures_used_in_triangles(&smd_triangles);
+                let ok_clone = ok.clone();
 
-                            let mut maybe_target_origin: Option<[f64; 3]> = None;
+                let (map2mdl_ok, map2mdl_err): (PartitionRes, PartitionRes) = marked_entities
+                    .par_iter()
+                    .zip(ok_clone) // safe to assume this is all in order?
+                    .map(|((_, entity), mut smd_triangles)| {
+                        // this output path will contain the .mdl extension
+                        let output_path = output_base_path
+                            .join(entity.attributes.get(MAP2MDL_ATTR_OUTPUT).unwrap());
+                        let resource_path = self.map.as_ref().unwrap();
 
-                            if let Some(target_origin) =
-                                entity.attributes.get(MAP2MDL_ATTR_TARGET_ORIGIN)
-                            {
-                                // is_empty just to be nice i guess?
-                                if !target_origin.is_empty() {
-                                    if let Some(entity_attributes) =
-                                        map_entities_attributes_clone.iter().find(|attributes| {
-                                            attributes.get("classname").is_some_and(|classname| {
-                                                classname == MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY
-                                            }) && attributes.get("targetname").is_some_and(
-                                                |targetname| targetname == target_origin,
-                                            )
-                                        })
+                        let mut textures_used_in_smd = textures_used_in_triangles(&smd_triangles);
+
+                        let mut maybe_target_origin: Option<[f64; 3]> = None;
+
+                        if let Some(target_origin) =
+                            entity.attributes.get(MAP2MDL_ATTR_TARGET_ORIGIN)
+                        {
+                            // is_empty just to be nice i guess?
+                            if !target_origin.is_empty() {
+                                if let Some(entity_attributes) =
+                                    map_entities_attributes_clone.iter().find(|attributes| {
+                                        attributes.get("classname").is_some_and(|classname| {
+                                            classname == MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY
+                                        }) && attributes
+                                            .get("targetname")
+                                            .is_some_and(|targetname| targetname == target_origin)
+                                    })
+                                {
+                                    if let Ok(triplet) =
+                                        parse_triplet(entity_attributes.get("origin").unwrap())
                                     {
-                                        if let Ok(triplet) =
-                                            parse_triplet(entity_attributes.get("origin").unwrap())
-                                        {
-                                            maybe_target_origin = triplet.into();
-                                        } else {
-                                            return err!(
-                                                "Cannot parse origin for {} with targetname {}",
-                                                MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY,
-                                                target_origin
-                                            );
-                                        }
+                                        maybe_target_origin = triplet.into();
                                     } else {
                                         return err!(
+                                            "Cannot parse origin for {} with targetname {}",
+                                            MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY,
+                                            target_origin
+                                        );
+                                    }
+                                } else {
+                                    return err!(
                                         "Cannot find entity specified in {} for {} with output {} ",
                                         MAP2MDL_ATTR_TARGET_ORIGIN,
                                         MAP2MDL_ENTITY_NAME,
                                         entity.attributes.get(MAP2MDL_ATTR_OUTPUT).unwrap()
                                     );
-                                    }
                                 }
                             }
+                        }
 
-                            let entity_options = entity
-                                .attributes
-                                .get(MAP2MDL_ATTR_OPTIONS)
-                                .and_then(|v| v.parse::<u32>().ok())
-                                .and_then(|v| Map2MdlEntityOptions::from_bits(v))
-                                .unwrap_or(Map2MdlEntityOptions::empty());
+                        let entity_options = entity
+                            .attributes
+                            .get(MAP2MDL_ATTR_OPTIONS)
+                            .and_then(|v| v.parse::<u32>().ok())
+                            .and_then(|v| Map2MdlEntityOptions::from_bits(v))
+                            .unwrap_or(Map2MdlEntityOptions::empty());
 
-                            let celshade_color = entity
-                                .attributes
-                                .get(MAP2MDL_ATTR_CELSHADE_COLOR)
-                                .and_then(|v| parse_triplet(v).ok())
-                                .map(|v| f64_3_to_u8_3(v))
-                                .unwrap_or([0, 0, 0]);
+                        let celshade_color = entity
+                            .attributes
+                            .get(MAP2MDL_ATTR_CELSHADE_COLOR)
+                            .and_then(|v| parse_triplet(v).ok())
+                            .map(|v| f64_3_to_u8_3(v))
+                            .unwrap_or([0, 0, 0]);
 
-                            let celshade_distance = entity
-                                .attributes
-                                .get(MAP2MDL_ATTR_CELSHADE_DISTANCE)
-                                .and_then(|v| v.parse::<f32>().ok())
-                                .unwrap_or(4.);
+                        let celshade_distance = entity
+                            .attributes
+                            .get(MAP2MDL_ATTR_CELSHADE_DISTANCE)
+                            .and_then(|v| v.parse::<f32>().ok())
+                            .unwrap_or(4.);
 
-                            self.maybe_process_celshade(
-                                &entity_options,
-                                entity,
-                                celshade_color,
-                                celshade_distance,
-                                &mut textures_used_in_smd,
-                                &simple_wads,
-                                &mut smd_triangles,
-                                self.map.as_ref().unwrap(),
-                            );
+                        self.maybe_process_celshade(
+                            &entity_options,
+                            entity,
+                            celshade_color,
+                            celshade_distance,
+                            &mut textures_used_in_smd,
+                            &simple_wads,
+                            &mut smd_triangles,
+                            self.map.as_ref().unwrap(),
+                        );
 
-                            let model_count =
-                                textures_used_in_smd.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
+                        let model_count =
+                            textures_used_in_smd.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
 
-                            // TODO: join thread
-                            let res = self.convert_from_triangles(
-                                &smd_triangles,
-                                &textures_used_in_smd,
-                                ConvertFromTrianglesOptions {
-                                    output_path: output_path.as_path(),
-                                    resource_path,
-                                    // always move to origin
-                                    // this makes the centroid more consistent when we move it back with entity
-                                    move_to_origin: true,
-                                    // if no export then the function returns right away
-                                    export_resource: map2mdl_export_resource,
-                                    use_special_texture: true,
-                                    maybe_target_origin,
-                                    entity_options,
-                                },
-                            );
+                        // TODO: join thread
+                        let res = self.convert_from_triangles(
+                            &smd_triangles,
+                            &textures_used_in_smd,
+                            ConvertFromTrianglesOptions {
+                                output_path: output_path.as_path(),
+                                resource_path,
+                                // always move to origin
+                                // this makes the centroid more consistent when we move it back with entity
+                                move_to_origin: true,
+                                // if no export then the function returns right away
+                                export_resource: map2mdl_export_resource,
+                                use_special_texture: true,
+                                maybe_target_origin,
+                                entity_options,
+                            },
+                        );
 
-                            // way to pass more data... for now
-                            match res {
-                                Ok(processes_output) => {
-                                    // some error handling stuffs for studiomdl step
-                                    if let Some(handles) = processes_output {
-                                        let errs: Vec<_> = handles
-                                            .into_iter()
-                                            .map(|handle| {
-                                                let result = handle.join();
-                                                handle_studiomdl_output(result, None)
-                                            })
-                                            .filter_map(|res| res.err())
-                                            .collect();
+                        // way to pass more data... for now
+                        match res {
+                            Ok(processes_output) => {
+                                // some error handling stuffs for studiomdl step
+                                if let Some(handles) = processes_output {
+                                    let errs: Vec<_> = handles
+                                        .into_iter()
+                                        .map(|handle| {
+                                            let result = handle.join();
+                                            handle_studiomdl_output(result, None)
+                                        })
+                                        .filter_map(|res| res.err())
+                                        .collect();
 
-                                        errs.iter().for_each(|err| {
-                                            self.log(err.to_string().as_str());
-                                        });
+                                    errs.iter().for_each(|err| {
+                                        self.log(err.to_string().as_str());
+                                    });
 
-                                        if !errs.is_empty() {
-                                            return err!("cannot compile mdl");
-                                        }
+                                    if !errs.is_empty() {
+                                        return err!("cannot compile mdl");
                                     }
-
-                                    Ok((model_count, maybe_target_origin))
                                 }
-                                Err(err) => err!(
-                                    "Cannot convert from triangles for {} with output {}: {}",
-                                    MAP2MDL_ENTITY_NAME,
-                                    entity.attributes.get(MAP2MDL_ATTR_OUTPUT).unwrap(),
-                                    err
-                                ),
+
+                                Ok((model_count, maybe_target_origin))
                             }
-                        })
-                        .partition(|res| res.is_ok());
+                            Err(err) => err!(
+                                "Cannot convert from triangles for {} with output {}: {}",
+                                MAP2MDL_ENTITY_NAME,
+                                entity.attributes.get(MAP2MDL_ATTR_OUTPUT).unwrap(),
+                                err
+                            ),
+                        }
+                    })
+                    .partition(|res| res.is_ok());
 
                 if !map2mdl_err.is_empty() {
                     return err!(
