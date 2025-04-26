@@ -384,6 +384,9 @@ impl Map2Mdl {
                     )
                 };
 
+                // current model might contain no draw texture, but that doesn't matter
+                // because there are no triangles containing nodraw textures
+                // but the known textures do have no draws in them
                 let current_model_textures = textures_used_vec
                     .chunks(MAX_GOLDSRC_MODEL_TEXTURE_COUNT)
                     .nth(model_index)
@@ -436,6 +439,10 @@ impl Map2Mdl {
                 new_qc.set_cd_texture(resource_path.parent().unwrap().to_str().unwrap());
 
                 current_model_textures.iter().for_each(|texture| {
+                    if NoRenderTexture.contains(texture.as_str()) {
+                        return;
+                    }
+
                     let curr_tex = format!("{}.bmp", texture);
 
                     // for the best results, TexTile does convert to compliant transparent texture
@@ -447,9 +454,7 @@ impl Map2Mdl {
                         );
                     }
 
-                    if entity_options.contains(Map2MdlEntityOptions::FlatShade)
-                        && !NoRenderTexture.contains(texture.as_str())
-                    {
+                    if entity_options.contains(Map2MdlEntityOptions::FlatShade) {
                         new_qc.add_texrendermode(curr_tex.as_str(), qc::RenderMode::FlatShade);
                     }
 
@@ -460,6 +465,9 @@ impl Map2Mdl {
                     {
                         new_qc.add_texrendermode(curr_tex.as_str(), qc::RenderMode::FlatShade);
                     }
+
+                    // all textures need to explicitly enable mipmap
+                    new_qc.add_texrendermode(curr_tex.as_str(), qc::RenderMode::NoMips);
                 });
 
                 for smd_index in 0..smd_count {
