@@ -22,3 +22,8 @@
 /dist/no_vtf
 
 /wad/test/out
+
+/dist/*.mdl
+/dist/*.bmp
+/dist/*.smd
+/dist/*.qc
