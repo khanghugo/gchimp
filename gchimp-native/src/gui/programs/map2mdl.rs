@@ -19,7 +19,17 @@ pub struct Map2MdlGui {
     entity: String,
     use_entity: bool,
     options: Map2MdlOptions,
+    gui_options: GuiOptions,
     sync: Map2MdlSync,
+}
+
+#[derive(Default, Clone)]
+struct GuiOptions {
+    flatshade: bool,
+    reverse_normal: bool,
+    with_cel_shade: bool,
+    celshade_color: [u8; 3],
+    celshade_distance: f32,
 }
 
 impl Map2MdlGui {
@@ -30,6 +40,7 @@ impl Map2MdlGui {
             entity: Default::default(),
             use_entity: false,
             options: Map2MdlOptions::default(),
+            gui_options: GuiOptions::default(),
             sync: Map2MdlSync::default(),
         }
     }
@@ -50,9 +61,7 @@ impl Map2MdlGui {
             export_texture,
             move_to_origin,
             marked_entity,
-            flatshade,
             uppercase,
-            reverse_normal,
             ..
         } = self.options;
         let entity = self.entity.clone();
@@ -61,18 +70,27 @@ impl Map2MdlGui {
 
         let sync = self.sync.clone();
 
+        let gui_options = self.gui_options.clone();
+
         thread::spawn(move || {
             let mut binding = Map2Mdl::default();
+
             binding
                 .auto_pickup_wad(auto_pickup_wad)
                 .move_to_origin(move_to_origin)
                 .export_texture(export_texture)
                 .studiomdl(PathBuf::from(&studiomdl).as_path())
                 .marked_entity(marked_entity)
-                .flatshade(flatshade)
+                .flatshade(gui_options.flatshade)
                 .uppercase(uppercase)
-                .reverse_normal(reverse_normal)
+                .reverse_normal(gui_options.reverse_normal)
                 .sync(sync.clone());
+
+            if gui_options.with_cel_shade {
+                binding
+                    .celshade_color(gui_options.celshade_color)
+                    .celshade_distance(gui_options.celshade_distance);
+            }
 
             if use_entity {
                 binding.entity(&entity);
@@ -167,13 +185,27 @@ This option is to coerce every texture in this process to be upper case.")
             ));
             ui.checkbox(&mut self.options.move_to_origin, "Center the model")
                 .on_hover_text("The center of the model is the origin");
-            ui.checkbox(&mut self.options.flatshade, "Flatshade")
+            ui.checkbox(&mut self.gui_options.flatshade, "Flatshade")
                 .on_hover_text("Model is flatshade");
         });
 
         ui.horizontal(|ui| {
-            ui.checkbox(&mut self.options.reverse_normal, "Reverse normal")
+            ui.checkbox(&mut self.gui_options.reverse_normal, "Reverse normal")
                 .on_hover_text("Reverses every vertex normals");
+
+            ui.checkbox(&mut self.gui_options.with_cel_shade, "CelShade")
+                .on_hover_text("Enable cell shading");
+
+            ui.add_enabled_ui(self.gui_options.with_cel_shade, |ui| {
+                // let color_picker = egui::color_picker::color_picker_color32(ui, srgba, alpha)
+                ui.label("Color");
+                ui.color_edit_button_srgb(&mut self.gui_options.celshade_color);
+
+                ui.label("Distance");
+                let drag = egui::DragValue::new(&mut self.gui_options.celshade_distance)
+                    .range(0.0..=128.0);
+                ui.add(drag);
+            });
         });
 
         ui.separator();

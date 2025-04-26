@@ -15,12 +15,15 @@ pub const MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY: &str = "info_target";
 pub const MAP2MDL_ATTR_OPTIONS: &str = "options";
 
 bitflags! {
+    #[derive(Debug, Clone, Copy)]
     pub struct Map2MdlEntityOptions: u32 {
         const FlatShade = 1 << 0;
         /// Containing the original brush and celshade
         const WithCelShade = 1 << 1;
         /// Turning the brush into just celshade
         const AsCelShade = 1 << 2;
+        /// Reverses all normals in the model. This is mainly for reflection scenes.
+        const ReverseNormals = 1 << 3;
     }
 }
 

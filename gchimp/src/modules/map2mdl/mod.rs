@@ -90,16 +90,12 @@ pub struct Map2MdlOptions {
     ///
     /// Not only this will creates a new model but potentially a new .map file
     pub marked_entity: bool,
-    /// Model is flatshade
-    pub flatshade: bool,
+    pub entity_options: Map2MdlEntityOptions,
     /// For .map exported from Hammer or jack, they all are upper case
     ///
     /// This option is to forcefully make sure every texture in the WAD and .map are both the same
     pub uppercase: bool,
-    /// Reverses the normal of each vertex
-    ///
-    /// A cool usecase for this would be reflection of the scene.
-    pub reverse_normal: bool,
+    pub cel_shade: Option<CelShadeOptions>,
 }
 
 impl Default for Map2MdlOptions {
@@ -112,9 +108,24 @@ impl Default for Map2MdlOptions {
             studiomdl: None,
             #[cfg(target_os = "linux")]
             wineprefix: None,
-            flatshade: true,
+            entity_options: Map2MdlEntityOptions::empty(),
             uppercase: false,
-            reverse_normal: false,
+            cel_shade: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CelShadeOptions {
+    pub color: [u8; 3],
+    pub distance: f32,
+}
+
+impl Default for CelShadeOptions {
+    fn default() -> Self {
+        Self {
+            color: [0u8; 3],
+            distance: 4.,
         }
     }
 }
@@ -207,7 +218,9 @@ impl Map2Mdl {
     }
 
     pub fn flatshade(&mut self, v: bool) -> &mut Self {
-        self.options.flatshade = v;
+        self.options
+            .entity_options
+            .set(Map2MdlEntityOptions::FlatShade, v);
         self
     }
 
@@ -217,7 +230,19 @@ impl Map2Mdl {
     }
 
     pub fn reverse_normal(&mut self, v: bool) -> &mut Self {
-        self.options.reverse_normal = v;
+        self.options
+            .entity_options
+            .set(Map2MdlEntityOptions::ReverseNormals, v);
+        self
+    }
+
+    pub fn celshade_color(&mut self, v: [u8; 3]) -> &mut Self {
+        self.options.cel_shade.get_or_insert_default().color = v;
+        self
+    }
+
+    pub fn celshade_distance(&mut self, v: f32) -> &mut Self {
+        self.options.cel_shade.get_or_insert_default().distance = v;
         self
     }
 
@@ -282,7 +307,11 @@ impl Map2Mdl {
             .for_each(|tri| {
                 let mut new_tri = tri.clone();
 
-                if self.options.reverse_normal {
+                if self
+                    .options
+                    .entity_options
+                    .contains(Map2MdlEntityOptions::ReverseNormals)
+                {
                     new_tri.vertices.iter_mut().for_each(|vertex| {
                         vertex.norm *= -1.;
                     });
@@ -420,6 +449,14 @@ impl Map2Mdl {
 
                     if entity_options.contains(Map2MdlEntityOptions::FlatShade)
                         && !NoRenderTexture.contains(texture.as_str())
+                    {
+                        new_qc.add_texrendermode(curr_tex.as_str(), qc::RenderMode::FlatShade);
+                    }
+
+                    // forcing flatshade based on texture name
+                    // stupid?
+                    if texture.as_bytes().iter().filter(|x| **x == b'_').count() == 3
+                        && texture.ends_with("_gfs")
                     {
                         new_qc.add_texrendermode(curr_tex.as_str(), qc::RenderMode::FlatShade);
                     }
@@ -932,87 +969,16 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                                 .and_then(|v| v.parse::<f32>().ok())
                                 .unwrap_or(4.);
 
-                            if entity_options.intersects(
-                                Map2MdlEntityOptions::WithCelShade
-                                    | Map2MdlEntityOptions::AsCelShade,
-                            ) {
-                                let Some(mut brushes) = entity.brushes.clone() else {
-                                    panic!("cell shading a brush without brushes");
-                                };
-
-                                let celshade_texture_name = format!(
-                                    "{}_{}_{}",
-                                    celshade_color[0], celshade_color[1], celshade_color[2]
-                                );
-                                textures_used_in_smd.insert(celshade_texture_name.clone());
-
-                                // now write our own texture
-                                let img = [0u8; 16 * 16];
-                                // need to pad a few colors, otherwise, the mdl compiler will whine
-                                let palette = [celshade_color; 16];
-                                // hard code the dimensions
-                                let dimensions = (16, 16);
-
-                                write_8bpp_to_file(
-                                    &img,
-                                    &palette,
-                                    dimensions,
-                                    self.map
-                                        .as_ref()
-                                        .unwrap()
-                                        .with_file_name(celshade_texture_name.clone())
-                                        .with_extension("bmp"),
-                                )
-                                .unwrap();
-
-                                let triangles: Vec<Triangle> = brushes
-                                    .iter_mut()
-                                    .flat_map(|brush| {
-                                        let solid = brush_to_solid3d(brush)
-                                            .expand(celshade_distance as f64);
-
-                                        let mut triangles = solid3d_to_triangulated_smd(
-                                            brush,
-                                            &solid,
-                                            // this simple_wads contains all textures used in this map
-                                            // so, we will convert this into smd triangles
-                                            // then we will change the triangles here into our celshade color
-                                            // and then add celshade texture into "textures_used_in_smd"
-                                            &simple_wads,
-                                            false,
-                                        )
-                                        .unwrap();
-
-                                        // now flip the triangles
-                                        triangles.iter_mut().for_each(|triangle| {
-                                            triangle.vertices.swap(0, 1);
-                                        });
-
-                                        // remove nodraws
-                                        triangles.retain(|triangle| {
-                                            !NO_RENDER_TEXTURE.contains(&triangle.material.as_str())
-                                        });
-
-                                        // name it all to "black"
-                                        triangles.iter_mut().for_each(|triangle| {
-                                            // hardcode black texture
-                                            triangle.material = celshade_texture_name.clone();
-                                        });
-
-                                        triangles
-                                    })
-                                    .collect();
-
-                                if entity_options.contains(Map2MdlEntityOptions::AsCelShade) {
-                                    smd_triangles = triangles;
-                                } else if entity_options
-                                    .contains(Map2MdlEntityOptions::WithCelShade)
-                                {
-                                    smd_triangles.extend(triangles);
-                                } else {
-                                    unreachable!()
-                                }
-                            }
+                            self.maybe_process_celshade(
+                                &entity_options,
+                                entity,
+                                celshade_color,
+                                celshade_distance,
+                                &mut textures_used_in_smd,
+                                &simple_wads,
+                                &mut smd_triangles,
+                                self.map.as_ref().unwrap(),
+                            );
 
                             let model_count =
                                 textures_used_in_smd.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
@@ -1258,13 +1224,17 @@ However, it will still turn {} into model displaying entities such as cycler_spr
 
                 let output_path = self.map.as_ref().unwrap();
 
-                let entity_options = {
-                    let mut options = Map2MdlEntityOptions::empty();
-
-                    options.set(Map2MdlEntityOptions::FlatShade, self.options.flatshade);
-
-                    options
-                };
+                // doesnt work for whole map file
+                // TODO: seems dumb but maybe it should work
+                // self.maybe_process_celshade(
+                //     &self.options.entity_options,
+                //     entity,
+                //     celshade_color,
+                //     celshade_distance,
+                //     &mut textures_used_in_smd,
+                //     &simple_wads,
+                //     &mut smd_triangles,
+                // );
 
                 let handles = self.convert_from_triangles(
                     &smd_triangles,
@@ -1278,7 +1248,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                         // TODO: do the steps in a way that we dont' need this, might be unnecessary but something to keep in mind
                         use_special_texture: false,
                         maybe_target_origin: None,
-                        entity_options,
+                        entity_options: self.options.entity_options,
                     },
                 )?;
 
@@ -1308,7 +1278,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
             self.maybe_export_texture(&textures_used_in_map, &wads, &simple_wads)?;
 
             self.log("Running convex hull clipping algorithm");
-            let smd_triangles = entity_to_triangulated_smd(entity, &simple_wads, false)?;
+            let mut smd_triangles = entity_to_triangulated_smd(entity, &simple_wads, false)?;
             self.log(format!("Created {} triangles", smd_triangles.len()).as_str());
 
             let output_path = self
@@ -1320,17 +1290,31 @@ However, it will still turn {} into model displaying entities such as cycler_spr
 
             self.log("Creating model");
 
-            let entity_options = {
-                let mut options = Map2MdlEntityOptions::empty();
+            // explicitly enable celshade because this code is shit
+            if self.options.cel_shade.is_some() {
+                self.options
+                    .entity_options
+                    .set(Map2MdlEntityOptions::WithCelShade, true);
+            }
 
-                options.set(Map2MdlEntityOptions::FlatShade, self.options.flatshade);
+            let celshade_options = self.options.cel_shade.unwrap_or_default();
 
-                options
-            };
+            let mut textures_used_in_smd = textures_used_in_triangles(&smd_triangles);
+
+            self.maybe_process_celshade(
+                &self.options.entity_options,
+                entity,
+                celshade_options.color,
+                celshade_options.distance,
+                &mut textures_used_in_smd,
+                &simple_wads,
+                &mut smd_triangles,
+                &output_path,
+            );
 
             let handles = self.convert_from_triangles(
                 &smd_triangles,
-                &textures_used_in_map,
+                &textures_used_in_smd,
                 ConvertFromTrianglesOptions {
                     output_path: output_path.as_path(),
                     resource_path: output_path.as_path(),
@@ -1338,7 +1322,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     export_resource: true,
                     use_special_texture: true,
                     maybe_target_origin: None,
-                    entity_options,
+                    entity_options: self.options.entity_options,
                 },
             )?;
 
@@ -1366,6 +1350,97 @@ However, it will still turn {} into model displaying entities such as cycler_spr
         };
 
         Ok(())
+    }
+
+    // refactor out of here so other processes can call it
+    fn maybe_process_celshade(
+        &self,
+        entity_options: &Map2MdlEntityOptions,
+        entity: &Entity,
+        celshade_color: [u8; 3],
+        celshade_distance: f32,
+        textures_used_in_smd: &mut HashSet<String>,
+        simple_wads: &SimpleWad,
+        smd_triangles: &mut Vec<Triangle>,
+        output_path: &Path,
+    ) {
+        if entity_options
+            .intersects(Map2MdlEntityOptions::WithCelShade | Map2MdlEntityOptions::AsCelShade)
+        {
+            let Some(mut brushes) = entity.brushes.clone() else {
+                panic!("cell shading a brush without brushes");
+            };
+
+            let celshade_texture_name = format!(
+                // adding "_gfs" to force flatshade when we are in another step
+                // is this stupid?
+                "{}_{}_{}_gfs",
+                celshade_color[0], celshade_color[1], celshade_color[2]
+            );
+            textures_used_in_smd.insert(celshade_texture_name.clone());
+
+            // now write our own texture
+            let img = [0u8; 16 * 16];
+            // need to pad a few colors, otherwise, the mdl compiler will whine
+            let palette = [celshade_color; 16];
+            // hard code the dimensions
+            let dimensions = (16, 16);
+
+            write_8bpp_to_file(
+                &img,
+                &palette,
+                dimensions,
+                output_path
+                    .with_file_name(celshade_texture_name.clone())
+                    .with_extension("bmp"),
+            )
+            .unwrap();
+
+            let triangles: Vec<Triangle> = brushes
+                .iter_mut()
+                .flat_map(|brush| {
+                    let solid = brush_to_solid3d(brush).expand(celshade_distance as f64);
+
+                    let mut triangles = solid3d_to_triangulated_smd(
+                        brush,
+                        &solid,
+                        // this simple_wads contains all textures used in this map
+                        // so, we will convert this into smd triangles
+                        // then we will change the triangles here into our celshade color
+                        // and then add celshade texture into "textures_used_in_smd"
+                        &simple_wads,
+                        false,
+                    )
+                    .unwrap();
+
+                    // now flip the triangles
+                    triangles.iter_mut().for_each(|triangle| {
+                        triangle.vertices.swap(0, 1);
+                    });
+
+                    // remove nodraws
+                    triangles.retain(|triangle| {
+                        !NO_RENDER_TEXTURE.contains(&triangle.material.as_str())
+                    });
+
+                    // name it all to "black"
+                    triangles.iter_mut().for_each(|triangle| {
+                        // hardcode black texture
+                        triangle.material = celshade_texture_name.clone();
+                    });
+
+                    triangles
+                })
+                .collect();
+
+            if entity_options.contains(Map2MdlEntityOptions::AsCelShade) {
+                *smd_triangles = triangles;
+            } else if entity_options.contains(Map2MdlEntityOptions::WithCelShade) {
+                smd_triangles.extend(triangles);
+            } else {
+                unreachable!()
+            }
+        }
     }
 }
 
