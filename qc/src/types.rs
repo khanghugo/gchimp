@@ -36,6 +36,8 @@ pub enum RenderMode {
     FlatShade,
     FullBright,
     Chrome,
+    // Is actually "Yes I want mipmaps PLEASE"
+    NoMips,
 }
 
 impl RenderMode {
@@ -46,6 +48,7 @@ impl RenderMode {
             "flatshade" => Self::FlatShade,
             "fullbright" => Self::FullBright,
             "chrome" => Self::Chrome,
+            "nomips" => Self::NoMips,
             _ => unreachable!(
                 "\
 Invalid string for conversion to RenderMode `{}`
@@ -67,6 +70,7 @@ impl fmt::Display for RenderMode {
                 Self::FlatShade => "flatshade",
                 Self::FullBright => "fullbright",
                 Self::Chrome => "chrome",
+                Self::NoMips => "nomips",
             }
         )
     }
