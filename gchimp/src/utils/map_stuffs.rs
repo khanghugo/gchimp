@@ -85,7 +85,14 @@ fn brush_to_triangulated_smd(
     wads: &SimpleWad,
     three_planes: bool,
 ) -> eyre::Result<Vec<Triangle>> {
-    let solid: Solid3D = brush
+    let solid = brush_to_solid3d(&brush);
+
+    solid3d_to_triangulated_smd(brush, &solid, wads, three_planes)
+}
+
+// technical debt
+pub fn brush_to_solid3d(brush: &Brush) -> Solid3D {
+    brush
         .planes
         .iter()
         .map(|brush_plane| {
@@ -94,10 +101,22 @@ fn brush_to_triangulated_smd(
                 brush_plane.p2.into(),
                 brush_plane.p3.into(),
             )
+            .simplify()
         })
         .collect::<Vec<Plane3D>>()
-        .into();
+        .into()
+}
 
+// technical debt
+pub fn solid3d_to_triangulated_smd(
+    // brush is still needed here so we can get correct triangle data
+    // TODO: refactor this so that this function doesnt do too much
+    // right now, it does not only turn brush into triangles, but also makes them SMD triangles
+    brush: &Brush,
+    solid: &Solid3D,
+    wads: &SimpleWad,
+    three_planes: bool,
+) -> eyre::Result<Vec<Triangle>> {
     // TODO maybe phase out three_planes
     let polytope = if three_planes {
         // https://3707026871-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2F-LtVT8pJjInrrHVCovzy%2Fuploads%2FEukkFYJLwfafFXUMpsI2%2FMAPFiles_2001_StefanHajnoczi.pdf?alt=media&token=51471685-bf69-42ae-a015-a474c0b95165

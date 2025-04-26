@@ -1,4 +1,5 @@
 use std::{
+    array::from_fn,
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
@@ -246,4 +247,10 @@ pub fn build_file_lookup(dir: &Path) -> FileLookup {
     }
 
     return res;
+}
+
+pub fn f64_3_to_u8_3(i: [f64; 3]) -> [u8; 3] {
+    let cast = |i: f64| (i as i32).clamp(0, 255) as u8;
+
+    from_fn(|x| cast(i[x]))
 }

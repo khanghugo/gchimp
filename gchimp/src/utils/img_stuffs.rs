@@ -259,7 +259,7 @@ pub fn write_8bpp_to_file(
 }
 
 // need to encode it into a format so it has all the info to easily display every where
-pub fn encode_8bpp_to_bitmap(
+pub fn encode_8bpp_to_bitmap_bytes(
     img: &[u8],
     palette: &[[u8; 3]],
     dimension: (u32, u32),

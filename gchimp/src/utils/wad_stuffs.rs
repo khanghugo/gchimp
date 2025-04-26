@@ -8,7 +8,7 @@ use wad::types::{FileEntry, Wad};
 
 use super::img_stuffs::write_8bpp_to_file;
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SimpleWadEntry {
     // instead of storing the name, for now just store the index instead
     // this implies we have to keep track of the orginal Vec<Wad> to index correctly
@@ -26,7 +26,7 @@ impl SimpleWadEntry {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Debug, Clone, Default)]
 /// Just WAD(s) data indexed by texture name
 ///
 /// HashMap of (texture name, { wad file index, dimensions })

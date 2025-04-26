@@ -1700,6 +1700,7 @@ checksum = "1d758ba1b47b00caf47f24925c0074ecb20d6dfcffe7f6d53395c0465674841a"
 name = "gchimp"
 version = "0.3.4"
 dependencies = [
+ "bitflags 2.9.0",
  "bsp",
  "chrono",
  "clap",

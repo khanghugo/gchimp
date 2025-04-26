@@ -41,6 +41,7 @@ cuet = "0.1.0"
 chrono = "0.4.38"
 wav_io = "0.1.15"
 zip = { version = "2.2.2", features = ["deflate"], default-features = false }
+bitflags = "2.9.0"
 
 # enable js support for this random shit so that wasm32 can compile
 getrandom = { version = "0.2.15", features = ["js"] }

@@ -23,5 +23,9 @@
 	options(Flags) =
 	[
 		1: "Flat shade" : 1
+		2: "With CelShade" : 0
+		4: "As CelShade" : 0
 	]
+	celshade_color(color255) : "CelShade Color" : "0 0 0"
+	celshade_distance(string) : "CelShade Distance" : "4.0"
 ]

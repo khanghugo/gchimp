@@ -552,6 +552,25 @@ impl Plane3D {
             w: -self.w,
         }
     }
+
+    /// Changing the distance based of normalized plane normal
+    pub fn expand(&self, distance: f64) -> Self {
+        let normal_length = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
+
+        // normalized
+        let nx = self.x / normal_length;
+        let ny = self.y / normal_length;
+        let nz = self.z / normal_length;
+
+        let new_w = self.w / normal_length - distance;
+
+        Self {
+            x: nx,
+            y: ny,
+            z: nz,
+            w: new_w,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -1332,7 +1351,7 @@ impl ConvexPolytope {
 }
 
 #[derive(Debug)]
-pub struct Solid3D(Vec<Plane3D>);
+pub struct Solid3D(pub Vec<Plane3D>);
 
 impl Solid3D {
     pub fn contains_point(&self, point: Point3D) -> bool {
@@ -1347,6 +1366,11 @@ impl Solid3D {
 
     pub fn faces(&self) -> &Vec<Plane3D> {
         &self.0
+    }
+
+    /// Uniformly expand the solid
+    pub fn expand(&self, distance: f64) -> Self {
+        Self(self.0.iter().map(|plane| plane.expand(distance)).collect())
     }
 }
 
