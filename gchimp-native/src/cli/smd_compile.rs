@@ -105,7 +105,9 @@ pub fn smd_compile(smd_paths: &[PathBuf]) -> eyre::Result<()> {
 
     // do things to qc files
     let smd_path0 = smds_with_new_name[0].1.as_path();
-    let root_dir = smd_path0.parent().unwrap().to_str().unwrap();
+    let canon_path = smd_path0.canonicalize().unwrap();
+
+    let root_dir = canon_path.parent().unwrap().to_str().unwrap();
 
     qc.set_model_name(smd_path0.with_extension("mdl").to_str().unwrap());
     qc.set_cd(root_dir);
