@@ -666,7 +666,28 @@ impl Map2Mdl {
             self.log(format!("Auto pickup WAD found: {}", wad).as_str());
 
             wad.split_terminator(";")
-                .map(|path_as_str| (path_as_str.to_owned(), Wad::from_file(path_as_str)))
+                .map(|path_as_str| {
+                    let mut path_as_string = path_as_str.to_owned();
+                    let path = Path::new(path_as_str);
+
+                    if !path.exists() {
+                        #[cfg(target_os = "windows")]
+                        {
+                            (b'A'..b'Z').for_each(|l: u8| {
+                                let chr = l as char;
+
+                                let new_path_string = format!("{chr}:{}", path_as_str);
+                                let new_path = Path::new(&new_path_string);
+
+                                if new_path.exists() {
+                                    path_as_string = new_path_string;
+                                }
+                            });
+                        }
+                    }
+
+                    (path_as_string.clone(), Wad::from_file(path_as_string))
+                })
                 .collect::<Vec<(String, eyre::Result<Wad>)>>()
         } else {
             unreachable!()
@@ -717,6 +738,9 @@ impl Map2Mdl {
         } else {
             unreachable!()
         };
+
+        // just make everything uppercase because the world is full of pain (jack)
+        self.options.uppercase = true;
 
         let (simple_wads, textures_used_in_map, mut map_file) = if self.options.uppercase {
             self.log("Uppercase is used. Converting \"\"\"everything\"\"\" into uppercase.");
