@@ -101,7 +101,6 @@ pub fn brush_to_solid3d(brush: &Brush) -> Solid3D {
                 brush_plane.p2.into(),
                 brush_plane.p3.into(),
             )
-            .simplify()
         })
         .collect::<Vec<Plane3D>>()
         .into()
