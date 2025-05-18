@@ -482,7 +482,7 @@ impl S2G {
             // eg: old smd name is `what.smd` -> what_goldsrc0.smd
             // if it is sequence then it will only add the goldsrc suffix
             for SmdInfo {
-                name: _,
+                name: smd_assigned_qc_name,
                 smd,
                 is_body,
                 path,
@@ -534,7 +534,7 @@ impl S2G {
                             ;
                         // TODO do something more than just idle
                         goldsrc_qc.add_sequence(
-                            "idle",
+                            format!("{}{}", smd_assigned_qc_name, GOLDSRC_SUFFIX).as_str(),
                             smd_path_for_qc.display().to_string().as_str(),
                             vec![],
                         );
@@ -544,10 +544,10 @@ impl S2G {
 
                     // info_player_start.001_goldsrc0 and .with_extension() will remove the .001_goldsrc0 portion
                     // so what we want to do is to add .smd without using with_extension
-                    let smd_path_for_writing = qc_path.parent().unwrap().join(format!(
-                        "{}.smd",
-                        smd_path_for_qc.file_name().unwrap().to_str().unwrap()
-                    ));
+                    let smd_path_for_writing = qc_path
+                        .parent()
+                        .unwrap()
+                        .join(format!("{}.smd", smd_path_for_qc.display().to_string()));
 
                     match smd.write(smd_path_for_writing.display().to_string().as_str()) {
                         Ok(_) => {}
