@@ -107,7 +107,15 @@ pub fn smd_compile(smd_paths: &[PathBuf]) -> eyre::Result<()> {
     let smd_path0 = smds_with_new_name[0].1.as_path();
     let canon_path = smd_path0.canonicalize().unwrap();
 
+    // this canonical path is used for displaying, not for manipulating
+    // on windows, .canonicalize() will add "\\?\"
+    // so, we will strip it
     let root_dir = canon_path.parent().unwrap().to_str().unwrap();
+
+    // strip it for root_dir because we have a string
+    // only target windows just to make sure
+    #[cfg(target_os = "windows")]
+    let root_dir = root_dir.strip_prefix(r"\\?\").unwrap_or(root_dir);
 
     qc.set_model_name(smd_path0.with_extension("mdl").to_str().unwrap());
     qc.set_cd(root_dir);
