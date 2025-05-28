@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use dem::open_demo;
 use dem::types::Demo;
+use glam::Vec3Swizzles;
 
 use crate::utils::dem_stuffs::get_ghost::get_ghost_demo;
 
@@ -146,7 +147,12 @@ pub fn _dem2cam_string(
         let mut cum_time: f32 = 0.;
 
         while let Some(frame) = ghost.get_frame(cum_time as f64, None) {
-            exporter.append_entry(cum_time, frame.origin, frame.viewangles, frame.fov.unwrap());
+            exporter.append_entry(
+                cum_time,
+                frame.origin,
+                frame.viewangles.zxy(),
+                frame.fov.unwrap(),
+            );
             cum_time += *frametime;
         }
     } else {
@@ -187,14 +193,12 @@ mod test {
 
     #[test]
     fn run() {
-        let path = PathBuf::from(
-            "/home/khang/bxt/game_isolated/cstrike/cc1036/azl_lcyo_Hawaii_0026.14.dem",
-        );
+        let path = PathBuf::from("/tmp/aaaaaa/kz_hb_Hopez45MIN.dem");
         // let demo = dem::open_demo(path.as_path()).unwrap();
         dem2cam(
             path,
             &Dem2CamOptions {
-                frametime: Some(0.1),
+                frametime: Some(1.0),
                 // frametime: None,
                 rotation: None,
             },
