@@ -809,12 +809,12 @@ pub fn resmake_single_bsp(
     };
 
     let FindResource {
-        bsp_name: _bsp_name,
+        bsp_name,
         bsp_path: _bsp_path,
         models,
         sound,
         gfx,
-        has_detailed_textures: _x,
+        has_detail_textures,
         sprites,
         wads,
         external_textures,
@@ -956,6 +956,18 @@ pub fn resmake_single_bsp(
         }
     }
 
+    // adding _detail.txt file apparently if applicable
+    {
+        if has_detail_textures {
+            res_file += "\n";
+            res_file += "// detail textures file\n";
+
+            res_file += format!("maps/{}_detail.txt\n", bsp_name).as_str();
+
+            entry_count += 1;
+        }
+    }
+
     // add header when everything is done
     res_file.insert_str(0, resmake_res_header(entry_count).as_str());
 
@@ -975,7 +987,7 @@ struct FindResource {
     models: ResourceList,
     sound: ResourceList,
     gfx: ResourceList,
-    has_detailed_textures: bool,
+    has_detail_textures: bool,
     sprites: ResourceList,
     // wad contains absolute path
     wads: ResourceList,
@@ -990,7 +1002,7 @@ impl FindResource {
             models,
             sound,
             gfx,
-            has_detailed_textures,
+            has_detail_textures,
             sprites,
             wads,
             external_textures,
@@ -1008,7 +1020,7 @@ impl FindResource {
             models,
             sound,
             gfx,
-            has_detailed_textures,
+            has_detail_textures,
             sprites,
             wads,
             external_textures,
@@ -1022,7 +1034,7 @@ impl FindResource {
             models,
             sound,
             gfx,
-            has_detailed_textures,
+            has_detail_textures: has_detailed_textures,
             sprites,
             wads,
             external_textures,
@@ -1040,7 +1052,7 @@ impl FindResource {
             models,
             sound,
             gfx,
-            has_detailed_textures,
+            has_detail_textures: has_detailed_textures,
             sprites,
             wads,
             external_textures,
@@ -1087,7 +1099,7 @@ fn find_resource(
         models: to_vec(models),
         sound: to_vec(sound),
         gfx: to_vec(gfx),
-        has_detailed_textures,
+        has_detail_textures: has_detailed_textures,
         sprites: to_vec(sprites),
         wads,
         external_textures,
@@ -1114,7 +1126,7 @@ fn resmake_zip_res(
         models,
         sound,
         gfx,
-        has_detailed_textures: _x,
+        has_detail_textures: _x,
         sprites,
         wads,
         external_textures: _,
