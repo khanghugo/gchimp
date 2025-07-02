@@ -667,7 +667,9 @@ impl Map2Mdl {
 
             wad.split_terminator(";")
                 .map(|path_as_str| {
+                    #[allow(unused_mut)]
                     let mut path_as_string = path_as_str.to_owned();
+
                     let path = Path::new(path_as_str);
 
                     if !path.exists() {
@@ -774,7 +776,20 @@ impl Map2Mdl {
             .collect::<Vec<String>>();
 
         if !textures_missing.is_empty() {
-            return err!("Missing textures: {:?}", textures_missing);
+            let mut message = format!("Missing textures: {:?}", textures_missing);
+
+            let all_upper_case = textures_missing
+                .iter()
+                .all(|s| s.to_ascii_uppercase() == *s);
+
+            if all_upper_case {
+                message = format!("\
+All missing textures have uppercase letters. If you use jack, make sure to have \"Uppercase texture\" checkbox ticked.
+
+{}", message);
+            }
+
+            return err!(message);
         }
 
         // this is the main part
