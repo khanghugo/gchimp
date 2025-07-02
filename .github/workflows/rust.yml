@@ -17,7 +17,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-2019]
+        os: [ubuntu-latest, windows-2022]
         rust: [stable, beta]
         configuration: [release]
 
@@ -28,7 +28,7 @@ jobs:
             filename-compiled: gchimp-native
             label: Ubuntu
 
-          - os: windows-2019
+          - os: windows-2022
             target: x86_64-pc-windows-msvc
             filename: gchimp.exe
             filename-compiled: gchimp-native.exe
