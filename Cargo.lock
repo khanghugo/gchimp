@@ -946,7 +946,7 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "nom",
 ]
@@ -1698,7 +1698,7 @@ checksum = "1d758ba1b47b00caf47f24925c0074ecb20d6dfcffe7f6d53395c0465674841a"
 
 [[package]]
 name = "gchimp"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "bitflags 2.9.0",
  "bsp",
@@ -1733,7 +1733,7 @@ dependencies = [
 
 [[package]]
 name = "gchimp-native"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "arboard",
  "bsp",
@@ -1758,7 +1758,7 @@ dependencies = [
 
 [[package]]
 name = "gchimp-web"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "bsp",
  "console_error_panic_hook",
@@ -2570,7 +2570,7 @@ dependencies = [
 
 [[package]]
 name = "mdl"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "bitflags 2.9.0",
  "byte_writer",
