@@ -375,8 +375,21 @@ pub fn eight_bpp_transparent_img(
     let pad_color = get_a_color_that_does_not_exist(palette, 0);
     new_palette.resize(256, pad_color);
 
+    const OTHER_OBVIOUS_TRANSPARENT_COLORS: &[[u8; 3]] = &[
+        [0, 255, 0],   // green
+        [0, 0, 255],   // blue
+        [255, 0, 255], // magenta
+    ];
+
+    // if we can't use these obvious transparent colors, then just fall back to adaptive color stuff
+    let maybe_have_obvious_transparent_colors = OTHER_OBVIOUS_TRANSPARENT_COLORS
+        .iter()
+        .find(|current_trans| new_palette.iter().all(|x| x != *current_trans))
+        .cloned();
+
     // change the final color of the palette to a color that is not in the palette
-    let transparent_color = get_a_color_that_does_not_exist(palette, 1);
+    let transparent_color = maybe_have_obvious_transparent_colors
+        .unwrap_or(get_a_color_that_does_not_exist(palette, 1));
     new_palette[255] = transparent_color;
 
     // swap the most used color (index) with 255
