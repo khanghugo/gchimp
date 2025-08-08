@@ -36,7 +36,7 @@ pub enum RenderMode {
     FlatShade,
     FullBright,
     Chrome,
-    // Is actually "Yes I want mipmaps PLEASE"
+    /// Is actually "Yes I want mipmaps PLEASE"
     NoMips,
 }
 
