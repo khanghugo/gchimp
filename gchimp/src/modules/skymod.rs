@@ -426,29 +426,33 @@ impl SkyModBuilder {
             qc.set_cd(root_path.to_str().unwrap());
             qc.set_cd_texture(root_path.to_str().unwrap());
 
-            if self.options.flatshade {
-                for texture_index in 0..6 {
-                    for _y in 0..texture_per_side {
-                        for _x in 0..texture_per_side {
-                            let curr_texture_overall_count = texture_index
-                                * self.options.texture_per_face
-                                + _y * texture_per_side
-                                + _x;
-                            let new_qc_index = curr_texture_overall_count as usize
-                                / MAX_GOLDSRC_MODEL_TEXTURE_COUNT;
+            // add some texture flags
+            for texture_index in 0..6 {
+                for _y in 0..texture_per_side {
+                    for _x in 0..texture_per_side {
+                        let curr_texture_overall_count = texture_index
+                            * self.options.texture_per_face
+                            + _y * texture_per_side
+                            + _x;
+                        let new_qc_index =
+                            curr_texture_overall_count as usize / MAX_GOLDSRC_MODEL_TEXTURE_COUNT;
 
-                            if new_qc_index != model_index as usize {
-                                continue;
-                            }
+                        if new_qc_index != model_index as usize {
+                            continue;
+                        }
 
-                            let texture_file_name = format!(
-                                "{}{}{}{}.bmp",
-                                self.options.output_name,
-                                map_index_to_suffix(texture_index),
-                                _x,
-                                _y
-                            );
+                        let texture_file_name = format!(
+                            "{}{}{}{}.bmp",
+                            self.options.output_name,
+                            map_index_to_suffix(texture_index),
+                            _x,
+                            _y
+                        );
 
+                        // always mipmap
+                        qc.add_texrendermode(&texture_file_name, qc::RenderMode::NoMips);
+
+                        if self.options.flatshade {
                             qc.add_texrendermode(&texture_file_name, qc::RenderMode::FlatShade);
                         }
                     }
