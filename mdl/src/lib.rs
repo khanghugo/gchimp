@@ -1,3 +1,8 @@
+//! Based on
+//!
+//! https://github.com/malortie/assimp/wiki/MDL:-Half-Life-1-file-format
+//!
+pub mod error;
 mod nom_helpers;
 mod parser;
 mod types;
@@ -11,9 +16,9 @@ mod test {
     use std::mem;
 
     use crate::{
-        types::{Header, SequenceHeader, TextureHeader},
-        BodypartHeader, Bone, BoneController, Hitbox, MeshHeader, ModelHeader, SequenceGroup,
+        BodypartHeader, Bone, BoneController, Hitbox, Mdl, MeshHeader, ModelHeader, SequenceGroup,
         TrivertHeader,
+        types::{Header, SequenceHeader, TextureHeader},
     };
 
     #[test]
@@ -29,5 +34,26 @@ mod test {
         assert_eq!(mem::size_of::<BoneController>(), 24);
         assert_eq!(mem::size_of::<Hitbox>(), 32);
         assert_eq!(mem::size_of::<SequenceGroup>(), 104);
+    }
+
+    #[test]
+    /// Model with external texture
+    fn parse_orange() {
+        let bytes = include_bytes!("./tests/orange.mdl");
+        let mdl = Mdl::open_from_bytes(bytes).unwrap();
+
+        assert_eq!(mdl.textures.len(), 0);
+    }
+
+    #[test]
+    fn parse_chick() {
+        let bytes = include_bytes!("./tests/chick.mdl");
+        let mdl = Mdl::open_from_bytes(bytes).unwrap();
+    }
+
+    #[test]
+    fn parse_usp() {
+        let bytes = include_bytes!("./tests/v_usp.mdl");
+        let mdl = Mdl::open_from_bytes(bytes).unwrap();
     }
 }

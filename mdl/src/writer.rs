@@ -75,7 +75,11 @@ impl Mdl {
 
         writer.append_i32(self.header.sound_table);
         writer.append_i32(self.header.sound_index);
+        writer.append_i32(self.header.sound_groups);
         writer.append_i32(self.header.sound_group_index);
+
+        // writer.append_i32(self.);
+        writer.append_i32(self.header.transition_index);
 
         // writer.append_i32(self.header.tran);
 

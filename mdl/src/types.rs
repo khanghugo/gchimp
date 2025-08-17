@@ -5,7 +5,7 @@ pub const VEC3_T_SIZE: usize = 3 * 4;
 
 pub struct Mdl {
     pub header: Header,
-    pub sequences: Vec<SequenceHeader>,
+    pub sequences: Vec<Sequence>,
     pub textures: Vec<Texture>,
     pub bodyparts: Vec<Bodypart>,
     pub bones: Vec<Bone>,
@@ -55,10 +55,18 @@ pub struct Header {
     pub transition_index: i32,
 }
 
+bitflags! {
+    #[derive(Debug)]
+    pub struct SequenceFlag: i32 {
+        const LOOPING = 1 << 0;
+    }
+}
+
+#[derive(Debug)]
 pub struct SequenceHeader {
     pub label: [u8; 32],
     pub fps: f32,
-    pub flags: i32,
+    pub flags: SequenceFlag,
     pub activity: i32,
     pub act_weight: i32,
     pub num_events: i32,
@@ -84,6 +92,20 @@ pub struct SequenceHeader {
     pub exit_node: i32,
     pub node_flags: i32,
     pub next_seq: i32,
+}
+
+/// [[[animation value; frame count]; 6 motion types]; bone count]
+///
+/// Number is i16, not u16 because we want signed.
+pub type Blend = Vec<BlendBone>;
+pub type BlendBone = [AnimValues; 6];
+pub type AnimValues = Vec<i16>;
+
+#[derive(Debug)]
+pub struct Sequence {
+    pub header: SequenceHeader,
+    /// `[[[[short animation value; frame count]; 6 motion types]; bone count]; blend count]`
+    pub anim_blends: Vec<Blend>,
 }
 
 bitflags! {
@@ -158,6 +180,12 @@ pub struct ModelHeader {
 pub struct Model {
     pub header: ModelHeader,
     pub meshes: Vec<Mesh>,
+    /// > """vertexinfoindex is the offset to an array of int.
+    /// This array is the same size as numverts and maps each vertex position to a bone index.
+    /// This bone index is used to tell which bone affects this vertex position."""
+    ///
+    /// But it is actually u8 type, not i32
+    pub vertex_info: Vec<u8>,
 }
 
 pub struct MeshHeader {
@@ -170,32 +198,36 @@ pub struct MeshHeader {
 
 pub struct Mesh {
     pub header: MeshHeader,
-    pub vertices: Vec<Trivert>,
+    /// Each [`MeshTriangles`] could be multiple triangles.
+    ///
+    /// So, this `triangle` field stores arrays of triangles.
+    pub triangles: Vec<MeshTriangles>,
 }
 
-pub enum TrivertStoreOrder {
-    Strip,
-    Fan,
+pub enum MeshTriangles {
+    Strip(Vec<Trivert>),
+    Fan(Vec<Trivert>),
 }
 
-impl Mesh {
-    pub fn store_order(&self) -> TrivertStoreOrder {
-        if self.header.num_tris.is_positive() {
-            TrivertStoreOrder::Strip
-        } else {
-            TrivertStoreOrder::Fan
-        }
-    }
+// impl Mesh {
+//     pub fn store_order(&self) -> TrivertStoreOrder {
+//         if self.header.num_tris.is_positive() {
+//             TrivertStoreOrder::Strip
+//         } else {
+//             TrivertStoreOrder::Fan
+//         }
+//     }
 
-    pub fn is_fan(&self) -> bool {
-        matches!(self.store_order(), TrivertStoreOrder::Fan)
-    }
+//     pub fn is_fan(&self) -> bool {
+//         matches!(self.store_order(), TrivertStoreOrder::Fan)
+//     }
 
-    pub fn is_strip(&self) -> bool {
-        matches!(self.store_order(), TrivertStoreOrder::Strip)
-    }
-}
+//     pub fn is_strip(&self) -> bool {
+//         matches!(self.store_order(), TrivertStoreOrder::Strip)
+//     }
+// }
 
+#[derive(Debug, Clone, Copy)]
 pub struct TrivertHeader {
     pub vert_index: i16,
     pub norm_index: i16,
@@ -203,12 +235,14 @@ pub struct TrivertHeader {
     pub t: i16,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Trivert {
     pub header: TrivertHeader,
     pub vertex: Vec3,
     pub normal: Vec3,
 }
 
+#[derive(Debug)]
 pub struct Bone {
     pub name: [u8; 32],
     pub parent: i32,
