@@ -37,6 +37,12 @@ impl ByteWriter {
         self.offset(4);
     }
 
+    pub fn append_i32_slice(&mut self, i: &[i32]) {
+        for x in i {
+            self.append_i32(*x);
+        }
+    }
+
     pub fn append_u8(&mut self, i: u8) {
         self.data.extend(i.to_le_bytes());
         self.offset(1);
@@ -82,6 +88,12 @@ impl ByteWriter {
     pub fn append_f32(&mut self, i: f32) {
         self.data.extend(i.to_le_bytes());
         self.offset(4);
+    }
+
+    pub fn append_f32_slice(&mut self, i: &[f32]) {
+        for x in i {
+            self.append_f32(*x);
+        }
     }
 
     pub fn append_u16(&mut self, i: u16) {

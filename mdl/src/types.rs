@@ -14,6 +14,7 @@ pub struct Mdl {
     pub sequence_groups: Vec<SequenceGroup>,
     pub skin_families: SkinFamilies,
     pub attachments: Vec<Attachment>,
+    pub transitions: Vec<u8>,
 }
 
 pub struct Header {
@@ -173,7 +174,9 @@ pub struct ModelHeader {
     pub num_norms: i32,
     pub norm_info_index: i32,
     pub norm_index: i32,
+    /// Unused
     pub num_groups: i32,
+    /// Unused
     pub group_index: i32,
 }
 
@@ -186,13 +189,17 @@ pub struct Model {
     ///
     /// But it is actually u8 type, not i32
     pub vertex_info: Vec<u8>,
+    pub normal_info: Vec<u8>,
 }
 
 pub struct MeshHeader {
     pub num_tris: i32,
+    /// This points to the first trivert
     pub tri_index: i32,
     pub skin_ref: i32,
+    /// Unused
     pub num_norms: i32,
+    /// Unused
     pub norm_index: i32,
 }
 
@@ -204,9 +211,28 @@ pub struct Mesh {
     pub triangles: Vec<MeshTriangles>,
 }
 
+/// A strip/fan run
+///
+/// Still uses the same material as described in the mesh
 pub enum MeshTriangles {
     Strip(Vec<Trivert>),
     Fan(Vec<Trivert>),
+}
+
+impl MeshTriangles {
+    pub fn len_and_type(&self) -> i16 {
+        match self {
+            MeshTriangles::Strip(triverts) => triverts.len() as i16,
+            MeshTriangles::Fan(triverts) => -(triverts.len() as i16),
+        }
+    }
+
+    pub fn get_triverts(&self) -> &Vec<Trivert> {
+        match self {
+            MeshTriangles::Strip(triverts) => triverts,
+            MeshTriangles::Fan(triverts) => triverts,
+        }
+    }
 }
 
 // impl Mesh {

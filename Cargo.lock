@@ -557,7 +557,7 @@ dependencies = [
  "anyhow",
  "arrayvec",
  "log",
- "nom",
+ "nom 7.1.3",
  "num-rational",
  "v_frame",
 ]
@@ -679,7 +679,7 @@ dependencies = [
  "common",
  "eyre",
  "glam 0.28.0",
- "nom",
+ "nom 7.1.3",
  "thiserror 2.0.12",
  "wad",
 ]
@@ -948,7 +948,7 @@ dependencies = [
 name = "common"
 version = "0.3.5"
 dependencies = [
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -1125,7 +1125,7 @@ checksum = "7130730cbdec5224998b37dde21066ee8e72e2e58e6eda7a528578ec75bb147b"
 dependencies = [
  "bitvec",
  "eyre",
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -1135,7 +1135,7 @@ source = "git+https://github.com/khanghugo/dem.git#83575f8a589b896072c8f906d81bb
 dependencies = [
  "bitvec",
  "eyre",
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -1715,7 +1715,7 @@ dependencies = [
  "map",
  "mdl",
  "ndarray",
- "nom",
+ "nom 7.1.3",
  "qc",
  "quantette",
  "rand",
@@ -2545,7 +2545,7 @@ version = "0.1.0"
 dependencies = [
  "eyre",
  "glam 0.27.0",
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -2574,9 +2574,9 @@ version = "0.3.5"
 dependencies = [
  "bitflags 2.9.0",
  "byte_writer",
- "eyre",
  "glam 0.29.3",
- "nom",
+ "nom 8.0.0",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -2758,6 +2758,15 @@ checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "nom"
+version = "8.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df9761775871bdef83bee530e60050f7e54b1105350d6884eb0fb4f46c2f9405"
+dependencies = [
+ "memchr",
 ]
 
 [[package]]
@@ -3453,7 +3462,7 @@ dependencies = [
  "common",
  "eyre",
  "glam 0.27.0",
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -4058,7 +4067,7 @@ version = "0.1.0"
 dependencies = [
  "eyre",
  "glam 0.27.0",
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -4598,7 +4607,7 @@ version = "0.1.0"
 dependencies = [
  "eyre",
  "image",
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]
@@ -4607,7 +4616,7 @@ version = "0.1.0"
 dependencies = [
  "byte_writer",
  "eyre",
- "nom",
+ "nom 7.1.3",
 ]
 
 [[package]]

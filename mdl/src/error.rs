@@ -20,6 +20,9 @@ pub enum MdlError {
     ParseAttachments,
     #[error("Failed to parse sequences")]
     ParseSequences,
+    #[error("Failed to parse transitions")]
+    ParseTransitions,
+
     #[error("IOError: {source}")]
     IOError {
         #[from]

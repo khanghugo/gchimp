@@ -1,20 +1,20 @@
 use std::{array::from_fn, ffi::OsStr, fs::OpenOptions, io::Read, path::Path};
 
 use nom::{
-    Parser,
     bytes::complete::take,
     combinator::map,
     multi::count,
-    number::complete::{le_f32, le_i16, le_i32, le_u8, le_u16},
+    number::complete::{le_f32, le_i16, le_i32, le_u16, le_u8},
+    Parser,
 };
 
 use crate::{
-    Attachment, Blend, Bodypart, BodypartHeader, Bone, BoneController, Hitbox, Mesh, MeshHeader,
-    MeshTriangles, Model, ModelHeader, PALETTE_COUNT, Sequence, SequenceFlag, SequenceGroup,
-    SkinFamilies, Trivert, TrivertHeader, VEC3_T_SIZE,
     error::MdlError,
-    nom_helpers::{IResult, vec3},
+    nom_helpers::{vec3, IResult},
     types::{Header, Mdl, SequenceHeader, Texture, TextureFlag, TextureHeader},
+    Attachment, Blend, Bodypart, BodypartHeader, Bone, BoneController, Hitbox, Mesh, MeshHeader,
+    MeshTriangles, Model, ModelHeader, Sequence, SequenceFlag, SequenceGroup, SkinFamilies,
+    Trivert, TrivertHeader, PALETTE_COUNT, VEC3_T_SIZE,
 };
 
 impl Mdl {
@@ -64,6 +64,9 @@ fn parse_mdl(i: &[u8]) -> Result<Mdl, MdlError> {
     let (_, sequences) =
         parse_sequences(start, &mdl_header).map_err(|_| MdlError::ParseSequences)?;
 
+    let (_, transitions) =
+        parse_transitions(start, &mdl_header).map_err(|_| MdlError::ParseTransitions)?;
+
     Ok(Mdl {
         header: mdl_header,
         sequences,
@@ -75,10 +78,11 @@ fn parse_mdl(i: &[u8]) -> Result<Mdl, MdlError> {
         sequence_groups,
         skin_families,
         attachments,
+        transitions,
     })
 }
 
-fn parse_header(i: &[u8]) -> IResult<Header> {
+fn parse_header(i: &'_ [u8]) -> IResult<'_, Header> {
     map(
         (
             (
@@ -278,7 +282,7 @@ fn _parse_animation_frame_rle_gemini(
 // Based on the comments from this
 // https://github.com/LogicAndTrick/sledge-formats/blob/7a3bfb33562aece483e15796b8573b23d71319ab/Sledge.Formats.Model/Goldsource/MdlFile.cs#L442
 // And then make it more idiomatic rust
-pub fn parse_animation_frame_rle(rle_start: &[u8], num_frame: usize) -> IResult<Vec<i16>> {
+pub fn parse_animation_frame_rle(rle_start: &'_ [u8], num_frame: usize) -> IResult<'_, Vec<i16>> {
     let mut res = vec![0i16; num_frame];
     let mut next = rle_start;
 
@@ -494,7 +498,7 @@ fn parse_sequences<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<
     count(parser, mdl_header.num_seq as usize).parse(&start[mdl_header.seq_index as usize..])
 }
 
-fn parse_sequence_description(i: &[u8]) -> IResult<SequenceHeader> {
+fn parse_sequence_description(i: &'_ [u8]) -> IResult<'_, SequenceHeader> {
     map(
         (
             (
@@ -589,7 +593,7 @@ fn parse_sequence_description(i: &[u8]) -> IResult<SequenceHeader> {
     .parse(i)
 }
 
-fn parse_texture_header(i: &[u8]) -> IResult<TextureHeader> {
+fn parse_texture_header(i: &'_ [u8]) -> IResult<'_, TextureHeader> {
     map(
         (count(le_u8, 64), le_i32, le_i32, le_i32, le_i32),
         |(name, flags, width, height, index)| TextureHeader {
@@ -798,10 +802,16 @@ fn parse_vertex_info<'a>(start: &'a [u8], model_header: &ModelHeader) -> IResult
         .parse(&start[model_header.vert_info_index as usize..])
 }
 
+fn parse_normal_info<'a>(start: &'a [u8], model_header: &ModelHeader) -> IResult<'a, Vec<u8>> {
+    count(le_u8, model_header.num_norms as usize)
+        .parse(&start[model_header.norm_info_index as usize..])
+}
+
 fn parse_model<'a>(i: &'a [u8], start: &'a [u8]) -> IResult<'a, Model> {
     let (end_of_header, model_header) = parse_model_header(i)?;
     let (_end_of_meshes, meshes) = parse_meshes(start, &model_header)?;
     let (_end_of_vertex_info, vertex_info) = parse_vertex_info(start, &model_header)?;
+    let (_end_of_normal_info, normal_info) = parse_normal_info(start, &model_header)?;
 
     Ok((
         end_of_header,
@@ -809,6 +819,7 @@ fn parse_model<'a>(i: &'a [u8], start: &'a [u8]) -> IResult<'a, Model> {
             header: model_header,
             meshes,
             vertex_info,
+            normal_info,
         },
     ))
 }
@@ -853,7 +864,7 @@ fn parse_bodyparts<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<
         .parse(&start[mdl_header.bodypart_index as usize..])
 }
 
-fn parse_bone(i: &[u8]) -> IResult<Bone> {
+fn parse_bone(i: &'_ [u8]) -> IResult<'_, Bone> {
     map(
         (
             count(le_u8, 32),
@@ -969,4 +980,9 @@ pub fn parse_attachment(i: &[u8]) -> IResult<Attachment> {
 pub fn parse_attachments<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<Attachment>> {
     count(parse_attachment, mdl_header.num_attachments as usize)
         .parse(&start[mdl_header.attachment_index as usize..])
+}
+
+pub fn parse_transitions<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<u8>> {
+    count(le_u8, (mdl_header.num_transitions.pow(2)) as usize)
+        .parse(&start[mdl_header.transition_index as usize..])
 }
