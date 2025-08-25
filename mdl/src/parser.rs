@@ -12,9 +12,9 @@ use crate::{
     error::MdlError,
     nom_helpers::{vec3, IResult},
     types::{Header, Mdl, SequenceHeader, Texture, TextureFlag, TextureHeader},
-    Attachment, Blend, Bodypart, BodypartHeader, Bone, BoneController, Hitbox, Mesh, MeshHeader,
-    MeshTriangles, Model, ModelHeader, Sequence, SequenceFlag, SequenceGroup, SkinFamilies,
-    Trivert, TrivertHeader, PALETTE_COUNT, VEC3_T_SIZE,
+    AnimValues, Attachment, Blend, Bodypart, BodypartHeader, Bone, BoneController, Hitbox, Mesh,
+    MeshHeader, MeshTriangles, Model, ModelHeader, Sequence, SequenceFlag, SequenceGroup,
+    SkinFamilies, Trivert, TrivertHeader, PALETTE_COUNT, VEC3_T_SIZE,
 };
 
 impl Mdl {
@@ -178,7 +178,7 @@ fn parse_header(i: &'_ [u8]) -> IResult<'_, Header> {
 }
 
 // https://github.com/LogicAndTrick/sledge-formats/blob/7a3bfb33562aece483e15796b8573b23d71319ab/Sledge.Formats.Model/Goldsource/MdlFile.cs#L442
-fn _parse_animation_frame_rle_sledge(br: &[u8], read_count: usize) -> IResult<Vec<i16>> {
+fn _parse_animation_frame_rle_sledge(br: &'_ [u8], read_count: usize) -> IResult<'_, Vec<i16>> {
     let mut values: Vec<i16> = vec![0; read_count];
 
     let mut i = 0;
@@ -209,9 +209,9 @@ fn _parse_animation_frame_rle_sledge(br: &[u8], read_count: usize) -> IResult<Ve
 
 // gemini2.5 solution. just send it the entire mdl documentation and send it the compression algorithm
 fn _parse_animation_frame_rle_gemini(
-    mut reader: &[u8], // Track input slice consumption
+    mut reader: &'_ [u8], // Track input slice consumption
     num_frames: usize,
-) -> IResult<Vec<i16>> {
+) -> IResult<'_, Vec<i16>> {
     let mut output_values: Vec<i16> = vec![0; num_frames]; // Pre-allocate result
     let mut current_frame_index = 0; // Track how many frames we've filled
 
@@ -282,8 +282,8 @@ fn _parse_animation_frame_rle_gemini(
 // Based on the comments from this
 // https://github.com/LogicAndTrick/sledge-formats/blob/7a3bfb33562aece483e15796b8573b23d71319ab/Sledge.Formats.Model/Goldsource/MdlFile.cs#L442
 // And then make it more idiomatic rust
-pub fn parse_animation_frame_rle(rle_start: &'_ [u8], num_frame: usize) -> IResult<'_, Vec<i16>> {
-    let mut res = vec![0i16; num_frame];
+pub fn parse_animation_frame_rle(rle_start: &'_ [u8], num_frame: usize) -> IResult<'_, AnimValues> {
+    let mut res = AnimValues(vec![0i16; num_frame]);
     let mut next = rle_start;
 
     let mut curr_frame = 0;
@@ -317,8 +317,8 @@ pub fn parse_animation_frame_rle(rle_start: &'_ [u8], num_frame: usize) -> IResu
 
         let last_value = compressed_values.last();
 
-        // uncompressed values
-        // repeating the last element
+        // uncompressing values
+        // by repeating the last element
         match last_value {
             Some(x) => compressed_values.iter().chain(std::iter::repeat(x)),
             None => {
@@ -360,7 +360,7 @@ fn _parse_blend_studiomdl_impl<'a>(
     let num_frames = sequence_header.num_frames as usize;
 
     for blend_offsets in blends_offets.into_iter() {
-        let mut bone_values: [Vec<i16>; 6] = from_fn(|_| vec![0; num_frames]);
+        let mut bone_values: [AnimValues; 6] = from_fn(|_| AnimValues(vec![0; num_frames]));
 
         for (motion_idx, offset) in blend_offsets.into_iter().enumerate() {
             // if no offset, the whole run of bone blend value is 0
@@ -453,7 +453,7 @@ fn parse_blend<'a>(
     // at the moment, we have the bone count and the offsets
     // now we have to fit animations inside the bone count
     for (bone_idx, blend_offsets) in blends_offsets.into_iter().enumerate() {
-        let mut bone_values: [Vec<i16>; 6] = from_fn(|_| vec![0; num_frames]);
+        let mut bone_values: [AnimValues; 6] = from_fn(|_| AnimValues(vec![0; num_frames]));
 
         for (motion_idx, offset) in blend_offsets.into_iter().enumerate() {
             if offset == 0 {
@@ -643,7 +643,7 @@ fn parse_textures<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<T
         .parse(&start[mdl_header.texture_index as usize..])
 }
 
-fn parse_trivert_header(i: &[u8]) -> IResult<TrivertHeader> {
+fn parse_trivert_header(i: &'_ [u8]) -> IResult<'_, TrivertHeader> {
     map(
         (le_i16, le_i16, le_i16, le_i16),
         |(vert_index, norm_index, s, t)| TrivertHeader {
@@ -714,7 +714,7 @@ fn parse_mesh_triangles<'a>(
     Ok((trivert_run_start, res))
 }
 
-fn parse_mesh_header(i: &[u8]) -> IResult<MeshHeader> {
+fn parse_mesh_header(i: &'_ [u8]) -> IResult<'_, MeshHeader> {
     map(
         (le_i32, le_i32, le_i32, le_i32, le_i32),
         |(num_tris, tri_index, skin_ref, num_norms, norm_index)| MeshHeader {
@@ -747,7 +747,7 @@ fn parse_meshes<'a>(start: &'a [u8], model_header: &ModelHeader) -> IResult<'a, 
     count(parser, model_header.num_mesh as usize).parse(&start[model_header.mesh_index as usize..])
 }
 
-fn parse_model_header(i: &[u8]) -> IResult<ModelHeader> {
+fn parse_model_header(i: &'_ [u8]) -> IResult<'_, ModelHeader> {
     map(
         (
             count(le_u8, 64),
@@ -831,7 +831,7 @@ fn parse_models<'a>(start: &'a [u8], bodypart_header: &BodypartHeader) -> IResul
         .parse(&start[bodypart_header.model_index as usize..])
 }
 
-fn parse_bodypart_header(i: &[u8]) -> IResult<BodypartHeader> {
+fn parse_bodypart_header(i: &'_ [u8]) -> IResult<'_, BodypartHeader> {
     map(
         (count(le_u8, 64), le_i32, le_i32, le_i32),
         |(name, num_models, base, model_index)| BodypartHeader {
@@ -890,7 +890,7 @@ fn parse_bones<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<Bone
     count(parse_bone, mdl_header.num_bones as usize).parse(&start[mdl_header.bone_index as usize..])
 }
 
-fn parse_bone_controller(i: &[u8]) -> IResult<BoneController> {
+fn parse_bone_controller(i: &'_ [u8]) -> IResult<'_, BoneController> {
     map(
         (le_i32, le_i32, le_f32, le_f32, le_i32, le_i32),
         |(bone, type_, start, end, rest, index)| BoneController {
@@ -916,7 +916,7 @@ fn parse_bone_controllers<'a>(
     .parse(&start[mdl_header.bone_controller_index as usize..])
 }
 
-pub fn parse_hitbox(i: &[u8]) -> IResult<Hitbox> {
+pub fn parse_hitbox(i: &'_ [u8]) -> IResult<'_, Hitbox> {
     map(
         (le_i32, le_i32, vec3, vec3),
         |(bone, group, bbmin, bbmax)| Hitbox {
@@ -934,7 +934,7 @@ pub fn parse_hitboxes<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, V
         .parse(&start[mdl_header.hitbox_index as usize..])
 }
 
-pub fn parse_sequence_group(i: &[u8]) -> IResult<SequenceGroup> {
+pub fn parse_sequence_group(i: &'_ [u8]) -> IResult<'_, SequenceGroup> {
     map(
         (count(le_u8, 32), count(le_u8, 64), le_i32, le_i32),
         |(label, name, unused1, unused2)| SequenceGroup {
@@ -963,7 +963,7 @@ pub fn parse_skin_families<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<
     .parse(&start[mdl_header.skin_index as usize..])
 }
 
-pub fn parse_attachment(i: &[u8]) -> IResult<Attachment> {
+pub fn parse_attachment(i: &'_ [u8]) -> IResult<'_, Attachment> {
     map(
         (count(le_u8, 32), le_i32, le_i32, vec3, count(vec3, 3)),
         |(name, type_, bone, org, vectors)| Attachment {

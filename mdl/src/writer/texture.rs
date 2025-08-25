@@ -1,51 +1,58 @@
 use byte_writer::ByteWriter;
 
-use crate::{
-    writer::{WriteToWriter, PADDING_MAGIC},
-    Bone, BoneController, Mdl,
-};
+use crate::{writer::impl_trait::WriteToWriterTexture, Texture, TextureHeader};
 
-impl Mdl {
-    // must write all the texture headers then write data
-    pub(super) fn write_textures(&self, writer: &mut ByteWriter) -> usize {
-        let pixel_offsets = self
-            .textures
+impl WriteToWriterTexture for &[Texture] {
+    fn write_to_writer(&self, writer: &mut ByteWriter) -> (usize, usize) {
+        // write all textures then write header
+        let texture_image_offset = writer.get_offset();
+
+        let image_offsets: Vec<usize> = self
             .iter()
             .map(|texture| {
-                writer.append_u8_slice(texture.header.name.as_slice());
-                writer.append_i32(texture.header.flags.bits());
-                writer.append_i32(texture.header.width);
-                writer.append_i32(texture.header.height);
+                let offset = writer.get_offset();
 
-                let index = writer.get_offset();
-                writer.append_i32(PADDING_MAGIC);
+                let Texture {
+                    header: _,
+                    image,
+                    palette,
+                } = texture;
 
-                index
-            })
-            .collect::<Vec<usize>>();
-
-        let texture_data_start = writer.get_offset();
-
-        pixel_offsets
-            .iter()
-            .zip(self.textures.iter())
-            .for_each(|(&index, texture)| {
-                let start = writer.get_offset();
-
-                writer.replace_with_i32(index, start as i32);
-
-                writer.append_u8_slice(&texture.image);
+                writer.append_u8_slice(&image);
                 writer.append_u8_slice(
-                    texture
-                        .palette
+                    palette
                         .iter()
                         .cloned()
                         .flatten()
                         .collect::<Vec<u8>>()
                         .as_slice(),
                 );
+
+                offset
+            })
+            .collect();
+
+        // write header with known image data offsets
+        let texture_header_offset = writer.get_offset();
+
+        self.iter()
+            .zip(image_offsets)
+            .for_each(|(texture, image_offset)| {
+                let TextureHeader {
+                    name,
+                    flags,
+                    width,
+                    height,
+                    index: _,
+                } = &texture.header;
+
+                writer.append_u8_slice(name.as_slice());
+                writer.append_i32(flags.bits());
+                writer.append_i32(*width);
+                writer.append_i32(*height);
+                writer.append_i32(image_offset as i32);
             });
 
-        texture_data_start
+        (texture_header_offset, texture_image_offset)
     }
 }

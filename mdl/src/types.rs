@@ -1,3 +1,5 @@
+use std::ops::{Index, IndexMut};
+
 use bitflags::bitflags;
 use glam::Vec3;
 
@@ -95,12 +97,28 @@ pub struct SequenceHeader {
     pub next_seq: i32,
 }
 
-/// [[[animation value; frame count]; 6 motion types]; bone count]
+/// `[[[animation value; frame count]; 6 motion types]; bone count]`
 ///
 /// Number is i16, not u16 because we want signed.
 pub type Blend = Vec<BlendBone>;
 pub type BlendBone = [AnimValues; 6];
-pub type AnimValues = Vec<i16>;
+
+#[derive(Debug, Clone)]
+pub struct AnimValues(pub Vec<i16>);
+
+impl Index<usize> for AnimValues {
+    type Output = i16;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0[index]
+    }
+}
+
+impl IndexMut<usize> for AnimValues {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.0[index]
+    }
+}
 
 #[derive(Debug)]
 pub struct Sequence {

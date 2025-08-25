@@ -2,14 +2,15 @@ use byte_writer::ByteWriter;
 use glam::Vec3;
 
 use crate::{
-    writer::impl_trait::{WriteToWriter, WriteToWriterSequence},
-    Blend, Mdl, Sequence, SequenceGroup, SequenceHeader,
+    writer::impl_trait::{WriteToWriter, WriteToWriterTexture},
+    Mdl, SequenceHeader,
 };
 
 mod bodypart;
 mod bone;
 mod impl_trait;
 mod others;
+mod sequence;
 mod texture;
 
 const MAGIC: &str = "IDST";
@@ -107,15 +108,16 @@ impl Mdl {
         writer.replace_with_i32(hitbox_index, writer.get_offset() as i32);
         self.write_hitboxes(&mut writer);
 
-        writer.replace_with_i32(sequence_index, writer.get_offset() as i32);
-        self.write_sequences(&mut writer);
+        let sequence_offset = self.sequences.as_slice().write_to_writer(&mut writer);
+        writer.replace_with_i32(sequence_index, sequence_offset as i32);
 
-        writer.replace_with_i32(sequence_group_index, writer.get_offset() as i32);
-        self.write_sequence_groups(&mut writer);
+        let sequence_group_offset = self.sequence_groups.as_slice().write_to_writer(&mut writer);
+        writer.replace_with_i32(sequence_group_index, sequence_group_offset as i32);
 
-        writer.replace_with_i32(texture_index, writer.get_offset() as i32);
-        let texture_data_start = self.write_textures(&mut writer);
-        writer.replace_with_i32(texture_data_index, texture_data_start as i32);
+        let (texture_offset, texture_image_offset) =
+            self.textures.as_slice().write_to_writer(&mut writer);
+        writer.replace_with_i32(texture_index, texture_offset as i32);
+        writer.replace_with_i32(texture_data_index, texture_image_offset as i32);
 
         writer.replace_with_i32(skin_index, writer.get_offset() as i32);
         self.write_skins(&mut writer);
@@ -132,16 +134,6 @@ impl Mdl {
         writer.replace_with_i32(header_length, writer.get_offset() as i32);
 
         writer.data
-    }
-
-    fn write_sequences(&self, _writer: &mut ByteWriter) {
-        todo!()
-    }
-
-    fn write_sequence_groups(&self, writer: &mut ByteWriter) {
-        self.sequence_groups.iter().for_each(|sequence_group| {
-            sequence_group.write_to_writer(writer);
-        });
     }
 }
 
@@ -208,45 +200,6 @@ impl WriteToWriter for SequenceHeader {
         writer.append_i32(*exit_node);
         writer.append_i32(*node_flags);
         writer.append_i32(*next_seq);
-
-        offset
-    }
-}
-
-impl WriteToWriter for Sequence {
-    fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
-        let Sequence {
-            header,
-            anim_blends,
-        } = self;
-        let offset = writer.get_offset();
-
-        header.write_to_writer(writer);
-
-        offset
-    }
-}
-
-impl WriteToWriterSequence for Blend {
-    fn write_to_writer(&self, sequence_header: &SequenceHeader, writer: &mut ByteWriter) {
-        todo!()
-    }
-}
-
-impl WriteToWriter for SequenceGroup {
-    fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
-        let SequenceGroup {
-            label,
-            name,
-            unused1,
-            unused2,
-        } = self;
-        let offset = writer.get_offset();
-
-        writer.append_u8_slice(label.as_slice());
-        writer.append_u8_slice(name.as_slice());
-        writer.append_i32(*unused1);
-        writer.append_i32(*unused2);
 
         offset
     }
