@@ -1,9 +1,9 @@
-use std::{ffi::OsStr, path::Path};
+use std::{ffi::OsStr, fs::OpenOptions, io::Write, path::Path};
 
 use image::RgbImage;
 use nom::Parser;
 
-use crate::{Spr, error::SprError, parser::parse_spr};
+use crate::{error::SprError, parser::parse_spr, Spr};
 
 impl Spr {
     pub fn open_from_bytes(i: &[u8]) -> Result<Spr, SprError> {
@@ -19,6 +19,20 @@ impl Spr {
         let file = std::fs::read(path).map_err(|op| SprError::IOError { source: op })?;
 
         Self::open_from_bytes(&file)
+    }
+
+    pub fn write_to_file(&self, path: impl AsRef<OsStr> + AsRef<Path>) -> Result<(), SprError> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(path)
+            .map_err(|op| SprError::IOError { source: op })?;
+
+        file.write_all(self.write_to_bytes().as_slice())
+            .map_err(|op| SprError::IOError { source: op })?;
+
+        Ok(())
     }
 
     pub fn to_rgb8(&self, frame_index: usize) -> RgbImage {
