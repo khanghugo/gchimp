@@ -15,7 +15,7 @@ mod test {
         let file = include_bytes!("../test/glow01.spr");
         let spr = Spr::open_from_bytes(file).unwrap();
 
-        let image = spr.to_rgb8(0);
+        let _image = spr.to_rgb8(0);
         // image.save("./test/glow01.png").unwrap();
     }
 
@@ -24,7 +24,7 @@ mod test {
         let file = include_bytes!("../test/640hud1.spr");
         let spr = Spr::open_from_bytes(file).unwrap();
 
-        let image = spr.to_rgb8(0);
+        let _image = spr.to_rgb8(0);
         // image.save("./test/640hud1.png").unwrap();
     }
 
@@ -33,13 +33,13 @@ mod test {
         let file = include_bytes!("../test/d-tele1.spr");
         let spr = Spr::open_from_bytes(file).unwrap();
 
-        let image = spr.to_rgb8(0);
+        let _image = spr.to_rgb8(0);
         // image.save("./test/d-tele1_0.png").unwrap();
 
-        let image = spr.to_rgb8(10);
+        let _image = spr.to_rgb8(10);
         // image.save("./test/d-tele1_1.png").unwrap();
 
-        let image = spr.to_rgb8(20);
+        let _image = spr.to_rgb8(20);
         // image.save("./test/d-tele1_3.png").unwrap();
     }
 
