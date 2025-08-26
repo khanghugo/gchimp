@@ -1,3 +1,4 @@
+#[derive(Debug, PartialEq)]
 pub struct SprHeader {
     pub id: i32,
     pub version: i32,
@@ -14,6 +15,7 @@ pub struct SprHeader {
 
 pub type SprPalette = Vec<[u8; 3]>;
 
+#[derive(Debug, PartialEq)]
 pub struct SprFrameHeader {
     pub group: i32,
     pub origin_x: i32,

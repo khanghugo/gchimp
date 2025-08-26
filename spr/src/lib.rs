@@ -42,4 +42,22 @@ mod test {
         let image = spr.to_rgb8(20);
         image.save("./test/d-tele1_3.png").unwrap();
     }
+
+    #[test]
+    fn parse_write_parse() {
+        let file = include_bytes!("../test/d-tele1.spr");
+        let spr1 = Spr::open_from_bytes(file).unwrap();
+        let file2 = spr1.write_to_bytes();
+        let spr2 = Spr::open_from_bytes(&file2).unwrap();
+
+        assert_eq!(spr1.frames.len(), spr1.frames.len());
+        assert_eq!(spr1.palette, spr2.palette);
+        assert_eq!(spr1.header, spr2.header);
+
+        // compare random frames
+        spr1.frames.iter().zip(spr2.frames).for_each(|(f1, f2)| {
+            assert_eq!(f1.header, f2.header);
+            assert_eq!(f1.image, f2.image);
+        });
+    }
 }
