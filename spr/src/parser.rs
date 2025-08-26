@@ -6,7 +6,7 @@ use nom::{
     IResult as _IResult, Parser,
 };
 
-use crate::{Spr, SprFrame, SprFrameHeader, SprFrameImage, SprHeader, SprPalette};
+use crate::{Spr, SprFrame, SprFrameHeader, SprFrameImage, SprFrames, SprHeader, SprPalette};
 
 pub type IResult<'a, T> = _IResult<&'a [u8], T>;
 
@@ -78,7 +78,7 @@ pub fn parse_frame(i: &'_ [u8]) -> IResult<'_, SprFrame> {
     Ok((i, SprFrame { header, image }))
 }
 
-pub fn parse_frames(i: &'_ [u8], frame_count: usize) -> IResult<'_, Vec<SprFrame>> {
+pub fn parse_frames(i: &'_ [u8], frame_count: usize) -> IResult<'_, SprFrames> {
     count(parse_frame, frame_count).parse(i)
 }
 

@@ -29,8 +29,10 @@ pub struct SprFrame {
     pub image: SprFrameImage,
 }
 
+pub type SprFrames = Vec<SprFrame>;
+
 pub struct Spr {
     pub header: SprHeader,
     pub palette: SprPalette,
-    pub frames: Vec<SprFrame>,
+    pub frames: SprFrames,
 }

@@ -4128,6 +4128,7 @@ dependencies = [
 name = "spr"
 version = "0.3.5"
 dependencies = [
+ "byte_writer",
  "common",
  "image",
  "nom 8.0.0",
