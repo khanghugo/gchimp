@@ -16,7 +16,7 @@ mod test {
         let spr = Spr::open_from_bytes(file).unwrap();
 
         let image = spr.to_rgb8(0);
-        image.save("./test/glow01.png").unwrap();
+        // image.save("./test/glow01.png").unwrap();
     }
 
     #[test]
@@ -25,7 +25,7 @@ mod test {
         let spr = Spr::open_from_bytes(file).unwrap();
 
         let image = spr.to_rgb8(0);
-        image.save("./test/640hud1.png").unwrap();
+        // image.save("./test/640hud1.png").unwrap();
     }
 
     #[test]
@@ -34,13 +34,13 @@ mod test {
         let spr = Spr::open_from_bytes(file).unwrap();
 
         let image = spr.to_rgb8(0);
-        image.save("./test/d-tele1_0.png").unwrap();
+        // image.save("./test/d-tele1_0.png").unwrap();
 
         let image = spr.to_rgb8(10);
-        image.save("./test/d-tele1_1.png").unwrap();
+        // image.save("./test/d-tele1_1.png").unwrap();
 
         let image = spr.to_rgb8(20);
-        image.save("./test/d-tele1_3.png").unwrap();
+        // image.save("./test/d-tele1_3.png").unwrap();
     }
 
     #[test]
@@ -54,7 +54,6 @@ mod test {
         assert_eq!(spr1.palette, spr2.palette);
         assert_eq!(spr1.header, spr2.header);
 
-        // compare random frames
         spr1.frames.iter().zip(spr2.frames).for_each(|(f1, f2)| {
             assert_eq!(f1.header, f2.header);
             assert_eq!(f1.image, f2.image);
