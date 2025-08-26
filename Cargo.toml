@@ -1,5 +1,5 @@
 [workspace]
-members = ["map", "smd", "qc" , "wad", "bsp", "byte_writer", "vtf", "gchimp", "gchimp-native", "gchimp-web", "mdl", "common"]
+members = ["map", "smd", "qc" , "wad", "bsp", "byte_writer", "vtf", "gchimp", "gchimp-native", "gchimp-web", "mdl", "common", "spr"]
 
 [workspace.package]
 authors = [ "Lê Hàn Minh Khang (Khang Le) <mkhangle20@gmail.com>" ]

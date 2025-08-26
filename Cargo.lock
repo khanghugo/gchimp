@@ -4125,6 +4125,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "spr"
+version = "0.3.5"
+dependencies = [
+ "common",
+ "image",
+ "nom 8.0.0",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
