@@ -5,6 +5,7 @@ mod constants;
 mod parser;
 pub mod types;
 pub mod utils;
+mod writer;
 
 pub use parser::{parse_miptex, parse_wad};
 
@@ -105,9 +106,7 @@ mod test {
 
         let wad = wad.unwrap();
 
-        let res = wad.write_to_file("test/out/wad_test_out.wad");
-
-        assert!(res.is_ok());
+        let _res = wad.write_to_file("test/out/wad_test_out.wad").unwrap();
     }
 
     #[test]
@@ -118,9 +117,7 @@ mod test {
 
         let wad = wad.unwrap();
 
-        let res = wad.write_to_file("test/out/wad_test2_out.wad");
-
-        assert!(res.is_ok());
+        let _res = wad.write_to_file("test/out/wad_test2_out.wad").unwrap();
     }
 
     #[test]
@@ -131,26 +128,38 @@ mod test {
 
         let wad = wad.unwrap();
 
-        let res = wad.write_to_file("test/out/surf_cyberwave_out.wad");
-
-        assert!(res.is_ok());
+        wad.write_to_file("test/out/surf_cyberwave_out.wad")
+            .unwrap();
     }
 
-    #[test]
-    fn parse_big() {
-        let _wad = Wad::from_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
-        let _wad2 = Wad::from_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
+    // #[test]
+    // fn parse_big() {
+    //     let _wad = Wad::from_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
+    //     let _wad2 = Wad::from_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
 
-        // check the memory usage
-        std::thread::sleep(std::time::Duration::from_secs(5));
-    }
+    //     // check the memory usage
+    //     std::thread::sleep(std::time::Duration::from_secs(5));
+    // }
+
+    // #[test]
+    // fn parse_gfx() {
+    //     let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/gfx.wad").unwrap();
+    //     let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/cached.wad").unwrap();
+    //     let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/decals.wad").unwrap();
+    //     let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/tempdecal.wad").unwrap();
+    //     let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/spraypaint.wad").unwrap();
+    // }
 
     #[test]
-    fn parse_gfx() {
-        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/gfx.wad").unwrap();
-        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/cached.wad").unwrap();
-        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/decals.wad").unwrap();
-        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/tempdecal.wad").unwrap();
-        let _wad = Wad::from_file("/home/khang/bxt/_game_native/valve/spraypaint.wad").unwrap();
+    fn parse_tempdecal() {
+        let file = include_bytes!("../test/tempdecal.wad");
+        let wad = Wad::from_bytes(file).unwrap();
+
+        // tempdecal is miptex
+        wad.entries.iter().for_each(|entry| {
+            let FileEntry::MipTex(_miptex) = &entry.file_entry else {
+                panic!("no");
+            };
+        });
     }
 }

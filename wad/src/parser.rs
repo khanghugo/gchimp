@@ -16,7 +16,7 @@ use crate::types::{
 
 type IResult<'a, T> = _IResult<&'a [u8], T>;
 
-fn parse_header(i: &[u8]) -> IResult<Header> {
+fn parse_header(i: &'_ [u8]) -> IResult<'_, Header> {
     map(
         tuple((count(le_u8, 4), le_i32, le_i32)),
         |(magic, num_dirs, dir_offset)| Header {
@@ -27,7 +27,7 @@ fn parse_header(i: &[u8]) -> IResult<Header> {
     )(i)
 }
 
-fn parse_directory_entry(i: &[u8]) -> IResult<DirectoryEntry> {
+fn parse_directory_entry(i: &'_ [u8]) -> IResult<'_, DirectoryEntry> {
     map(
         tuple((
             le_i32,
@@ -52,7 +52,7 @@ fn parse_directory_entry(i: &[u8]) -> IResult<DirectoryEntry> {
     )(i)
 }
 
-fn parse_qpic(i: &[u8]) -> IResult<Qpic> {
+fn parse_qpic(i: &'_ [u8]) -> IResult<'_, Qpic> {
     let (i, (width, height)) = tuple((le_u32, le_u32))(i)?;
     let (i, data) = count(le_u8, (width * height) as usize)(i)?;
     let (i, colors_used) = le_i16(i)?;
@@ -73,7 +73,7 @@ fn parse_qpic(i: &[u8]) -> IResult<Qpic> {
     ))
 }
 
-pub fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
+pub fn parse_miptex(i: &'_ [u8]) -> IResult<'_, MipTex> {
     let struct_start = i;
 
     let (i, texture_name) = count(le_u8, 16)(i)?;
@@ -155,7 +155,7 @@ pub fn parse_miptex(i: &[u8]) -> IResult<MipTex> {
     ))
 }
 
-fn parse_font(i: &[u8]) -> IResult<Font> {
+fn parse_font(i: &'_ [u8]) -> IResult<'_, Font> {
     let (i, (width, height)) = tuple((le_u32, le_u32))(i)?;
     let (i, (row_count, row_height)) = tuple((le_u32, le_u32))(i)?;
 
@@ -200,7 +200,7 @@ fn parse_font(i: &[u8]) -> IResult<Font> {
 
 static FILE_TYPES: &[i8] = &[0x40, 0x42, 0x43, 0x44, 0x45, 0x46];
 
-pub fn parse_wad(i: &[u8]) -> IResult<Wad> {
+pub fn parse_wad(i: &'_ [u8]) -> IResult<'_, Wad> {
     let file_start = i;
 
     let (_, header) = parse_header(i)?;
