@@ -463,6 +463,12 @@ fn parse_blend<'a>(
             let panimvalue = &panim[
                 // not sure why, but i have to offset this by this
                 // thanks to newbspguy for easy compilation so that i can debug this
+                // the reason why we offset by "bone_idx * 12" is because panimvalue run
+                // starts from panim. 
+                // panim is previously read to check offsets.
+                // this means, panimvalue starts at offset from the beginning of that bone offset pos
+                // if it is bone 2, then it starts from "bone 2 offset position"
+                // so, it is "offset + bone x offset value position"
                 (offset as usize + bone_idx * 12)..];
 
             let (_, values) = parse_animation_frame_rle(panimvalue, num_frames)?;
