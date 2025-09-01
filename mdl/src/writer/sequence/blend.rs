@@ -1,22 +1,61 @@
+use byte_writer::ByteWriter;
+
 use crate::{writer::WriteToWriter, AnimValues, Blend};
 
-// Pretty fucking complicated, I guess.
-// Should just take a look at HLAM code but I will eventually
-// The first 6 u16 are "offsets" where it says where the motion type starts
-// 6 * bone count
-// We should know the bone count from Blend data type
-// It is weird how the data is stored and how the data is read differ.
-impl WriteToWriter for Blend {
-    fn write_to_writer(&self, writer: &mut byte_writer::ByteWriter) -> usize {
+impl WriteToWriter for &[Blend] {
+    fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
+        let offset = writer.get_offset();
         // need to write the RLE first
         // the RLE contains all frame animation values for motion type for a bone
-        todo!()
+
+        // need to use a different writer so that we can write offset at the end
+        let mut motion_data_writer = ByteWriter::new();
+
+        // [[[offset; 6 motion types]; bone count]; blend count]
+        let motion_idx_offsets = self
+            .iter()
+            .map(|blend| {
+                blend
+                    .iter()
+                    .enumerate()
+                    .map(|(bone_idx, bone)| {
+                        bone
+                            .iter()
+                            .map(|motion|
+                                // need to offset 12 here to have the offset start correctly at the "offset position"
+                                if motion.is_zero() {
+                                    0
+                                } else {
+motion.write_to_writer(&mut motion_data_writer) - (bone_idx * 12)
+                                }
+                                )
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect::<Vec<Vec<Vec<usize>>>>();
+
+        // now write all the offsets
+        motion_idx_offsets.iter().for_each(|blend| {
+            blend.iter().for_each(|bone| {
+                bone.iter().for_each(|offset| {
+                    // using main writer now
+                    writer.append_u32(*offset as u32);
+                });
+            });
+        });
+
+        // then add the motion data to the writer
+        writer.append_u8_slice(&motion_data_writer.data);
+
+        offset
     }
 }
 
 impl WriteToWriter for AnimValues {
-    fn write_to_writer(&self, writer: &mut byte_writer::ByteWriter) -> usize {
+    fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
         let offset = writer.get_offset();
+
         let frame_count = self.0.len();
 
         // TODO actually compressing stuffs

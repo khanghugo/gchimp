@@ -16,9 +16,9 @@ mod test {
     use std::mem;
 
     use crate::{
-        BodypartHeader, Bone, BoneController, Hitbox, Mdl, MeshHeader, ModelHeader, SequenceGroup,
-        TrivertHeader,
         types::{Header, SequenceHeader, TextureHeader},
+        BodypartHeader, Bone, BoneController, Hitbox, Mdl, MeshHeader, ModelHeader, SequenceGroup,
+        Trivert, TrivertHeader,
     };
 
     #[test]
@@ -48,12 +48,41 @@ mod test {
     #[test]
     fn parse_chick() {
         let bytes = include_bytes!("./tests/chick.mdl");
-        let mdl = Mdl::open_from_bytes(bytes).unwrap();
+        let _mdl = Mdl::open_from_bytes(bytes).unwrap();
     }
 
     #[test]
     fn parse_usp() {
         let bytes = include_bytes!("./tests/v_usp.mdl");
+        let _mdl = Mdl::open_from_bytes(bytes).unwrap();
+    }
+
+    #[test]
+    fn parse_write_parse_static_tree() {
+        let bytes = include_bytes!("./tests/static_tree.mdl");
+
         let mdl = Mdl::open_from_bytes(bytes).unwrap();
+
+        let bytes2 = mdl.write_to_bytes();
+        let mdl2 = Mdl::open_from_bytes(&bytes2).unwrap();
+
+        // no animation
+        assert_eq!(mdl.sequences[0].anim_blends, mdl2.sequences[0].anim_blends);
+
+        // check triangles
+        let contains = |y: &Vec<Trivert>| {
+            mdl2.bodyparts[0].models[0].meshes[0]
+                .triangles
+                .iter()
+                .any(|x| x.get_triverts() == y)
+        };
+
+        mdl.bodyparts[0].models[0].meshes[0]
+            .triangles
+            .iter()
+            .for_each(|triangle| assert!(contains(triangle.get_triverts())));
+
+        mdl.write_to_file("/home/khang/gchimp/mdl/src/tests/static_tree_parse_write.mdl")
+            .unwrap();
     }
 }

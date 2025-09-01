@@ -103,7 +103,7 @@ pub struct SequenceHeader {
 pub type Blend = Vec<BlendBone>;
 pub type BlendBone = [AnimValues; 6];
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AnimValues(pub Vec<i16>);
 
 impl Index<usize> for AnimValues {
@@ -111,6 +111,16 @@ impl Index<usize> for AnimValues {
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.0[index]
+    }
+}
+
+impl AnimValues {
+    pub fn is_zero(&self) -> bool {
+        self.0.is_empty() || self.0.iter().all(|x| *x == 0)
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -210,6 +220,7 @@ pub struct Model {
     pub normal_info: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub struct MeshHeader {
     pub num_tris: i32,
     /// This points to the first trivert
@@ -221,6 +232,7 @@ pub struct MeshHeader {
     pub norm_index: i32,
 }
 
+#[derive(Debug)]
 pub struct Mesh {
     pub header: MeshHeader,
     /// Each [`MeshTriangles`] could be multiple triangles.
@@ -232,6 +244,7 @@ pub struct Mesh {
 /// A strip/fan run
 ///
 /// Still uses the same material as described in the mesh
+#[derive(Debug, PartialEq)]
 pub enum MeshTriangles {
     Strip(Vec<Trivert>),
     Fan(Vec<Trivert>),
@@ -271,7 +284,7 @@ impl MeshTriangles {
 //     }
 // }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TrivertHeader {
     pub vert_index: i16,
     pub norm_index: i16,
@@ -284,6 +297,12 @@ pub struct Trivert {
     pub header: TrivertHeader,
     pub vertex: Vec3,
     pub normal: Vec3,
+}
+
+impl PartialEq for Trivert {
+    fn eq(&self, other: &Self) -> bool {
+        self.vertex == other.vertex && self.normal == other.normal
+    }
 }
 
 #[derive(Debug)]

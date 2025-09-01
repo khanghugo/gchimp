@@ -1,9 +1,16 @@
+use std::{
+    fs::OpenOptions,
+    io::Write,
+    path::{Path, PathBuf},
+};
+
 use byte_writer::ByteWriter;
 use glam::Vec3;
 
 use crate::{
+    error::MdlError,
     writer::impl_trait::{WriteToWriter, WriteToWriterTexture},
-    Mdl, SequenceHeader,
+    Mdl,
 };
 
 mod bodypart;
@@ -17,6 +24,22 @@ const MAGIC: &str = "IDST";
 const PADDING_MAGIC: i32 = 0x69696969;
 
 impl Mdl {
+    pub fn write_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> Result<(), MdlError> {
+        let bytes = self.write_to_bytes();
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(path)?;
+
+        file.write_all(&bytes)?;
+
+        file.flush()?;
+
+        Ok(())
+    }
+
     pub fn write_to_bytes(&self) -> Vec<u8> {
         let mut writer = ByteWriter::new();
 
@@ -134,73 +157,5 @@ impl Mdl {
         writer.replace_with_i32(header_length, writer.get_offset() as i32);
 
         writer.data
-    }
-}
-
-impl WriteToWriter for SequenceHeader {
-    fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
-        let offset = writer.get_offset();
-
-        let SequenceHeader {
-            label,
-            fps,
-            flags,
-            activity,
-            act_weight,
-            num_events,
-            event_index,
-            num_frames,
-            num_pivots,
-            pivot_index,
-            motion_type,
-            motion_bone,
-            linear_movement,
-            auto_move_pos_index,
-            auto_move_angle_index,
-            bbmin,
-            bbmax,
-            num_blends,
-            anim_index,
-            blend_type,
-            blend_start,
-            blend_end,
-            blend_parent,
-            seq_group,
-            entry_node,
-            exit_node,
-            node_flags,
-            next_seq,
-        } = self;
-
-        writer.append_u8_slice(label.as_slice());
-        writer.append_f32(*fps);
-        writer.append_i32(flags.bits());
-        writer.append_i32(*activity);
-        writer.append_i32(*act_weight);
-        writer.append_i32(*num_events);
-        writer.append_i32(*event_index);
-        writer.append_i32(*num_frames);
-        writer.append_i32(*num_pivots);
-        writer.append_i32(*pivot_index);
-        writer.append_i32(*motion_type);
-        writer.append_i32(*motion_bone);
-        writer.append_f32_slice(linear_movement.to_array().as_slice());
-        writer.append_i32(*auto_move_pos_index);
-        writer.append_i32(*auto_move_angle_index);
-        writer.append_f32_slice(bbmin.to_array().as_slice());
-        writer.append_f32_slice(bbmax.to_array().as_slice());
-        writer.append_i32(*num_blends);
-        writer.append_i32(*anim_index);
-        writer.append_i32_slice(blend_type.as_slice());
-        writer.append_f32_slice(blend_start.as_slice());
-        writer.append_f32_slice(blend_end.as_slice());
-        writer.append_i32(*blend_parent);
-        writer.append_i32(*seq_group);
-        writer.append_i32(*entry_node);
-        writer.append_i32(*exit_node);
-        writer.append_i32(*node_flags);
-        writer.append_i32(*next_seq);
-
-        offset
     }
 }
