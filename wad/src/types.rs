@@ -1,9 +1,7 @@
 use std::{
     ffi::OsStr,
     fmt::{self, Display, Write as FmtWrite},
-    fs::OpenOptions,
-    io::Write,
-    path::{Path, PathBuf},
+    path::Path,
     str::from_utf8,
 };
 
@@ -418,21 +416,5 @@ impl Wad {
         drop(bytes);
 
         res
-    }
-
-    pub fn write_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
-        let bytes = self.write_to_bytes();
-
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(path)?;
-
-        file.write_all(&bytes)?;
-
-        file.flush()?;
-
-        Ok(())
     }
 }

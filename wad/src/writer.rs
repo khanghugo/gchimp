@@ -1,3 +1,9 @@
+use std::{
+    fs::OpenOptions,
+    io::Write,
+    path::{Path, PathBuf},
+};
+
 use byte_writer::ByteWriter;
 
 use crate::{
@@ -6,6 +12,22 @@ use crate::{
 };
 
 impl Wad {
+    pub fn write_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
+        let bytes = self.write_to_bytes();
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(path)?;
+
+        file.write_all(&bytes)?;
+
+        file.flush()?;
+
+        Ok(())
+    }
+
     pub fn write_to_bytes(&self) -> Vec<u8> {
         let mut writer = ByteWriter::new();
 
