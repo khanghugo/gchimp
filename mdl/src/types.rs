@@ -16,9 +16,10 @@ pub struct Mdl {
     pub sequence_groups: Vec<SequenceGroup>,
     pub skin_families: SkinFamilies,
     pub attachments: Vec<Attachment>,
-    pub transitions: Vec<u8>,
+    pub transitions: Transitions,
 }
 
+#[derive(Debug)]
 pub struct Header {
     pub id: i32,
     pub version: i32,
@@ -138,6 +139,7 @@ pub struct Sequence {
 }
 
 bitflags! {
+    #[derive(Debug, PartialEq)]
     pub struct TextureFlag: i32 {
         const FLATSHADE = 1;
         const CHROME = 1 << 1;
@@ -149,6 +151,7 @@ bitflags! {
     }
 }
 
+#[derive(Debug)]
 pub struct TextureHeader {
     pub name: [u8; 64],
     pub flags: TextureFlag,
@@ -157,8 +160,18 @@ pub struct TextureHeader {
     pub index: i32,
 }
 
+impl PartialEq for TextureHeader {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.flags == other.flags
+            && self.width == other.width
+            && self.height == other.height
+    }
+}
+
 pub const PALETTE_COUNT: usize = 256;
 
+#[derive(Debug, PartialEq)]
 pub struct Texture {
     pub header: TextureHeader,
     pub image: Vec<u8>,
@@ -284,12 +297,18 @@ impl MeshTriangles {
 //     }
 // }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct TrivertHeader {
     pub vert_index: i16,
     pub norm_index: i16,
     pub s: i16,
     pub t: i16,
+}
+
+impl PartialEq for TrivertHeader {
+    fn eq(&self, other: &Self) -> bool {
+        self.s == other.s && self.t == other.t
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -301,11 +320,11 @@ pub struct Trivert {
 
 impl PartialEq for Trivert {
     fn eq(&self, other: &Self) -> bool {
-        self.vertex == other.vertex && self.normal == other.normal
+        self.header == other.header && self.vertex == other.vertex && self.normal == other.normal
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Bone {
     pub name: [u8; 32],
     pub parent: i32,
@@ -315,6 +334,7 @@ pub struct Bone {
     pub scale: [f32; 6],
 }
 
+#[derive(Debug, PartialEq)]
 pub struct BoneController {
     pub bone: i32,
     pub type_: i32,
@@ -324,6 +344,7 @@ pub struct BoneController {
     pub index: i32,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Hitbox {
     pub bone: i32,
     pub group: i32,
@@ -340,6 +361,7 @@ pub struct SequenceGroup {
 
 pub type SkinFamilies = Vec<Vec<i16>>;
 
+#[derive(Debug)]
 pub struct Attachment {
     pub name: [u8; 32],
     pub type_: i32,
@@ -347,3 +369,5 @@ pub struct Attachment {
     pub org: Vec3,
     pub vectors: [Vec3; 3],
 }
+
+pub type Transitions = Vec<u8>;

@@ -208,6 +208,8 @@ impl WriteToWriter for &[Model] {
                 group_index,
             } = model.header;
 
+            let start = writer.get_offset();
+
             writer.append_u8_slice(name.as_slice());
             writer.append_i32(type_);
             writer.append_f32(bounding_radius);
@@ -223,6 +225,10 @@ impl WriteToWriter for &[Model] {
             // unused fields
             writer.append_i32(num_groups);
             writer.append_i32(group_index);
+
+            let end = writer.get_offset();
+
+            assert_eq!(end - start, std::mem::size_of::<ModelHeader>());
         });
 
         model_headers_offset

@@ -13,17 +13,19 @@ impl WriteToWriterTexture for &[Texture] {
                 let offset = writer.get_offset();
 
                 let Texture {
-                    header: _,
+                    header,
                     image,
                     palette,
                 } = texture;
+
+                assert_eq!(image.len(), (header.width * header.height) as usize);
 
                 writer.append_u8_slice(&image);
                 writer.append_u8_slice(
                     palette
                         .iter()
-                        .cloned()
                         .flatten()
+                        .cloned()
                         .collect::<Vec<u8>>()
                         .as_slice(),
                 );

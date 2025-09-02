@@ -1,18 +1,28 @@
 use byte_writer::ByteWriter;
 
-use crate::{writer::WriteToWriter, Bone, BoneController, Mdl};
+use crate::{writer::WriteToWriter, Bone, BoneController};
 
-impl Mdl {
-    pub(super) fn write_bones(&self, writer: &mut ByteWriter) {
-        self.bones.iter().for_each(|bone| {
+impl WriteToWriter for &[Bone] {
+    fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
+        let offset = writer.get_offset();
+
+        self.iter().for_each(|bone| {
             bone.write_to_writer(writer);
         });
-    }
 
-    pub(super) fn write_bone_controllers(&self, writer: &mut ByteWriter) {
-        self.bone_controllers.iter().for_each(|bone_controller| {
+        offset
+    }
+}
+
+impl WriteToWriter for &[BoneController] {
+    fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
+        let offset = writer.get_offset();
+
+        self.iter().for_each(|bone_controller| {
             bone_controller.write_to_writer(writer);
         });
+
+        offset
     }
 }
 

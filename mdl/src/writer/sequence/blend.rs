@@ -26,7 +26,7 @@ impl WriteToWriter for &[Blend] {
                                 if motion.is_zero() {
                                     0
                                 } else {
-motion.write_to_writer(&mut motion_data_writer) - (bone_idx * 12)
+                                    motion.write_to_writer(&mut motion_data_writer) - (bone_idx * 12)
                                 }
                                 )
                             .collect()
@@ -40,7 +40,8 @@ motion.write_to_writer(&mut motion_data_writer) - (bone_idx * 12)
             blend.iter().for_each(|bone| {
                 bone.iter().for_each(|offset| {
                     // using main writer now
-                    writer.append_u32(*offset as u32);
+                    // make sure this is u16
+                    writer.append_u16(*offset as u16);
                 });
             });
         });

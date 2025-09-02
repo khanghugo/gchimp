@@ -14,7 +14,7 @@ use crate::{
     types::{Header, Mdl, SequenceHeader, Texture, TextureFlag, TextureHeader},
     AnimValues, Attachment, Blend, Bodypart, BodypartHeader, Bone, BoneController, Hitbox, Mesh,
     MeshHeader, MeshTriangles, Model, ModelHeader, Sequence, SequenceFlag, SequenceGroup,
-    SkinFamilies, Trivert, TrivertHeader, PALETTE_COUNT, VEC3_T_SIZE,
+    SkinFamilies, Transitions, Trivert, TrivertHeader, PALETTE_COUNT, VEC3_T_SIZE,
 };
 
 impl Mdl {
@@ -988,7 +988,7 @@ pub fn parse_attachments<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a
         .parse(&start[mdl_header.attachment_index as usize..])
 }
 
-pub fn parse_transitions<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Vec<u8>> {
+pub fn parse_transitions<'a>(start: &'a [u8], mdl_header: &Header) -> IResult<'a, Transitions> {
     count(le_u8, (mdl_header.num_transitions.pow(2)) as usize)
         .parse(&start[mdl_header.transition_index as usize..])
 }

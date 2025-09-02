@@ -7,6 +7,7 @@ mod sequence_group;
 
 impl WriteToWriter for &[Sequence] {
     fn write_to_writer(&self, mut writer: &mut ByteWriter) -> usize {
+        
         // write sequence data and then sequence headers next
         let anim_indices = self
             .iter()
@@ -50,6 +51,8 @@ impl WriteToWriter for &[Sequence] {
                     next_seq,
                 } = &sequence.header;
 
+                let start = writer.get_offset();
+
                 writer.append_u8_slice(label);
                 writer.append_f32(*fps);
                 writer.append_i32(flags.bits());
@@ -78,6 +81,10 @@ impl WriteToWriter for &[Sequence] {
                 writer.append_i32(*exit_node);
                 writer.append_i32(*node_flags);
                 writer.append_i32(*next_seq);
+
+                let end = writer.get_offset();
+
+                assert_eq!(end - start, std::mem::size_of::<SequenceHeader>());
             });
 
         offsets
