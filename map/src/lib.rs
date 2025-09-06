@@ -36,7 +36,7 @@ pub struct BrushPlane {
 impl TryFrom<&str> for BrushPlane {
     type Error = &'static str;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &'_ str) -> Result<Self, Self::Error> {
         match parse_brush_plane(value) {
             Ok((_, res)) => Ok(res),
             Err(err) => Err(err.to_string().leak()),
@@ -52,7 +52,7 @@ pub struct Brush {
 impl TryFrom<&str> for Brush {
     type Error = &'static str;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &'_ str) -> Result<Self, Self::Error> {
         match parse_brush(value) {
             Ok((_, res)) => Ok(res),
             Err(err) => Err(err.to_string().leak()),
@@ -73,7 +73,7 @@ pub struct Entity {
 impl TryFrom<&str> for Entity {
     type Error = &'static str;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn try_from(value: &'_ str) -> Result<Self, Self::Error> {
         match parse_entity(value) {
             Ok((_, res)) => Ok(res),
             Err(err) => Err(err.to_string().leak()),
@@ -101,7 +101,7 @@ impl Map {
         }
     }
 
-    pub fn from_text(text: &str) -> eyre::Result<Self> {
+    pub fn from_text(text: &'_ str) -> eyre::Result<Self> {
         match parse_map(text) {
             Ok((_, res)) => Ok(res),
             Err(err) => Err(eyre!("Cannot parse text: {}", err.to_string())),
@@ -172,30 +172,30 @@ impl Map {
 
 type IResult<'a, T> = _IResult<&'a str, T>;
 
-fn take_comment_line(i: &str) -> IResult<&str> {
+fn take_comment_line(i: &'_ str) -> IResult<'_, &str> {
     terminated(
         preceded(tuple((space0, tag("//"))), take_till(|c| c == '\n')),
         multispace0,
     )(i)
 }
 
-fn take_tb_header(i: &str) -> IResult<Vec<String>> {
+fn take_tb_header(i: &'_ str) -> IResult<'_, Vec<String>> {
     many_m_n(0, 2, map(take_comment_line, |i| i.to_string()))(i)
 }
 
 // TODO: make it not discard
 // Many 0 because it doesn't necessary have it every time.
-fn discard_comment_lines(i: &str) -> IResult<&str> {
+fn discard_comment_lines(i: &'_ str) -> IResult<'_, &str> {
     map(many0(take_comment_line), |_| "")(i)
 }
 
-fn signed_double(i: &str) -> IResult<f64> {
+fn signed_double(i: &'_ str) -> IResult<'_, f64> {
     map(recognize(preceded(opt(tag("-")), _double)), |what: &str| {
         what.parse().unwrap()
     })(i)
 }
 
-pub fn double(i: &str) -> IResult<f64> {
+pub fn double(i: &'_ str) -> IResult<'_, f64> {
     preceded(space0, signed_double)(i)
 }
 
@@ -208,14 +208,14 @@ fn between_line_bracket<'a, T>(
     )
 }
 
-fn quoted_text(i: &str) -> IResult<&str> {
+fn quoted_text(i: &'_ str) -> IResult<'_, &str> {
     terminated(preceded(tag("\""), take_till(|c| c == '"')), tag("\""))(i)
 }
 
 // For brushes
 // These ones take in space0 at the end
 // just to make sure that the next thing we read is a value.
-fn parse_plane_coordinate(i: &str) -> IResult<DVec3> {
+fn parse_plane_coordinate(i: &'_ str) -> IResult<'_, DVec3> {
     terminated(
         preceded(
             tuple((space0, tag("("), space0)),
@@ -227,7 +227,7 @@ fn parse_plane_coordinate(i: &str) -> IResult<DVec3> {
     )(i)
 }
 
-fn parse_plane_uv(i: &str) -> IResult<DVec4> {
+fn parse_plane_uv(i: &'_ str) -> IResult<'_, DVec4> {
     terminated(
         preceded(
             tuple((space0, tag("["), space0)),
@@ -240,7 +240,7 @@ fn parse_plane_uv(i: &str) -> IResult<DVec4> {
     )(i)
 }
 
-fn parse_brush_plane(i: &str) -> IResult<BrushPlane> {
+fn parse_brush_plane(i: &'_ str) -> IResult<'_, BrushPlane> {
     map(
         tuple((
             parse_plane_coordinate,
@@ -269,14 +269,14 @@ fn parse_brush_plane(i: &str) -> IResult<BrushPlane> {
     )(i)
 }
 
-fn parse_brush(i: &str) -> IResult<Brush> {
+fn parse_brush(i: &'_ str) -> IResult<'_, Brush> {
     map(
         many1(terminated(parse_brush_plane, multispace0)),
         |planes| Brush { planes },
     )(i)
 }
 
-fn parse_brushes(i: &str) -> IResult<Vec<Brush>> {
+fn parse_brushes(i: &'_ str) -> IResult<'_, Vec<Brush>> {
     many1(delimited(
         discard_comment_lines,
         between_line_bracket(parse_brush),
@@ -285,11 +285,11 @@ fn parse_brushes(i: &str) -> IResult<Vec<Brush>> {
 }
 
 // For attributes
-fn parse_attribute(i: &str) -> IResult<(&str, &str)> {
+fn parse_attribute(i: &'_ str) -> IResult<'_, (&str, &'_ str)> {
     tuple((quoted_text, preceded(space0, quoted_text)))(i)
 }
 
-fn parse_attributes(i: &str) -> IResult<Attributes> {
+fn parse_attributes(i: &'_ str) -> IResult<'_, Attributes> {
     fold_many1(
         terminated(parse_attribute, multispace0),
         Attributes::new,
@@ -301,7 +301,7 @@ fn parse_attributes(i: &str) -> IResult<Attributes> {
 }
 
 // For map
-fn parse_entity(i: &str) -> IResult<Entity> {
+fn parse_entity(i: &'_ str) -> IResult<'_, Entity> {
     map(
         tuple((parse_attributes, opt(parse_brushes))),
         |(attributes, brushes)| Entity {
@@ -311,7 +311,7 @@ fn parse_entity(i: &str) -> IResult<Entity> {
     )(i)
 }
 
-fn parse_entities(i: &str) -> IResult<Vec<Entity>> {
+fn parse_entities(i: &'_ str) -> IResult<'_, Vec<Entity>> {
     many1(delimited(
         discard_comment_lines,
         between_line_bracket(parse_entity),
@@ -319,7 +319,7 @@ fn parse_entities(i: &str) -> IResult<Vec<Entity>> {
     ))(i)
 }
 
-fn parse_map(i: &str) -> IResult<Map> {
+fn parse_map(i: &'_ str) -> IResult<'_, Map> {
     map(
         all_consuming(tuple((opt(take_tb_header), parse_entities))),
         |(tb_header, entities)| Map {

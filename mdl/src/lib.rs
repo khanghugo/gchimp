@@ -66,6 +66,12 @@ mod test {
         let bytes2 = mdl.write_to_bytes();
         let mdl2 = Mdl::open_from_bytes(&bytes2).unwrap();
 
+        println!("{:?}", mdl.bodyparts[0].models[0].meshes[0].triangles.len());
+        println!(
+            "{:?}",
+            mdl2.bodyparts[0].models[0].meshes[0].triangles.len()
+        );
+
         // no animation
         assert_eq!(mdl.sequences[0].anim_blends, mdl2.sequences[0].anim_blends);
 
@@ -82,6 +88,57 @@ mod test {
             .iter()
             .for_each(|triangle| assert!(contains(triangle.get_triverts())));
 
+        // do it again becuase i might be crazy
+        mdl.bodyparts[0].models[0].meshes[0]
+            .triangles
+            .iter()
+            .zip(mdl2.bodyparts[0].models[0].meshes[0].triangles.iter())
+            .for_each(|(t1, t2)| match t1 {
+                crate::MeshTriangles::Strip(triverts1) => {
+                    let crate::MeshTriangles::Strip(triverts2) = t2 else {
+                        panic!()
+                    };
+
+                    assert_eq!(triverts1.len(), triverts2.len());
+
+                    triverts1.iter().zip(triverts2.iter()).for_each(|(t1, t2)| {
+                        assert_eq!(t1.normal, t2.normal);
+                        assert_eq!(t1.vertex, t2.vertex);
+                    });
+                }
+                crate::MeshTriangles::Fan(triverts1) => {
+                    let crate::MeshTriangles::Fan(triverts2) = t2 else {
+                        panic!()
+                    };
+
+                    assert_eq!(triverts1.len(), triverts2.len());
+
+                    triverts1.iter().zip(triverts2.iter()).for_each(|(t1, t2)| {
+                        assert_eq!(t1.normal, t2.normal);
+                        assert_eq!(t1.vertex, t2.vertex);
+                    });
+                }
+            });
+
+        // check bones
+        assert_eq!(mdl.bones, mdl2.bones);
+
+        // check textures
+        assert_eq!(mdl.textures, mdl2.textures);
+
+        // check transitions
+        assert_eq!(mdl.transitions, mdl2.transitions);
+
+        // check skin families
+        assert_eq!(mdl.skin_families, mdl2.skin_families);
+
+        // check bone controllers
+        assert_eq!(mdl.bone_controllers, mdl2.bone_controllers);
+
+        // check hitbox
+        assert_eq!(mdl.hitboxes, mdl2.hitboxes);
+
+        // write the file
         mdl.write_to_file("/home/khang/gchimp/mdl/src/tests/static_tree_parse_write.mdl")
             .unwrap();
     }
