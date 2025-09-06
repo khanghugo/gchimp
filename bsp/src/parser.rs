@@ -22,16 +22,16 @@ use crate::{
     utils::{between_braces, quoted_text},
 };
 
-fn parse_lump_header(i: &[u8]) -> IResult<LumpHeader> {
+fn parse_lump_header(i: &'_ [u8]) -> IResult<'_, LumpHeader> {
     map(tuple((le_i32, le_i32)), |(offset, length)| LumpHeader {
         offset,
         length,
     })(i)
 }
 
-// parse_entity takes in &str, not &[u8]
+// parse_entity takes in &str, not &'_ [u8]
 // this is to make things more convenient to parse
-fn parse_entity(i: &str) -> SResult<Entity> {
+fn parse_entity(i: &'_ str) -> SResult<'_, Entity> {
     let mut res = Entity::new();
 
     let parser = |i| delimited(multispace0, quoted_text, multispace0)(i);
@@ -46,7 +46,7 @@ fn parse_entity(i: &str) -> SResult<Entity> {
 }
 
 // hacky stuffs to avoid parsing bytes :DD
-fn parse_entities(i: &[u8]) -> Result<Vec<Entity>, BspEntitiesError> {
+fn parse_entities(i: &'_ [u8]) -> Result<Vec<Entity>, BspEntitiesError> {
     // HOLY FUCKING RETARD
     let s = String::from_utf8_lossy(i).replace(std::char::REPLACEMENT_CHARACTER, "");
 
@@ -56,7 +56,7 @@ fn parse_entities(i: &[u8]) -> Result<Vec<Entity>, BspEntitiesError> {
     Ok(res)
 }
 
-fn parse_plane(i: &[u8]) -> IResult<Plane> {
+fn parse_plane(i: &'_ [u8]) -> IResult<'_, Plane> {
     map(
         tuple((le_f32, le_f32, le_f32, le_f32, le_i32)),
         |(x, y, z, distance, type_)| Plane {
@@ -67,11 +67,11 @@ fn parse_plane(i: &[u8]) -> IResult<Plane> {
     )(i)
 }
 
-fn parse_planes(i: &[u8]) -> IResult<Vec<Plane>> {
+fn parse_planes(i: &'_ [u8]) -> IResult<'_, Vec<Plane>> {
     all_consuming(many0(parse_plane))(i)
 }
 
-fn parse_textures(i: &[u8]) -> IResult<Vec<Texture>> {
+fn parse_textures(i: &'_ [u8]) -> IResult<'_, Vec<Texture>> {
     let (header, tex_count) = le_u32(i)?;
     let (_, offsets) = count(le_i32, tex_count as usize)(header)?;
 
@@ -95,13 +95,13 @@ fn parse_textures(i: &[u8]) -> IResult<Vec<Texture>> {
     Ok((&[], miptexes))
 }
 
-fn parse_vertices(i: &[u8]) -> IResult<Vec<Vertex>> {
+fn parse_vertices(i: &'_ [u8]) -> IResult<'_, Vec<Vertex>> {
     all_consuming(many0(map(tuple((le_f32, le_f32, le_f32)), |(x, y, z)| {
         Vec3::new(x, y, z)
     })))(i)
 }
 
-fn parse_node(i: &[u8]) -> IResult<Node> {
+fn parse_node(i: &'_ [u8]) -> IResult<'_, Node> {
     map(
         tuple((
             le_u32,
@@ -123,11 +123,11 @@ fn parse_node(i: &[u8]) -> IResult<Node> {
     )(i)
 }
 
-fn parse_nodes(i: &[u8]) -> IResult<Vec<Node>> {
+fn parse_nodes(i: &'_ [u8]) -> IResult<'_, Vec<Node>> {
     all_consuming(many0(parse_node))(i)
 }
 
-fn parse_texinfo_singular(i: &[u8]) -> IResult<TexInfo> {
+fn parse_texinfo_singular(i: &'_ [u8]) -> IResult<'_, TexInfo> {
     map(
         tuple((
             count(le_f32, 3),
@@ -148,11 +148,11 @@ fn parse_texinfo_singular(i: &[u8]) -> IResult<TexInfo> {
     )(i)
 }
 
-fn parse_texinfo(i: &[u8]) -> IResult<Vec<TexInfo>> {
+fn parse_texinfo(i: &'_ [u8]) -> IResult<'_, Vec<TexInfo>> {
     all_consuming(many0(parse_texinfo_singular))(i)
 }
 
-fn parse_face(i: &[u8]) -> IResult<Face> {
+fn parse_face(i: &'_ [u8]) -> IResult<'_, Face> {
     map(
         tuple((
             le_u16,
@@ -175,11 +175,11 @@ fn parse_face(i: &[u8]) -> IResult<Face> {
     )(i)
 }
 
-fn parse_faces(i: &[u8]) -> IResult<Vec<Face>> {
+fn parse_faces(i: &'_ [u8]) -> IResult<'_, Vec<Face>> {
     all_consuming(many0(parse_face))(i)
 }
 
-fn parse_lightmap(i: &[u8]) -> IResult<LightMap> {
+fn parse_lightmap(i: &'_ [u8]) -> IResult<'_, LightMap> {
     // map with zero lightmap will have lump with size of 1
     if i.len() == 1 {
         return Ok((&[], vec![]));
@@ -190,7 +190,7 @@ fn parse_lightmap(i: &[u8]) -> IResult<LightMap> {
     })))(i)
 }
 
-fn parse_clipnode(i: &[u8]) -> IResult<ClipNode> {
+fn parse_clipnode(i: &'_ [u8]) -> IResult<'_, ClipNode> {
     map(
         tuple((le_i32, le_i16, le_i16)),
         |(plane, child1, child2)| ClipNode {
@@ -200,11 +200,11 @@ fn parse_clipnode(i: &[u8]) -> IResult<ClipNode> {
     )(i)
 }
 
-fn parse_clipnodes(i: &[u8]) -> IResult<Vec<ClipNode>> {
+fn parse_clipnodes(i: &'_ [u8]) -> IResult<'_, Vec<ClipNode>> {
     all_consuming(many0(parse_clipnode))(i)
 }
 
-fn parse_leaf(i: &[u8]) -> IResult<Leaf> {
+fn parse_leaf(i: &'_ [u8]) -> IResult<'_, Leaf> {
     map(
         tuple((
             le_i32,
@@ -240,23 +240,23 @@ fn parse_leaf(i: &[u8]) -> IResult<Leaf> {
     )(i)
 }
 
-fn parse_leaves(i: &[u8]) -> IResult<Vec<Leaf>> {
+fn parse_leaves(i: &'_ [u8]) -> IResult<'_, Vec<Leaf>> {
     all_consuming(many0(parse_leaf))(i)
 }
 
-fn parse_mark_surfaces(i: &[u8]) -> IResult<Vec<MarkSurface>> {
+fn parse_mark_surfaces(i: &'_ [u8]) -> IResult<'_, Vec<MarkSurface>> {
     all_consuming(many0(le_u16))(i)
 }
 
-fn parse_edges(i: &[u8]) -> IResult<Vec<Edge>> {
+fn parse_edges(i: &'_ [u8]) -> IResult<'_, Vec<Edge>> {
     all_consuming(many0(map(tuple((le_u16, le_u16)), |(p1, p2)| [p1, p2])))(i)
 }
 
-fn parse_surf_edges(i: &[u8]) -> IResult<Vec<SurfEdge>> {
+fn parse_surf_edges(i: &'_ [u8]) -> IResult<'_, Vec<SurfEdge>> {
     all_consuming(many0(le_i32))(i)
 }
 
-fn parse_model(i: &[u8]) -> IResult<Model> {
+fn parse_model(i: &'_ [u8]) -> IResult<'_, Model> {
     map(
         tuple((
             count(le_f32, 3),
@@ -279,13 +279,13 @@ fn parse_model(i: &[u8]) -> IResult<Model> {
     )(i)
 }
 
-fn parse_models(i: &[u8]) -> IResult<Vec<Model>> {
+fn parse_models(i: &'_ [u8]) -> IResult<'_, Vec<Model>> {
     all_consuming(many0(parse_model))(i)
 }
 
 type FUCKOFF<'a> = nom::Err<nom::error::Error<&'a [u8]>>;
 
-pub fn parse_bsp(i: &[u8]) -> Result<Bsp, BspError> {
+pub fn parse_bsp(i: &'_ [u8]) -> Result<Bsp, BspError> {
     let (beginning, version) = le_i32(i).map_err(|_: FUCKOFF| BspError::NomParsingError)?;
 
     if version != BSP_VERSION {
