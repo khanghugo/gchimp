@@ -1,17 +1,22 @@
 use dxt::{Dxt1, Dxt5};
 use image::DynamicImage;
-use nom::{combinator::fail, error::context};
+use nom::{
+    combinator::{cut, fail},
+    error::context,
+    Parser,
+};
 use rgb8::{bgr888::Bgr888, rgb888::Rgb888};
 
-use crate::{IResult, ImageData};
+use crate::{formats::u8::i8::I8, IResult, ImageData};
 
 pub mod dxt;
 pub mod rgb8;
+pub mod u8;
 
 mod utils;
 
 pub trait VtfImageImpl {
-    fn parse(i: &[u8], dimensions: (u32, u32)) -> IResult<ImageData>;
+    fn parse(i: &'_ [u8], dimensions: (u32, u32)) -> IResult<'_, ImageData>;
     fn to_image(bytes: &[u8], dimensions: (u32, u32)) -> DynamicImage;
 }
 
@@ -95,43 +100,21 @@ impl TryFrom<i32> for VtfImageFormat {
 
 impl VtfImage {
     pub fn parse_from_format(
-        i: &[u8],
+        i: &'_ [u8],
         format: VtfImageFormat,
         dimensions: (u32, u32),
-    ) -> IResult<VtfImage> {
-        let mut not_supported = context("vtf image format not supported", fail);
-
+    ) -> IResult<'_, VtfImage> {
         let (i, bytes) = match format {
-            VtfImageFormat::None => not_supported(i),
-            VtfImageFormat::Rgba8888 => not_supported(i),
-            VtfImageFormat::Abgr8888 => not_supported(i),
             VtfImageFormat::Rgb888 => Rgb888::parse(i, dimensions),
             VtfImageFormat::Bgr888 => Bgr888::parse(i, dimensions),
-            VtfImageFormat::Rgb565 => not_supported(i),
-            VtfImageFormat::I8 => not_supported(i),
-            VtfImageFormat::Ia88 => not_supported(i),
-            VtfImageFormat::P8 => not_supported(i),
-            VtfImageFormat::A8 => not_supported(i),
-            VtfImageFormat::Rgb888Bluescreen => not_supported(i),
-            VtfImageFormat::Bgr888Bluescreen => not_supported(i),
-            VtfImageFormat::Argb8888 => not_supported(i),
-            VtfImageFormat::Bgra8888 => not_supported(i),
             VtfImageFormat::Dxt1 => Dxt1::parse(i, dimensions),
-            VtfImageFormat::Dxt3 => not_supported(i),
             VtfImageFormat::Dxt5 => Dxt5::parse(i, dimensions),
-            VtfImageFormat::Bgrx8888 => not_supported(i),
-            VtfImageFormat::Bgr565 => not_supported(i),
-            VtfImageFormat::Bgrx5551 => not_supported(i),
-            VtfImageFormat::Bgra4444 => not_supported(i),
-            VtfImageFormat::Dxt1Onebitalpha => not_supported(i),
-            VtfImageFormat::Bgra5551 => not_supported(i),
-            VtfImageFormat::Uv88 => not_supported(i),
-            VtfImageFormat::Uvwq8888 => not_supported(i),
-            VtfImageFormat::Rgba16161616f => not_supported(i),
-            VtfImageFormat::Rgba16161616 => not_supported(i),
-            VtfImageFormat::Uvlx8888 => not_supported(i),
-        }
-        .unwrap();
+            VtfImageFormat::I8 => I8::parse(i, dimensions),
+            not_supported => {
+                println!("image format not supported {:?}", not_supported);
+                return context("vtf image format not supported", cut(fail)).parse(&[]);
+            }
+        }?;
 
         Ok((
             i,
@@ -151,7 +134,7 @@ impl VtfImage {
             VtfImageFormat::Rgb888 => Rgb888::to_image(&self.bytes, self.dimensions),
             VtfImageFormat::Bgr888 => Bgr888::to_image(&self.bytes, self.dimensions),
             VtfImageFormat::Rgb565 => todo!(),
-            VtfImageFormat::I8 => todo!(),
+            VtfImageFormat::I8 => I8::to_image(&self.bytes, self.dimensions),
             VtfImageFormat::Ia88 => todo!(),
             VtfImageFormat::P8 => todo!(),
             VtfImageFormat::A8 => todo!(),

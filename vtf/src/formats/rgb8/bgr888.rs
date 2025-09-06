@@ -5,7 +5,7 @@ use super::*;
 pub struct Bgr888;
 
 impl VtfImageImpl for Bgr888 {
-    fn parse(i: &[u8], dimensions: (u32, u32)) -> IResult<ImageData> {
+    fn parse(i: &'_ [u8], dimensions: (u32, u32)) -> IResult<'_, ImageData> {
         parse_rgb888(i, dimensions)
     }
 

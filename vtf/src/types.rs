@@ -164,7 +164,7 @@ pub struct VtfHighResImage {
 }
 
 impl VtfHighResImage {
-    pub fn get_high_res_image(&self) -> eyre::Result<DynamicImage> {
+    pub fn get_image(&self) -> eyre::Result<DynamicImage> {
         let Some(mipmap) = self.mipmaps.last() else {
             return Err(eyre::eyre!("no mipmaps"));
         };
@@ -255,13 +255,13 @@ impl Vtf {
                 return Err(eyre::eyre!("Vtf does not have high res image"));
             }
 
-            res.unwrap().get_high_res_image()
+            res.unwrap().get_image()
         } else {
             let VtfData::Vtf70(data) = &self.data else {
                 return Err(eyre::eyre!("Vtf does not have matching data"));
             };
 
-            data.high_res.get_high_res_image()
+            data.high_res.get_image()
         }
     }
 }

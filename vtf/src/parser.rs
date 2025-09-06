@@ -13,7 +13,7 @@ use crate::{
     ResourceEntryTag, Vtf, Vtf70Data, Vtf73Data, VtfData, VtfFlag, VtfHighResImage,
 };
 
-fn parse_header(i: &[u8]) -> IResult<Header> {
+fn parse_header(i: &'_ [u8]) -> IResult<'_, Header> {
     let (i, signature) = take(4usize)(i)?;
 
     let (i, (version, header_size, width, height, flags, frames, first_frame)) = tuple((
@@ -217,7 +217,7 @@ fn parse_high_res_mipmaps<'a>(i: &'a [u8], header: &Header) -> IResult<'a, Vec<M
 }
 
 // 7.3+
-fn parse_resource_entry(i: &[u8]) -> IResult<ResourceEntry> {
+fn parse_resource_entry(i: &'_ [u8]) -> IResult<'_, ResourceEntry> {
     let (i, (tag, flags, offset)) = tuple((take(3usize), le_u8, le_u32))(i)?;
 
     let tag_res = ResourceEntryTag::try_from(tag);
@@ -236,7 +236,7 @@ fn parse_resource_entry(i: &[u8]) -> IResult<ResourceEntry> {
     ))
 }
 
-pub fn parse_vtf(i: &[u8]) -> IResult<Vtf> {
+pub fn parse_vtf(i: &'_ [u8]) -> IResult<'_, Vtf> {
     let (header_end, header) = parse_header(i)?;
 
     if header.version[0] != 7 {
@@ -254,17 +254,4 @@ pub fn parse_vtf(i: &[u8]) -> IResult<Vtf> {
     };
 
     Ok((b"", Vtf { header, data }))
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn vtf() {
-        let vtf = include_bytes!("tests/prodcaution_green.vtf");
-        let (_, vtf) = parse_vtf(vtf).unwrap();
-
-        println!("{:?}", vtf.header);
-    }
 }

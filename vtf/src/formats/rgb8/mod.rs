@@ -5,7 +5,7 @@ use super::*;
 pub mod bgr888;
 pub mod rgb888;
 
-fn parse_rgb888(i: &[u8], dimensions: (u32, u32)) -> IResult<ImageData> {
+fn parse_rgb888(i: &'_ [u8], dimensions: (u32, u32)) -> IResult<'_, ImageData> {
     let (width, height) = dimensions;
 
     let bit_count = (width) * height * 24; // 24 bpp
