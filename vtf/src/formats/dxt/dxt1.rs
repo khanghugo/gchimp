@@ -6,7 +6,7 @@ use super::*;
 pub struct Dxt1;
 
 impl VtfImageImpl for Dxt1 {
-    fn parse(i: &[u8], dimensions: (u32, u32)) -> IResult<ImageData> {
+    fn parse(i: &'_ [u8], dimensions: (u32, u32)) -> IResult<'_, ImageData> {
         let (width, height) = dimensions;
 
         let bit_count = width * height * 4; // 4 bpp
