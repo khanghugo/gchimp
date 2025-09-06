@@ -18,7 +18,6 @@ use crate::{
 };
 
 static FACE_SIZE: f32 = 94.;
-static SKY_TEXTURE_SUFFIX: [&str; 6] = ["up", "dn", "lf", "rt", "ft", "bk"];
 
 pub struct SkyModGui {
     app_config: Config,
