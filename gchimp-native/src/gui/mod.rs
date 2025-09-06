@@ -51,8 +51,8 @@ pub fn gui() -> eyre::Result<()> {
             .with_inner_size([PROGRAM_WIDTH, PROGRAM_HEIGHT])
             .with_drag_and_drop(true)
             .with_icon(icon)
-            .with_maximize_button(false)
-            .with_minimize_button(false),
+            .with_maximize_button(true)
+            .with_minimize_button(true),
         ..Default::default()
     };
 
