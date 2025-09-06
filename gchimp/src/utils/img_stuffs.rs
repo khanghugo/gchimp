@@ -23,10 +23,12 @@ type Palette = Vec<quantette::palette::rgb::Rgb<quantette::palette::encoding::Sr
 ///
 /// ## Must convert image to 8bpp with the palette.
 fn quantize_image(img: RgbImage) -> eyre::Result<(RgbImage, Palette)> {
-    let pipeline = ImagePipeline::try_from(&img)?
+    let mut binding = ImagePipeline::try_from(&img)?;
+
+    let pipeline = binding
         .palette_size(255)
         .dither(true)
-        .colorspace(ColorSpace::Oklab)
+        .colorspace(ColorSpace::Srgb)
         .quantize_method(QuantizeMethod::kmeans());
 
     let img = pipeline.clone().quantized_rgbimage_par();
