@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::io::{self, BufWriter, Write};
+use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use glam::{DVec2, DVec3};
@@ -141,7 +141,7 @@ impl Smd {
         }
     }
 
-    pub fn from(text: &str) -> eyre::Result<Self> {
+    pub fn from(text: &'_ str) -> eyre::Result<Self> {
         match parse_smd(text) {
             Ok((_, res)) => Ok(res),
             Err(err) => Err(eyre!("Cannot parse text: {}", err.to_string())),
@@ -272,27 +272,27 @@ impl Smd {
     }
 }
 
-fn _number(i: &str) -> IResult<i32> {
+fn _number(i: &'_ str) -> IResult<'_, i32> {
     map_res(recognize(preceded(opt(tag("-")), digit1)), |s: &str| {
         s.parse::<i32>()
     })(i)
 }
 
-fn number(i: &str) -> IResult<i32> {
+fn number(i: &'_ str) -> IResult<'_, i32> {
     preceded(space0, _number)(i)
 }
 
-fn signed_double(i: &str) -> IResult<f64> {
+fn signed_double(i: &'_ str) -> IResult<'_, f64> {
     map(recognize(preceded(opt(tag("-")), _double)), |what: &str| {
         what.parse().unwrap()
     })(i)
 }
 
-pub fn double(i: &str) -> IResult<f64> {
+pub fn double(i: &'_ str) -> IResult<'_, f64> {
     preceded(space0, signed_double)(i)
 }
 
-fn quoted_text(i: &str) -> IResult<&str> {
+fn quoted_text(i: &'_ str) -> IResult<'_, &str> {
     terminated(preceded(tag("\""), take_till(|c| c == '"')), tag("\""))(i)
 }
 
@@ -306,13 +306,13 @@ fn in_block<'a, T>(
     )
 }
 
-fn dvec3(i: &str) -> IResult<DVec3> {
+fn dvec3(i: &'_ str) -> IResult<'_, DVec3> {
     map(tuple((double, double, double)), |(x, y, z)| {
         DVec3::new(x, y, z)
     })(i)
 }
 
-fn dvec2(i: &str) -> IResult<DVec2> {
+fn dvec2(i: &'_ str) -> IResult<'_, DVec2> {
     map(tuple((double, double)), |(x, y)| DVec2::new(x, y))(i)
 }
 
@@ -326,16 +326,16 @@ fn between_space_and_endline<'a, T>(
 // Beware of the usage. If parsing to end of file,
 // it should pair with many_till and eof
 // many_till(take_line, eof)
-fn take_line(i: &str) -> IResult<&str> {
+fn take_line(i: &'_ str) -> IResult<'_, &str> {
     terminated(not_line_ending, multispace0)(i)
 }
 
-fn parse_header(i: &str) -> IResult<i32> {
+fn parse_header(i: &'_ str) -> IResult<'_, i32> {
     terminated(preceded(tag("version "), number), multispace0)(i)
 }
 
 // Main parsing functions
-fn parse_node(i: &str) -> IResult<(i32, &str, i32)> {
+fn parse_node(i: &'_ str) -> IResult<'_, (i32, &str, i32)> {
     tuple((
         number,
         preceded(space1, quoted_text),
@@ -343,7 +343,7 @@ fn parse_node(i: &str) -> IResult<(i32, &str, i32)> {
     ))(i)
 }
 
-fn parse_nodes(i: &str) -> IResult<Vec<Node>> {
+fn parse_nodes(i: &'_ str) -> IResult<'_, Vec<Node>> {
     in_block(
         "nodes",
         many0(map(
@@ -357,7 +357,7 @@ fn parse_nodes(i: &str) -> IResult<Vec<Node>> {
     )(i)
 }
 
-fn parse_bone_pos(i: &str) -> IResult<BonePos> {
+fn parse_bone_pos(i: &'_ str) -> IResult<'_, BonePos> {
     map(tuple((number, dvec3, dvec3)), |(id, pos, rot)| BonePos {
         id,
         pos,
@@ -365,11 +365,11 @@ fn parse_bone_pos(i: &str) -> IResult<BonePos> {
     })(i)
 }
 
-fn parse_bones(i: &str) -> IResult<Vec<BonePos>> {
+fn parse_bones(i: &'_ str) -> IResult<'_, Vec<BonePos>> {
     many0(between_space_and_endline(parse_bone_pos))(i)
 }
 
-fn parse_bones_single_time_frame(i: &str) -> IResult<Skeleton> {
+fn parse_bones_single_time_frame(i: &'_ str) -> IResult<'_, Skeleton> {
     map(
         tuple((
             preceded(tag("time"), between_space_and_endline(number)),
@@ -379,11 +379,11 @@ fn parse_bones_single_time_frame(i: &str) -> IResult<Skeleton> {
     )(i)
 }
 
-fn parse_skeleton(i: &str) -> IResult<Vec<Skeleton>> {
+fn parse_skeleton(i: &'_ str) -> IResult<'_, Vec<Skeleton>> {
     in_block("skeleton", many0(parse_bones_single_time_frame))(i)
 }
 
-fn parse_vertex_source_info(i: &str) -> IResult<VertexSourceInfo> {
+fn parse_vertex_source_info(i: &'_ str) -> IResult<'_, VertexSourceInfo> {
     map(
         tuple((number, opt(number), opt(double))),
         |(links, bone, weight)| VertexSourceInfo {
@@ -394,7 +394,7 @@ fn parse_vertex_source_info(i: &str) -> IResult<VertexSourceInfo> {
     )(i)
 }
 
-fn parse_vertex(i: &str) -> IResult<Vertex> {
+fn parse_vertex(i: &'_ str) -> IResult<'_, Vertex> {
     map(
         tuple((number, dvec3, dvec3, dvec2, opt(parse_vertex_source_info))),
         |(parent, pos, norm, uv, source)| Vertex {
@@ -407,11 +407,11 @@ fn parse_vertex(i: &str) -> IResult<Vertex> {
     )(i)
 }
 
-fn parse_vertices(i: &str) -> IResult<Vec<Vertex>> {
+fn parse_vertices(i: &'_ str) -> IResult<'_, Vec<Vertex>> {
     many0(between_space_and_endline(parse_vertex))(i)
 }
 
-fn parse_triangle(i: &str) -> IResult<Triangle> {
+fn parse_triangle(i: &'_ str) -> IResult<'_, Triangle> {
     // We cannot have a another line that is named "end" out of nowhere.
     // So no texture name "end" is allowed.
     map(
@@ -423,21 +423,21 @@ fn parse_triangle(i: &str) -> IResult<Triangle> {
     )(i)
 }
 
-fn parse_triangles(i: &str) -> IResult<Vec<Triangle>> {
+fn parse_triangles(i: &'_ str) -> IResult<'_, Vec<Triangle>> {
     in_block("triangles", many0(parse_triangle))(i)
 }
 
-fn parse_vertex_anim_pos(i: &str) -> IResult<VertexAnimPos> {
+fn parse_vertex_anim_pos(i: &'_ str) -> IResult<'_, VertexAnimPos> {
     map(tuple((number, dvec3, dvec3)), |(id, pos, norm)| {
         VertexAnimPos { id, pos, norm }
     })(i)
 }
 
-fn parse_vertex_anim_vertices(i: &str) -> IResult<Vec<VertexAnimPos>> {
+fn parse_vertex_anim_vertices(i: &'_ str) -> IResult<'_, Vec<VertexAnimPos>> {
     many0(between_space_and_endline(parse_vertex_anim_pos))(i)
 }
 
-fn parse_vertex_anim_single_time_frame(i: &str) -> IResult<VertexAnim> {
+fn parse_vertex_anim_single_time_frame(i: &'_ str) -> IResult<'_, VertexAnim> {
     map(
         tuple((
             preceded(tag("time"), between_space_and_endline(number)),
@@ -447,14 +447,14 @@ fn parse_vertex_anim_single_time_frame(i: &str) -> IResult<VertexAnim> {
     )(i)
 }
 
-fn parse_vertex_anims(i: &str) -> IResult<Vec<VertexAnim>> {
+fn parse_vertex_anims(i: &'_ str) -> IResult<'_, Vec<VertexAnim>> {
     in_block(
         "vertexanimation",
         many0(parse_vertex_anim_single_time_frame),
     )(i)
 }
 
-fn discard_comment_line(i: &str) -> IResult<&str> {
+fn discard_comment_line(i: &'_ str) -> IResult<'_, &str> {
     terminated(
         preceded(
             tuple((multispace0, tag("//"))),
@@ -464,7 +464,7 @@ fn discard_comment_line(i: &str) -> IResult<&str> {
     )(i)
 }
 
-fn parse_smd(i: &str) -> IResult<Smd> {
+fn parse_smd(i: &'_ str) -> IResult<'_, Smd> {
     map(
         tuple((
             opt(many0(discard_comment_line)),
