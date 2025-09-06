@@ -1,11 +1,13 @@
 @PointClass size(-8 -8 -8, 8 8 8) color(255 0 255) = gchimp_info : "Info for gchimp"
 [
-    hl_path(string) : "Path to hl.exe"
-    gamedir(string) : "Game mod directory" : "cstrike"
+    hl_path(string) : "Path to folder containing hl.exe"
+    gamedir(string) : "Game mod directory name" : "cstrike"
     options(Flags) =
 	[
-		1: "Enable map2mdl" : 0
-		2: "Enable map2mdl resource export (still converts gchimp_map2mdl to cycler_sprite)" : 0
+		// Converts brushes into models
+		1: "map2mdl Conversion" : 0
+		// Exports model entity into the map. Can be used without "conversion" option to avoid redoing conversion.
+		2: "map2mdl Export" : 0
 	]
 ] 
 
@@ -15,14 +17,14 @@
     model_entity(string) : "Classname of model displaying entity" : "cycler_sprite"
 	cliptype(choices) : "Generates CLIP brush overlaying model" : 0 =
 	[
-		0 : "No clip"
-		1 : "Precise (matching original brush)"
-		2 : "Box (biggest bounding box covering brush)"
+		0 : "No Clip"
+		1 : "Same as Brush"
+		2 : "Biggest Box"
 	]
-	target_origin(target_destination) : "Sets the model origin based on origin of info_target"
+	target_origin(target_source) : "Sets the model origin based on origin of info_target"
 	options(Flags) =
 	[
-		1: "Flat shade" : 1
+		1: "Flat Shade" : 1
 		2: "With CelShade" : 0
 		4: "As CelShade" : 0
 	]
