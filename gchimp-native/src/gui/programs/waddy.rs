@@ -852,7 +852,7 @@ impl WaddyGui {
                     } else if IMAGE_FORMATS.contains(&ext.to_str().unwrap()) {
                         if let Err(err) = self.instances[instance_index]
                             .waddy
-                            .add_texture_from_path(path)
+                            .add_texture_from_image_path(path)
                         {
                             println!("{}", err);
                         } else {
@@ -1040,7 +1040,7 @@ impl WaddyGui {
                     for path in &paths {
                         if let Err(err) = self.instances[instance_index]
                             .waddy
-                            .add_texture_from_path(path)
+                            .add_texture_from_image_path(path)
                         {
                             println!("{}", err);
                         } else {

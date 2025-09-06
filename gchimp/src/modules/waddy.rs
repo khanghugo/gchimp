@@ -1,5 +1,7 @@
 use std::{
     ffi::OsStr,
+    fs::OpenOptions,
+    io::Read,
     path::{Path, PathBuf},
     str::from_utf8,
 };
@@ -45,12 +47,10 @@ impl Waddy {
         Ok(Waddy { wad })
     }
 
-    pub fn from_bsp_file(
-        path: impl AsRef<Path> + Into<PathBuf> + AsRef<OsStr>,
-    ) -> eyre::Result<Self> {
+    pub fn from_bsp_bytes(bytes: &[u8]) -> eyre::Result<Self> {
         let mut res = Self::new();
 
-        let bsp = Bsp::from_file(path)?;
+        let bsp = Bsp::from_bytes(bytes)?;
         let textures = bsp.textures;
 
         // TODO maybe one day I will change this at wad write level
@@ -69,6 +69,17 @@ impl Waddy {
             .collect::<Vec<wad::types::Entry>>();
 
         Ok(res)
+    }
+
+    pub fn from_bsp_file(
+        path: impl AsRef<Path> + Into<PathBuf> + AsRef<OsStr>,
+    ) -> eyre::Result<Self> {
+        let mut file = OpenOptions::new().read(true).open(path)?;
+        let mut bytes = vec![];
+
+        file.read_to_end(&mut bytes)?;
+
+        Self::from_bsp_bytes(&bytes)
     }
 
     fn log(&self, i: impl std::fmt::Display + AsRef<str>) {
@@ -313,7 +324,7 @@ impl Waddy {
         Ok(())
     }
 
-    pub fn add_texture_from_path(
+    pub fn add_texture_from_image_path(
         &mut self,
         path: impl AsRef<Path> + Into<PathBuf>,
     ) -> eyre::Result<()> {
@@ -336,70 +347,33 @@ mod test {
     use super::*;
 
     #[test]
-    fn dump_info() {
-        let waddy = Waddy::from_wad_file("/home/khang/gchimp/wad/test/surf_cyberwave.wad").unwrap();
-        println!("{}", waddy.dump_info());
-    }
-
-    #[test]
-    fn dump_info2() {
-        let waddy = Waddy::from_wad_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
-        println!("{}", waddy.dump_info());
-    }
-
-    #[test]
-    fn dump_textures() {
-        let waddy = Waddy::from_wad_file("/home/khang/gchimp/wad/test/surf_cyberwave.wad").unwrap();
-        waddy
-            .dump_textures_to_files("/home/khang/gchimp/examples/waddy/")
-            .unwrap();
-    }
-
-    #[test]
-    fn dump_textures2() {
-        {
-            let waddy =
-                Waddy::from_wad_file("/home/khang/map_compiler/cso_normal_pack.wad").unwrap();
-
-            waddy
-                .dump_textures_to_files("/home/khang/gchimp/examples/waddy/cso")
-                .unwrap();
-        }
-
-        // check the memory usage
-        std::thread::sleep(std::time::Duration::from_secs(15));
-    }
-
-    #[test]
     fn add_wad() {
-        let mut waddy =
-            Waddy::from_wad_file("/home/khang/gchimp/examples/waddy/wad_test.wad").unwrap();
+        let mut waddy = Waddy::new();
 
-        // waddy
-        //     .add_texture("/home/khang/map_compiler/my_textures/black.bmp")
-        //     .unwrap();
+        let img1 = include_bytes!("../../test/neon_red.bmp");
+        let img2 = include_bytes!("../../test/neon_yellow.bmp");
 
-        // waddy
-        //     .add_texture("/home/khang/gchimp/examples/waddy/cyberwave/neon_blueing..bmp")
-        //     .unwrap();
+        let img1_dynamic = image::load_from_memory(img1).unwrap();
+        let img2_dynamic = image::load_from_memory(img2).unwrap();
 
         waddy
-            .add_texture_from_path("/home/khang/gchimp/examples/waddy/cyberwave/z.bmp")
+            .add_texture_from_rgba_image("neon_red", img1_dynamic.into())
+            .unwrap();
+        waddy
+            .add_texture_from_rgba_image("neon_yellow", img2_dynamic.into())
             .unwrap();
 
-        waddy
-            .save_to_file("/home/khang/gchimp/examples/waddy/wad_test_out.wad")
-            .unwrap();
+        assert_eq!(waddy.wad.entries.len(), 2);
+
+        assert_eq!(waddy.wad.entries[0].texture_name_standard(), "NEON_RED");
+        assert_eq!(waddy.wad.entries[1].texture_name_standard(), "NEON_YELLOW");
     }
 
     #[test]
     fn open_bsp() {
-        let waddy = Waddy::from_bsp_file("/home/khang/map/bsp/bsp_compile.bsp").unwrap();
-        // println!("{}", waddy.wad.entries)
-        waddy
-            .wad
-            .entries
-            .iter()
-            .for_each(|what| println!("{}", what.texture_name()));
+        let bsp_bytes = include_bytes!("../../test/datacore.bsp");
+        let waddy = Waddy::from_bsp_bytes(bsp_bytes).unwrap();
+
+        assert_eq!(waddy.wad.entries.len(), 94);
     }
 }
