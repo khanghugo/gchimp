@@ -328,6 +328,14 @@ impl Entry {
 
         Ok(())
     }
+
+    pub fn is_external(&self) -> bool {
+        match &self.file_entry {
+            FileEntry::Qpic(_qpic) => false,
+            FileEntry::MipTex(mip_tex) => mip_tex.is_external(),
+            FileEntry::Font(_font) => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
