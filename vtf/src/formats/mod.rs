@@ -7,7 +7,7 @@ use nom::{
 };
 use rgb8::{bgr888::Bgr888, rgb888::Rgb888};
 
-use crate::{formats::u8::i8::I8, IResult, ImageData};
+use crate::{formats::u8::U8, IResult, ImageData};
 
 pub mod dxt;
 pub mod rgb8;
@@ -109,7 +109,9 @@ impl VtfImage {
             VtfImageFormat::Bgr888 => Bgr888::parse(i, dimensions),
             VtfImageFormat::Dxt1 => Dxt1::parse(i, dimensions),
             VtfImageFormat::Dxt5 => Dxt5::parse(i, dimensions),
-            VtfImageFormat::I8 => I8::parse(i, dimensions),
+            VtfImageFormat::I8 => U8::parse(i, dimensions),
+            VtfImageFormat::A8 => U8::parse(i, dimensions),
+            VtfImageFormat::P8 => U8::parse(i, dimensions),
             not_supported => {
                 println!("image format not supported {:?}", not_supported);
                 return context("vtf image format not supported", cut(fail)).parse(&[]);
@@ -128,34 +130,14 @@ impl VtfImage {
 
     pub fn to_image(&self) -> DynamicImage {
         match self.format {
-            VtfImageFormat::None => todo!(),
-            VtfImageFormat::Rgba8888 => todo!(),
-            VtfImageFormat::Abgr8888 => todo!(),
             VtfImageFormat::Rgb888 => Rgb888::to_image(&self.bytes, self.dimensions),
             VtfImageFormat::Bgr888 => Bgr888::to_image(&self.bytes, self.dimensions),
-            VtfImageFormat::Rgb565 => todo!(),
-            VtfImageFormat::I8 => I8::to_image(&self.bytes, self.dimensions),
-            VtfImageFormat::Ia88 => todo!(),
-            VtfImageFormat::P8 => todo!(),
-            VtfImageFormat::A8 => todo!(),
-            VtfImageFormat::Rgb888Bluescreen => todo!(),
-            VtfImageFormat::Bgr888Bluescreen => todo!(),
-            VtfImageFormat::Argb8888 => todo!(),
-            VtfImageFormat::Bgra8888 => todo!(),
             VtfImageFormat::Dxt1 => Dxt1::to_image(&self.bytes, self.dimensions),
-            VtfImageFormat::Dxt3 => todo!(),
             VtfImageFormat::Dxt5 => Dxt5::to_image(&self.bytes, self.dimensions),
-            VtfImageFormat::Bgrx8888 => todo!(),
-            VtfImageFormat::Bgr565 => todo!(),
-            VtfImageFormat::Bgrx5551 => todo!(),
-            VtfImageFormat::Bgra4444 => todo!(),
-            VtfImageFormat::Dxt1Onebitalpha => todo!(),
-            VtfImageFormat::Bgra5551 => todo!(),
-            VtfImageFormat::Uv88 => todo!(),
-            VtfImageFormat::Uvwq8888 => todo!(),
-            VtfImageFormat::Rgba16161616f => todo!(),
-            VtfImageFormat::Rgba16161616 => todo!(),
-            VtfImageFormat::Uvlx8888 => todo!(),
+            VtfImageFormat::I8 => U8::to_image(&self.bytes, self.dimensions),
+            VtfImageFormat::A8 => U8::to_image(&self.bytes, self.dimensions),
+            VtfImageFormat::P8 => U8::to_image(&self.bytes, self.dimensions),
+            _ => todo!(),
         }
     }
 }

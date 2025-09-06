@@ -1,8 +1,27 @@
 use nom::bytes::complete::take;
 
-use crate::types::{IResult, ImageData};
+use crate::{
+    formats::{utils::rgb8_buffer_to_image, VtfImageImpl},
+    types::{IResult, ImageData},
+};
 
-pub mod i8;
+pub struct U8;
+impl VtfImageImpl for U8 {
+    fn parse(
+        i: &'_ [u8],
+        dimensions: (u32, u32),
+    ) -> crate::types::IResult<'_, crate::types::ImageData> {
+        parse_u8(i, dimensions)
+    }
+
+    fn to_image(bytes: &[u8], dimensions: (u32, u32)) -> image::DynamicImage {
+        let (width, height) = dimensions;
+
+        let buf = bytes.iter().map(|&v| [v; 3]).collect::<Vec<[u8; 3]>>();
+
+        rgb8_buffer_to_image(&buf, width, height)
+    }
+}
 
 fn parse_u8(i: &'_ [u8], dimensions: (u32, u32)) -> IResult<'_, ImageData> {
     let (width, height) = dimensions;
