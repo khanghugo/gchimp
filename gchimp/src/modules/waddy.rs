@@ -352,9 +352,13 @@ mod test {
 
         let img1 = include_bytes!("../../test/neon_red.bmp");
         let img2 = include_bytes!("../../test/neon_yellow.bmp");
+        let img3 = include_bytes!("../../test/rainbow.vtf");
+
+        let img3_vtf = vtf::Vtf::from_bytes(img3).unwrap();
 
         let img1_dynamic = image::load_from_memory(img1).unwrap();
         let img2_dynamic = image::load_from_memory(img2).unwrap();
+        let img3_dynamic = img3_vtf.get_high_res_image().unwrap();
 
         waddy
             .add_texture_from_rgba_image("neon_red", img1_dynamic.into())
@@ -362,11 +366,29 @@ mod test {
         waddy
             .add_texture_from_rgba_image("neon_yellow", img2_dynamic.into())
             .unwrap();
+        waddy
+            .add_texture_from_rgba_image("rainbow", img3_dynamic.into())
+            .unwrap();
 
-        assert_eq!(waddy.wad.entries.len(), 2);
+        assert_eq!(waddy.wad.entries.len(), 3);
 
-        assert_eq!(waddy.wad.entries[0].texture_name_standard(), "NEON_RED");
-        assert_eq!(waddy.wad.entries[1].texture_name_standard(), "NEON_YELLOW");
+        {
+            let entry = &waddy.wad.entries[0];
+            assert_eq!(entry.texture_name_standard(), "NEON_RED");
+            assert_eq!(entry.file_entry.dimensions(), (16, 16));
+        }
+
+        {
+            let entry = &waddy.wad.entries[1];
+            assert_eq!(entry.texture_name_standard(), "NEON_YELLOW");
+            assert_eq!(entry.file_entry.dimensions(), (16, 16));
+        }
+
+        {
+            let entry = &waddy.wad.entries[2];
+            assert_eq!(entry.texture_name_standard(), "RAINBOW");
+            assert_eq!(entry.file_entry.dimensions(), (512, 512));
+        }
     }
 
     #[test]
