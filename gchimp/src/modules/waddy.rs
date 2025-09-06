@@ -397,5 +397,16 @@ mod test {
         let waddy = Waddy::from_bsp_bytes(bsp_bytes).unwrap();
 
         assert_eq!(waddy.wad.entries.len(), 94);
+
+        assert!(waddy.wad.entries.iter().all(|entry| entry.is_external()))
+    }
+
+    #[test]
+    fn open_bsp2() {
+        let bsp_bytes = include_bytes!("../../test/kz_pinkblaus.bsp");
+        let waddy = Waddy::from_bsp_bytes(bsp_bytes).unwrap();
+
+        assert_eq!(waddy.wad.entries.len(), 83);
+        assert!(waddy.wad.entries.iter().all(|entry| !entry.is_external()))
     }
 }
