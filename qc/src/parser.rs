@@ -31,35 +31,35 @@ fn qc_command<'a, T>(
     map(terminated(command(s, f), multispace0), qc)
 }
 
-fn parse_modelname(i: &str) -> CResult {
+fn parse_modelname(i: &'_ str) -> CResult<'_> {
     qc_command("$modelname", name_string, |modelname| {
         QcCommand::ModelName(modelname.to_string())
     })(i)
 }
 
-fn parse_cd(i: &str) -> CResult {
+fn parse_cd(i: &'_ str) -> CResult<'_> {
     qc_command("$cd", name_string, |cd| QcCommand::Cd(cd.to_string()))(i)
 }
 
 // $cdtexture is for GoldSrc
-fn parse_cd_texture(i: &str) -> CResult {
+fn parse_cd_texture(i: &'_ str) -> CResult<'_> {
     qc_command("$cdtexture", name_string, |cd_texture| {
         QcCommand::CdTexture(cd_texture.to_string())
     })(i)
 }
 
 // $cdmaterials is for Source
-fn parse_cd_materials(i: &str) -> CResult {
+fn parse_cd_materials(i: &'_ str) -> CResult<'_> {
     qc_command("$cdmaterials", name_string, |cd_materials| {
         QcCommand::CdMaterials(cd_materials.to_string())
     })(i)
 }
 
-fn parse_scale(i: &str) -> CResult {
+fn parse_scale(i: &'_ str) -> CResult<'_> {
     qc_command("$scale", double, QcCommand::Scale)(i)
 }
 
-fn parse_texrendermode(i: &str) -> CResult {
+fn parse_texrendermode(i: &'_ str) -> CResult<'_> {
     qc_command(
         "$texrendermode",
         tuple((name_string, preceded(space0, between_space))),
@@ -70,19 +70,19 @@ fn parse_texrendermode(i: &str) -> CResult {
     )(i)
 }
 
-fn parse_cbox(i: &str) -> CResult {
+fn parse_cbox(i: &'_ str) -> CResult<'_> {
     qc_command("$cbox", tuple((dvec3, dvec3)), |(mins, maxs)| {
         QcCommand::CBox(CBox(BBox { mins, maxs }))
     })(i)
 }
 
-fn parse_bbox(i: &str) -> CResult {
+fn parse_bbox(i: &'_ str) -> CResult<'_> {
     qc_command("$bbox", tuple((dvec3, dvec3)), |(mins, maxs)| {
         QcCommand::BBox(BBox { mins, maxs })
     })(i)
 }
 
-fn body(i: &str) -> IResult<Body> {
+fn body(i: &'_ str) -> IResult<'_, Body> {
     map(
         tuple((
             name_string,
@@ -99,7 +99,7 @@ fn body(i: &str) -> IResult<Body> {
     )(i)
 }
 
-fn parse_body(i: &str) -> CResult {
+fn parse_body(i: &'_ str) -> CResult<'_> {
     qc_command("$body", body, QcCommand::Body)(i)
 }
 
@@ -112,7 +112,7 @@ fn sequence_option<'a, T>(
 }
 
 // TODO parse all of the options just in case
-fn parse_sequence_option(i: &str) -> IResult<SequenceOption> {
+fn parse_sequence_option(i: &'_ str) -> IResult<'_, SequenceOption> {
     context(
         format!("Parse command not supported yet {}", i).leak(),
         alt((
@@ -152,7 +152,7 @@ fn parse_sequence_option(i: &str) -> IResult<SequenceOption> {
 }
 
 // TODO: make it works like how studiomdl works (very complicated)
-fn parse_sequence(i: &str) -> CResult {
+fn parse_sequence(i: &'_ str) -> CResult<'_> {
     // I am not going to sugarcoat it.
     let (i, _) = terminated(tag("$sequence"), space0)(i)?;
 
@@ -210,17 +210,17 @@ fn parse_sequence(i: &str) -> CResult {
     ))
 }
 
-fn parse_clip_to_textures(i: &str) -> CResult {
+fn parse_clip_to_textures(i: &'_ str) -> CResult<'_> {
     qc_command("$cliptotextures", take(0usize), |_| {
         QcCommand::ClipToTextures
     })(i)
 }
 
-fn parse_eye_position(i: &str) -> CResult {
+fn parse_eye_position(i: &'_ str) -> CResult<'_> {
     qc_command("$eyeposition", dvec3, QcCommand::EyePosition)(i)
 }
 
-fn parse_bodygroup(i: &str) -> CResult {
+fn parse_bodygroup(i: &'_ str) -> CResult<'_> {
     qc_command(
         "$bodygroup",
         tuple((
@@ -236,23 +236,23 @@ fn parse_bodygroup(i: &str) -> CResult {
     )(i)
 }
 
-fn parse_static_prop(i: &str) -> CResult {
+fn parse_static_prop(i: &'_ str) -> CResult<'_> {
     qc_command("$staticprop", take(0usize), |_| QcCommand::StaticProp)(i)
 }
 
-fn parse_surface_prop(i: &str) -> CResult {
+fn parse_surface_prop(i: &'_ str) -> CResult<'_> {
     qc_command("$surfaceprop", name_string, |name| {
         QcCommand::SurfaceProp(name.to_string())
     })(i)
 }
 
-fn parse_contents(i: &str) -> CResult {
+fn parse_contents(i: &'_ str) -> CResult<'_> {
     qc_command("$contents", line(rest), |content| {
         QcCommand::Content(content.to_string())
     })(i)
 }
 
-fn parse_illum_position(i: &str) -> CResult {
+fn parse_illum_position(i: &'_ str) -> CResult<'_> {
     qc_command(
         "$illumposition",
         line(tuple((dvec3, opt(preceded(space0, name_string))))),
@@ -263,7 +263,7 @@ fn parse_illum_position(i: &str) -> CResult {
     )(i)
 }
 
-fn parse_texture_group(i: &str) -> CResult {
+fn parse_texture_group(i: &'_ str) -> CResult<'_> {
     qc_command(
         "$texturegroup",
         tuple((
@@ -280,7 +280,7 @@ fn parse_texture_group(i: &str) -> CResult {
     )(i)
 }
 
-fn parse_define_bone(i: &str) -> CResult {
+fn parse_define_bone(i: &'_ str) -> CResult<'_> {
     qc_command(
         "$definebone",
         tuple((
@@ -310,7 +310,7 @@ fn collision_model_option<'a, T>(
     map(terminated(command(s, f), multispace0), cm)
 }
 
-fn parse_collision_model_option(i: &str) -> IResult<CollisionModelOption> {
+fn parse_collision_model_option(i: &'_ str) -> IResult<'_, CollisionModelOption> {
     context(
         format!("Collision model options not yet supported {}", i).leak(),
         alt((
@@ -335,7 +335,7 @@ fn parse_collision_model_option(i: &str) -> IResult<CollisionModelOption> {
     )(i)
 }
 
-fn parse_collision_model(i: &str) -> CResult {
+fn parse_collision_model(i: &'_ str) -> CResult<'_> {
     qc_command(
         "$collisionmodel",
         tuple((
@@ -353,11 +353,11 @@ fn parse_collision_model(i: &str) -> CResult {
     )(i)
 }
 
-fn parse_mostly_opaque(i: &str) -> CResult {
+fn parse_mostly_opaque(i: &'_ str) -> CResult<'_> {
     qc_command("$mostlyopaque", take(0usize), |_| QcCommand::MostlyOpaque)(i)
 }
 
-fn parse_lod(i: &str) -> CResult {
+fn parse_lod(i: &'_ str) -> CResult<'_> {
     qc_command(
         "$lod",
         tuple((name_string, between_braces(rest))),
@@ -374,13 +374,13 @@ fn parse_lod(i: &str) -> CResult {
     )(i)
 }
 
-fn parse_hbox_set(i: &str) -> CResult {
+fn parse_hbox_set(i: &'_ str) -> CResult<'_> {
     qc_command("$hboxset", name_string, |name| {
         QcCommand::HBoxSet(name.to_owned())
     })(i)
 }
 
-fn parse_hbox(i: &str) -> CResult {
+fn parse_hbox(i: &'_ str) -> CResult<'_> {
     qc_command(
         "$hbox",
         tuple((
@@ -404,14 +404,14 @@ fn parse_hbox(i: &str) -> CResult {
     )(i)
 }
 
-fn parse_cast_texture_shadows(i: &str) -> CResult {
+fn parse_cast_texture_shadows(i: &'_ str) -> CResult<'_> {
     qc_command("$casttextureshadows", take(0usize), |_| {
         QcCommand::CastTextureShadows
     })(i)
 }
 
 // Main functions
-fn parse_qc_command(i: &str) -> CResult {
+fn parse_qc_command(i: &'_ str) -> CResult<'_> {
     context(
         format!("Parse command not supported yet {}", i).leak(),
         alt((
@@ -445,7 +445,7 @@ fn parse_qc_command(i: &str) -> CResult {
     )(i)
 }
 
-fn parse_qc_commands(i: &str) -> IResult<Vec<QcCommand>> {
+fn parse_qc_commands(i: &'_ str) -> IResult<'_, Vec<QcCommand>> {
     many0(delimited(
         discard_comment_lines,
         parse_qc_command,
@@ -453,7 +453,7 @@ fn parse_qc_commands(i: &str) -> IResult<Vec<QcCommand>> {
     ))(i)
 }
 
-pub fn parse_qc(i: &str) -> IResult<Qc> {
+pub fn parse_qc(i: &'_ str) -> IResult<'_, Qc> {
     map(all_consuming(parse_qc_commands), |commands| Qc { commands })(i)
 }
 

@@ -12,31 +12,31 @@ use nom::{
 
 use crate::types::IResult;
 
-pub fn _number(i: &str) -> IResult<i32> {
+pub fn _number(i: &'_ str) -> IResult<'_, i32> {
     map_res(recognize(preceded(opt(tag("-")), digit1)), |s: &str| {
         s.parse::<i32>()
     })(i)
 }
 
-pub fn number(i: &str) -> IResult<i32> {
+pub fn number(i: &'_ str) -> IResult<'_, i32> {
     preceded(space0, _number)(i)
 }
 
-pub fn signed_double(i: &str) -> IResult<f64> {
+pub fn signed_double(i: &'_ str) -> IResult<'_, f64> {
     map(recognize(preceded(opt(tag("-")), _double)), |what: &str| {
         what.parse().unwrap()
     })(i)
 }
 
-pub fn double(i: &str) -> IResult<f64> {
+pub fn double(i: &'_ str) -> IResult<'_, f64> {
     preceded(space0, signed_double)(i)
 }
 
-pub fn quoted_text(i: &str) -> IResult<&str> {
+pub fn quoted_text(i: &'_ str) -> IResult<'_, &str> {
     terminated(preceded(tag("\""), take_till(|c| c == '\"')), tag("\""))(i)
 }
 
-pub fn dvec3(i: &str) -> IResult<DVec3> {
+pub fn dvec3(i: &'_ str) -> IResult<'_, DVec3> {
     map(tuple((double, double, double)), |(x, y, z)| {
         DVec3::new(x, y, z)
     })(i)
@@ -44,7 +44,7 @@ pub fn dvec3(i: &str) -> IResult<DVec3> {
 
 // Do not consume space at the end because we don't know if we are at the end of line or not.
 // This is pretty dangerous and it might take braces or any kind of arbitrary delimiter.
-pub fn between_space(i: &str) -> IResult<&str> {
+pub fn between_space(i: &'_ str) -> IResult<'_, &str> {
     let (i, res) = take_till(|c| c == ' ' || c == '\n' || c == '\r')(i)?;
 
     if res.is_empty() {
@@ -55,18 +55,18 @@ pub fn between_space(i: &str) -> IResult<&str> {
 }
 
 // Filee name may or may not have quotation mark.
-pub fn name_string(i: &str) -> IResult<&str> {
+pub fn name_string(i: &'_ str) -> IResult<'_, &str> {
     alt((quoted_text, between_space))(i)
 }
 
-pub fn discard_comment_line(i: &str) -> IResult<&str> {
+pub fn discard_comment_line(i: &'_ str) -> IResult<'_, &str> {
     terminated(
         preceded(tuple((multispace0, tag("//"))), take_till(|c| c == '\n')),
         multispace0,
     )(i)
 }
 
-pub fn discard_comment_lines(i: &str) -> IResult<&str> {
+pub fn discard_comment_lines(i: &'_ str) -> IResult<'_, &str> {
     map(many0(discard_comment_line), |_| "")(i)
 }
 
