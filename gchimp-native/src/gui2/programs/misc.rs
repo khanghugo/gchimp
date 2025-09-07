@@ -173,7 +173,7 @@ impl MiscProgram {
     fn loop_wave_run(&mut self) {
         self.update(MiscMessage::Status("Running Loop Wave".to_string()));
 
-        if let Err(err) = loop_wave(&self.wav, self.loop_wave_should_loop) {
+        if let Err(err) = loop_wave(&self.wav, self.loop_wave_should_loop, true) {
             self.update(MiscMessage::Status(err.to_string()));
         } else {
             self.update(MiscMessage::Status("Done".to_string()));

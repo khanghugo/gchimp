@@ -30,7 +30,7 @@ egui_extras = {version = "0.29.1", features = ["all_loaders", "http"]}
 
 # iced stuffs
 iced = { version = "0.13.1", features = ["image"] }
-iced_aw = { version = "0.11.0", default-features = false, features = [ "context_menu", "menu" ] }
+iced_aw = { version = "0.12.2", default-features = false, features = [ "context_menu", "menu" ] }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 arboard = "3.4.0" # is not available on wasm32

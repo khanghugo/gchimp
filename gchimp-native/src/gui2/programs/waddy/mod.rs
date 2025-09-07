@@ -1,36 +1,56 @@
 use std::{
+    collections::HashSet,
     path::PathBuf,
     time::{Duration, Instant},
 };
 
-use eyre::eyre;
 use gchimp::utils::img_stuffs::generate_mipmaps_from_rgba_image;
 use iced::{
-    widget::{
-        button, column, container, horizontal_rule, mouse_area, row, scrollable, text, text_input,
-        vertical_rule, Stack,
-    },
-    Alignment, ContentFit, Element, Length, Padding, Subscription, Task,
+    widget::{column, container, scrollable, text_input, Stack},
+    Element, Length, Subscription, Task,
 };
-use iced_aw::{menu::Item, menu_items};
 
 use image::RgbaImage;
 use wad::types::Wad;
 
-use crate::{
-    context_menu_button,
-    gui2::{constants::DEFAULT_DIMENSIONS, utils::IMAGE_FORMATS, TabProgram},
-    menu_labeled_button, menu_submenu_button, spaced_row,
+use crate::gui2::{
+    constants::DEFAULT_DIMENSIONS,
+    programs::waddy::{
+        context_menu::{ContextMenu, ContextMenuMessage},
+        menu_bar::MenuBar,
+        tile::{get_texture_tiles_from_wad, TileMessage, WaddyTile},
+    },
+    utils::IMAGE_FORMATS,
+    TabProgram,
 };
 
-const TILE_DIMENSION: f32 = 134.;
+mod context_menu;
+mod menu_bar;
+mod tile;
+
 const DOUBLE_CLICK_TIME: u64 = 200; // in msec
+
+pub struct WaddyGrid {
+    tiles: Vec<WaddyTile>,
+    selected_tiles: HashSet<usize>,
+    in_edit_tile: Option<usize>,
+    last_selected: Option<usize>,
+}
+
+impl WaddyGrid {
+    fn new(texture_tiles: Vec<WaddyTile>) -> Self {
+        Self {
+            tiles: texture_tiles,
+            selected_tiles: HashSet::new(),
+            in_edit_tile: None,
+            last_selected: None,
+        }
+    }
+}
 
 pub struct WaddyProgram {
     id: iced::widget::text_input::Id,
-    // tiles
-    texture_tiles: Vec<TextureTile>,
-    last_selected: Option<usize>,
+    grid: WaddyGrid,
     // other info
     window_size: Option<iced::Size>,
     last_cursor_pos: Option<iced::Point>,
@@ -67,17 +87,18 @@ impl Default for WaddyProgram {
             Wad::from_file("/home/khang/map_compiler/colors.wad").unwrap(),
         );
 
+        let grid = WaddyGrid::new(texture_tiles);
+
         Self {
             id: iced::widget::text_input::Id::unique(),
             // _wad_images: images,
-            texture_tiles,
+            grid,
             window_size: Some(DEFAULT_DIMENSIONS.into()),
             modifiers: Default::default(),
             is_search_enabled: false,
             search_text: "".into(),
             last_cursor_pos: None,
             context_menu: Default::default(),
-            last_selected: None,
             last_click_time: None,
             wad_path: None,
             menu_bar: Default::default(),
@@ -137,26 +158,28 @@ pub enum WaddyMessage {
     Debug(String),
 }
 
-// impl From<WaddyMessage> for Option<WaddyMessage> {
-
-// }
-
 impl WaddyProgram {
-    pub fn view(&self) -> Element<WaddyMessage> {
+    pub fn view(&'_ self) -> Element<'_, WaddyMessage> {
         let tile_grid = iced::widget::row(
-            self.texture_tiles
+            self.grid
+                .tiles
                 .iter()
                 .enumerate()
-                .filter(|(_, e)| {
+                .filter(|(_, tile)| {
                     if self.is_search_enabled {
-                        e.name.contains(self.search_text.as_str())
+                        tile.label.contains(self.search_text.as_str())
                     } else {
                         true
                     }
                 })
-                .map(|(idx, e)| {
-                    e.view()
-                        .map(move |message| WaddyMessage::TileMessage(idx, message))
+                .map(|(idx, tile)| {
+                    let is_selected = self.grid.selected_tiles.contains(&idx);
+
+                    tile.view(
+                        is_selected,
+                        self.grid.in_edit_tile.map(|x| x == idx).unwrap_or(false),
+                    )
+                    .map(move |message| WaddyMessage::TileMessage(idx, message))
                 }),
         )
         .width(Length::Fill)
@@ -212,13 +235,14 @@ impl WaddyProgram {
             stack
         };
 
-        let selected_tiles = self.selected_tiles();
-
-        let texture_name = if selected_tiles.len() == 1 {
-            selected_tiles
-                .first()
-                .and_then(|&tile| self.texture_tiles.get(tile))
-                .map(|tile| tile.name.clone())
+        // texture name to appear when open context menu
+        let texture_name = if self.grid.selected_tiles.len() == 1 {
+            self.grid
+                .selected_tiles
+                .iter()
+                .next()
+                .and_then(|&tile| self.grid.tiles.get(tile))
+                .map(|tile| tile.label.clone())
         } else {
             None
         };
@@ -227,7 +251,7 @@ impl WaddyProgram {
             self.last_cursor_pos,
             self.window_size,
             texture_name,
-            self.last_selected,
+            self.grid.last_selected,
         );
 
         let stack = stack.push(context_menu);
@@ -296,9 +320,8 @@ impl WaddyProgram {
                 if let Some(last_click_time) = self.last_click_time {
                     let duration = now.duration_since(last_click_time);
 
+                    // enter edit if double click fast enough
                     if duration <= Duration::from_millis(DOUBLE_CLICK_TIME) {
-                        let _ = self.update(WaddyMessage::ClearSelected);
-                        let _ = self.update(WaddyMessage::SelectLogic(idx));
                         let _ = self.update(WaddyMessage::TileMessage(idx, TileMessage::EditEnter));
                     }
                 }
@@ -313,8 +336,17 @@ impl WaddyProgram {
 
                 Task::none()
             }
+            WaddyMessage::TileMessage(idx, TileMessage::EditEnter) => {
+                let _ = self.update(WaddyMessage::ClearSelected);
+                // let _ = self.update(WaddyMessage::SelectLogic(idx));
+                let _ = self.update(WaddyMessage::ContextMenuToggle(false));
+
+                let tile_id = self.grid.tiles[idx].id.clone();
+
+                iced::widget::text_input::focus(tile_id)
+            }
             WaddyMessage::TileMessage(idx, texture_tile_mesage) => {
-                if let Some(tile) = self.texture_tiles.get_mut(idx) {
+                if let Some(tile) = self.grid.tiles.get_mut(idx) {
                     // intercepting the message to do more things
                     let task = match texture_tile_mesage {
                         TileMessage::EditEnter => {
@@ -337,7 +369,7 @@ impl WaddyProgram {
             WaddyMessage::SelectLogic(idx) => {
                 if self.modifiers.control() {
                     // if current tile is selected and is ctrl seleted then unselect it
-                    if self.selected_tiles().contains(&idx) {
+                    if self.grid.selected_tiles.contains(&idx) {
                         let _ = self.update(WaddyMessage::DeselectTile(idx));
                     } else {
                         let _ = self.update(WaddyMessage::SelectTile(idx));
@@ -347,12 +379,11 @@ impl WaddyProgram {
                     // range exclusive max because
                     // if max is idx, it will be selected outside of this scope
                     // if max is last selected, it is included
-                    let selected_tiles = self.selected_tiles();
 
                     // TODO make good
-                    if let Some(last_selected) = self.last_selected {
+                    if let Some(last_selected) = self.grid.last_selected {
                         (idx.min(last_selected)..=idx.max(last_selected)).for_each(|idx| {
-                            if selected_tiles.contains(&idx) {
+                            if self.grid.selected_tiles.contains(&idx) {
                                 let _ = self.update(WaddyMessage::DeselectTile(idx));
                             } else {
                                 let _ = self.update(WaddyMessage::SelectTile(idx));
@@ -360,7 +391,7 @@ impl WaddyProgram {
                         });
 
                         // keep last selected
-                        self.last_selected = last_selected.into();
+                        self.grid.last_selected = last_selected.into();
                     }
 
                     // then select the tile
@@ -374,34 +405,27 @@ impl WaddyProgram {
                 Task::none()
             }
             WaddyMessage::SelectTile(idx) => {
-                if let Some(tile) = self.texture_tiles.get_mut(idx) {
-                    tile.update(TileMessage::Select);
+                self.grid.selected_tiles.insert(idx);
 
-                    self.last_selected = idx.into()
-                };
+                self.grid.last_selected = idx.into();
 
                 Task::none()
             }
             WaddyMessage::DeselectTile(idx) => {
-                if let Some(tile) = self.texture_tiles.get_mut(idx) {
-                    tile.update(TileMessage::Deselect);
+                self.grid.selected_tiles.remove(&idx);
 
-                    self.last_selected = self.selected_tiles().pop();
-                };
+                // self.last_selected = self.selected_tiles().pop();
+                self.grid.last_selected = None;
 
                 Task::none()
             }
             WaddyMessage::ClearSelected => {
-                self.texture_tiles.iter_mut().for_each(|tile| {
-                    tile.state = TileState::None;
-                });
+                self.grid.selected_tiles.clear();
 
                 Task::none()
             }
             WaddyMessage::SelectAllTiles => {
-                self.texture_tiles.iter_mut().for_each(|tile| {
-                    tile.state = TileState::Selected;
-                });
+                self.grid.selected_tiles = HashSet::from_iter(0..self.grid.tiles.len());
 
                 Task::none()
             }
@@ -502,7 +526,8 @@ impl WaddyProgram {
                 let mut wad = Wad::new();
 
                 let entries = self
-                    .texture_tiles
+                    .grid
+                    .tiles
                     .iter()
                     .filter_map(|tile| {
                         let iced::widget::image::Handle::Rgba {
@@ -523,7 +548,7 @@ impl WaddyProgram {
 
                         generate_mipmaps_from_rgba_image(image).ok()
                     })
-                    .zip(self.texture_tiles.iter().map(|tile| tile.name.clone()))
+                    .zip(self.grid.tiles.iter().map(|tile| tile.label.clone()))
                     .map(|(res, texture_name)| {
                         wad::types::Entry::new(
                             texture_name,
@@ -534,7 +559,7 @@ impl WaddyProgram {
                     })
                     .collect::<Vec<_>>();
 
-                if entries.len() != self.texture_tiles.len() {
+                if entries.len() != self.grid.tiles.len() {
                     // TODO toast component
                     println!("cannot convert all tiles to textures");
 
@@ -590,19 +615,18 @@ impl WaddyProgram {
                 },
             ),
             WaddyMessage::TextureAdd((texture_name, image_buffer)) => {
-                let new_tile = TextureTile {
+                let new_tile = WaddyTile {
                     id: iced::widget::text_input::Id::unique(),
-                    name: texture_name,
+                    label: texture_name,
                     dimensions: image_buffer.dimensions(),
                     handle: iced::widget::image::Handle::from_rgba(
                         image_buffer.width(),
                         image_buffer.height(),
                         image_buffer.into_vec(),
                     ),
-                    state: TileState::None,
                 };
 
-                self.texture_tiles.push(new_tile);
+                self.grid.tiles.push(new_tile);
 
                 Task::none()
             }
@@ -617,29 +641,18 @@ impl WaddyProgram {
                     return Task::done(WaddyMessage::SearchToggle);
                 }
 
-                // if there is a tile in edit, set it back to selected
-                let mut changed_edit_tile = false;
+                // if there is a tile in edit, cancel edit
+                if let Some(in_edit_tile) = self.grid.in_edit_tile {
+                    let _ = self.update(WaddyMessage::TileMessage(
+                        in_edit_tile,
+                        TileMessage::EditCancel,
+                    ));
 
-                self.texture_tiles
-                    .iter_mut()
-                    // there should be only 1 tiles in edit at a time
-                    // so this will help catching unwanted behavior
-                    .find(|tile| tile.state.is_in_edit())
-                    .map(|tile| {
-                        changed_edit_tile = true;
-                        tile.state = TileState::Selected;
-                    });
-
-                if changed_edit_tile {
                     return Task::none();
                 }
 
                 // otherwise, reset all tile states and deselect all
                 // reset tile states
-                self.texture_tiles.iter_mut().for_each(|tile| {
-                    tile.state = TileState::None;
-                });
-
                 let _ = self.update(WaddyMessage::ClearSelected);
 
                 Task::none()
@@ -715,376 +728,4 @@ impl WaddyProgram {
             _ => None,
         })
     }
-
-    fn selected_tiles(&self) -> Vec<usize> {
-        self.texture_tiles
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, e)| {
-                if e.state.is_selected() {
-                    Some(idx)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>()
-    }
-}
-
-#[derive(Debug, Clone)]
-struct MenuBar {
-    texture_fit: bool,
-}
-
-#[derive(Debug, Clone)]
-enum MenuBarMessage {
-    None,
-}
-
-impl Default for MenuBar {
-    fn default() -> Self {
-        Self { texture_fit: true }
-    }
-}
-
-impl MenuBar {
-    fn view(&self) -> Element<WaddyMessage> {
-        // let menu_tpl_1 = |items| iced_aw::Menu::new(items).max_width(180.0).offset(15.0).spacing(5.0);
-        let menu_tpl_2 = |items| {
-            iced_aw::Menu::new(items)
-                .max_width(180.0)
-                .offset(0.0)
-                .spacing(5.0)
-        };
-
-        let button1 = menu_submenu_button!("hello8", WaddyMessage::None);
-
-        let menu1 = menu_tpl_2(menu_items!((menu_labeled_button!(
-            "aa",
-            WaddyMessage::None
-        ))(button("hello2"))(button("hello3"))));
-
-        let menu2 = menu_tpl_2(menu_items!((button("hello4"))(button("hello5"))(button(
-            "hello6"
-        ))));
-
-        let menu3 = menu_tpl_2(menu_items!((button("hello7"))(button1, menu2)(button(
-            "hello9"
-        ))));
-
-        let menu = iced_aw::menu_bar!((button("text1"), menu1)(button("text2"), menu3));
-
-        menu.into()
-    }
-}
-
-struct ContextMenu {
-    is_enable: bool,
-    // last right click position
-    last_right_click: Option<iced::Point>,
-}
-
-impl Default for ContextMenu {
-    fn default() -> Self {
-        Self {
-            is_enable: false,
-            last_right_click: None,
-        }
-    }
-}
-
-enum ContextMenuMessage {
-    None,
-    Toggle(bool),
-    UpdateLastRightClick(iced::Point<f32>),
-}
-
-impl ContextMenu {
-    fn view(
-        &self,
-        last_cursor_pos: Option<iced::Point>,
-        window_size: Option<iced::Size<f32>>,
-        texture_name: Option<String>,
-        last_selected: Option<usize>,
-    ) -> Element<WaddyMessage> {
-        if !self.is_enable {
-            return column![].into();
-        }
-
-        // context menu is on top
-        // the reason why this is a custom component with fuckery code is iced_aw
-        // has a component for context menu but it will hijack the right click
-        // i want right click to select the component as well
-        // this means the component does not have a right click listener
-
-        // i love iced
-        // i love doing basic things like this over and over
-        let (align_x, align_y, padding) = {
-            let context_menu_pos = self.last_right_click.or(last_cursor_pos);
-
-            if let Some(context_menu_pos) = context_menu_pos {
-                const MIN_WIDTH: f32 = 80.;
-                const MIN_HEIGHT: f32 = 160.;
-
-                let align_x = if context_menu_pos.x + MIN_WIDTH > window_size.unwrap().width {
-                    Alignment::End
-                } else {
-                    Alignment::Start
-                };
-
-                let align_y = if context_menu_pos.y + MIN_HEIGHT > window_size.unwrap().height {
-                    Alignment::End
-                } else {
-                    Alignment::Start
-                };
-
-                let (top, bottom) = match align_y {
-                    Alignment::Start => (context_menu_pos.y - 36., 0.),
-                    Alignment::End => (0., (window_size.unwrap().height - context_menu_pos.y)),
-                    _ => unreachable!(),
-                };
-
-                let (left, right) = match align_x {
-                    Alignment::Start => (context_menu_pos.x, 0.),
-                    Alignment::End => (0., window_size.unwrap().width - context_menu_pos.x),
-                    _ => unreachable!(),
-                };
-
-                (
-                    align_x,
-                    align_y,
-                    Padding {
-                        top,
-                        right,
-                        bottom,
-                        left,
-                    },
-                )
-            } else {
-                (Alignment::Center, Alignment::Center, Padding::ZERO)
-            }
-        };
-
-        let rule1 = || horizontal_rule(1);
-
-        // TODO: filling the button for the entire column is nontrivial
-        // maybe future KL will fix it
-        // let name = if let Some(texture_name) = texture_name {
-        //     println!("texture name is {}", texture_name);
-        //     column![text(texture_name), rule1()]
-        // } else {
-        //     column![]
-        // };
-
-        let export = context_menu_button!("export", WaddyMessage::None);
-        let copy_to = context_menu_button!("copy_to", WaddyMessage::None);
-        let delete = context_menu_button!("delete", WaddyMessage::None);
-
-        // let a = container("abcd").style(style);
-
-        let mut column_display = column![];
-
-        if let Some(texture_name) = texture_name {
-            let view_image = context_menu_button!("view", WaddyMessage::None);
-            // last_selected is guaranteed to have a value
-            let rename = context_menu_button!(
-                "Rename",
-                WaddyMessage::TileMessage(last_selected.unwrap(), TileMessage::EditEnter)
-            );
-
-            column_display = column_display
-                .push(context_menu_button!(text(texture_name), WaddyMessage::None))
-                .push(rule1())
-                .push(view_image)
-                .push(rule1())
-                .push(rename);
-        }
-
-        column_display = column_display
-            .push(export)
-            .push(rule1())
-            .push(copy_to)
-            .push(rule1())
-            .push(delete);
-
-        container(
-            container(
-                column_display
-                    .align_x(Alignment::Start)
-                    .width(Length::Shrink),
-            )
-            .style(|theme| {
-                let palette = theme.palette();
-                let extended = theme.extended_palette();
-
-                iced::widget::container::Style {
-                    text_color: palette.text.into(),
-                    background: iced::Background::Color(palette.background).into(),
-                    border: iced::Border {
-                        radius: 2.into(),
-                        width: 1.,
-                        color: extended.background.strong.color,
-                    },
-                    shadow: iced::Shadow {
-                        color: iced::Color::BLACK,
-                        offset: iced::Vector::new(8., 8.),
-                        blur_radius: 8.,
-                    },
-                }
-            }),
-        )
-        .padding(padding)
-        // fill to make sure that it can align properly
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .align_x(align_x)
-        .align_y(align_y)
-        .into()
-    }
-
-    fn update(&mut self, message: ContextMenuMessage) {
-        match message {
-            ContextMenuMessage::None => {}
-            ContextMenuMessage::UpdateLastRightClick(point) => self.last_right_click = point.into(),
-            ContextMenuMessage::Toggle(bool) => self.is_enable = bool,
-        }
-    }
-}
-
-struct TextureTile {
-    id: iced::widget::text_input::Id,
-    name: String,
-    dimensions: (u32, u32),
-    handle: iced::widget::image::Handle,
-    state: TileState,
-}
-
-enum TileState {
-    None,
-    Selected,
-    InEdit,
-}
-
-impl TileState {
-    fn is_selected(&self) -> bool {
-        matches!(self, Self::Selected)
-    }
-
-    fn is_in_edit(&self) -> bool {
-        matches!(self, Self::InEdit)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum TileMessage {
-    EditRequest,
-    EditEnter,
-    EditChange(String),
-    EditFinish,
-    LeftClick,
-    RightClick,
-    Select,
-    Deselect,
-}
-
-impl TextureTile {
-    fn view(&self) -> Element<TileMessage> {
-        let image = iced::widget::image(&self.handle)
-            .width(Length::Fixed(TILE_DIMENSION))
-            .height(Length::Fixed(TILE_DIMENSION))
-            .content_fit(ContentFit::ScaleDown);
-        // let image_button = button(image)
-        //     .on_press(TileMessage::)
-        //     .style(iced::widget::button::text);
-
-        let image_button = iced::widget::mouse_area(image)
-            .on_press(TileMessage::LeftClick)
-            // tile can sense right click as well
-            // this is to make sure that the tile is selected
-            .on_right_press(TileMessage::RightClick);
-
-        let dimensions = text(format!("{}x{}", self.dimensions.0, self.dimensions.1));
-
-        // let a =text_input("texture name", self.name.as_str())
-        // .on_input(TileMessage::EditChange)
-        // .on_submit(TileMessage::EditFinish)
-        // // padding zero so it doesn't get bigger
-        // .padding(Padding::ZERO)
-        // .id(self.id.clone())
-        let name = if matches!(self.state, TileState::InEdit) {
-            row![text_input("texture name", self.name.as_str())
-                .on_input(TileMessage::EditChange)
-                .on_submit(TileMessage::EditFinish)
-                // padding zero so it doesn't get bigger
-                .padding(Padding::ZERO)
-                .id(self.id.clone())]
-        } else {
-            row![mouse_area(self.name.as_str()).on_press(TileMessage::EditRequest)]
-        };
-
-        let tile = container(column![image_button, name, dimensions])
-            .style(|theme: &iced::Theme| {
-                let palette = theme.palette();
-
-                iced::widget::container::Style {
-                    text_color: palette.text.into(),
-                    background: Some(iced::Background::Color(match self.state {
-                        TileState::None => palette.background,
-                        TileState::Selected => palette.primary,
-                        TileState::InEdit => palette.danger,
-                    })),
-                    ..Default::default()
-                }
-            })
-            .width(Length::Fixed(TILE_DIMENSION))
-            .padding(Padding {
-                top: 0.,
-                bottom: 0.,
-                right: 4.,
-                left: 4.,
-            });
-
-        tile.into()
-    }
-
-    fn update(&mut self, message: TileMessage) {
-        match message {
-            TileMessage::EditRequest => {}
-            TileMessage::EditFinish => self.state = TileState::None,
-            TileMessage::LeftClick => {}
-            TileMessage::RightClick => {}
-            TileMessage::Select => self.state = TileState::Selected,
-            TileMessage::Deselect => self.state = TileState::None,
-            TileMessage::EditEnter => self.state = TileState::InEdit,
-            TileMessage::EditChange(string) => {
-                self.name = string;
-                self.name.truncate(15);
-            }
-        }
-    }
-}
-
-fn get_texture_tiles_from_wad(wad: Wad) -> Vec<TextureTile> {
-    wad.entries
-        .iter()
-        .map(|entry| {
-            let wad::types::FileEntry::MipTex(ref image) = entry.file_entry else {
-                todo!("extracting image data from non-miptex is yet todo")
-            };
-
-            let (pixels, (width, height)) = image.to_rgba();
-
-            let handle = iced::widget::image::Handle::from_rgba(width, height, pixels);
-            let name = entry.texture_name();
-            let dimensions = entry.file_entry.dimensions();
-
-            TextureTile {
-                id: iced::widget::text_input::Id::unique(),
-                handle,
-                name,
-                dimensions,
-                state: TileState::None,
-            }
-        })
-        .collect()
 }
