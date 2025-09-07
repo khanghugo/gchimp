@@ -30,20 +30,26 @@ mod tile;
 
 const DOUBLE_CLICK_TIME: u64 = 200; // in msec
 
+#[derive(Default)]
+struct WaddyGridSelect {
+    last: Option<usize>,
+    // in selecting range, this is the first tile to selected all of other tiles
+    anchor: Option<usize>,
+    tiles: HashSet<usize>,
+}
+
 pub struct WaddyGrid {
     tiles: Vec<WaddyTile>,
-    selected_tiles: HashSet<usize>,
     in_edit_tile: Option<usize>,
-    last_selected: Option<usize>,
+    selected: WaddyGridSelect,
 }
 
 impl WaddyGrid {
     fn new(texture_tiles: Vec<WaddyTile>) -> Self {
         Self {
             tiles: texture_tiles,
-            selected_tiles: HashSet::new(),
             in_edit_tile: None,
-            last_selected: None,
+            selected: WaddyGridSelect::default(),
         }
     }
 }
@@ -173,7 +179,7 @@ impl WaddyProgram {
                     }
                 })
                 .map(|(idx, tile)| {
-                    let is_selected = self.grid.selected_tiles.contains(&idx);
+                    let is_selected = self.grid.selected.tiles.contains(&idx);
 
                     tile.view(
                         is_selected,
@@ -236,9 +242,10 @@ impl WaddyProgram {
         };
 
         // texture name to appear when open context menu
-        let texture_name = if self.grid.selected_tiles.len() == 1 {
+        let texture_name = if self.grid.selected.tiles.len() == 1 {
             self.grid
-                .selected_tiles
+                .selected
+                .tiles
                 .iter()
                 .next()
                 .and_then(|&tile| self.grid.tiles.get(tile))
@@ -251,7 +258,7 @@ impl WaddyProgram {
             self.last_cursor_pos,
             self.window_size,
             texture_name,
-            self.grid.last_selected,
+            self.grid.selected.last,
         );
 
         let stack = stack.push(context_menu);
@@ -369,63 +376,75 @@ impl WaddyProgram {
             WaddyMessage::SelectLogic(idx) => {
                 if self.modifiers.control() {
                     // if current tile is selected and is ctrl seleted then unselect it
-                    if self.grid.selected_tiles.contains(&idx) {
+                    if self.grid.selected.tiles.contains(&idx) {
                         let _ = self.update(WaddyMessage::DeselectTile(idx));
                     } else {
                         let _ = self.update(WaddyMessage::SelectTile(idx));
                     }
+
+                    // clear anchor because we want new range
+                    self.grid.selected.anchor = None;
                 } else if self.modifiers.shift() {
-                    // selecting range
-                    // range exclusive max because
-                    // if max is idx, it will be selected outside of this scope
-                    // if max is last selected, it is included
+                    // selecting range, i want this to mimic kde dolphin behavior
+                    // if an anchor is not known, last selected tile will be the anchor
+                    // after that, all tiles from anchor and last selected will be selected
+                    // there is no deselect but there will be a clear from anchor to last selected
 
-                    // TODO make good
-                    if let Some(last_selected) = self.grid.last_selected {
-                        (idx.min(last_selected)..=idx.max(last_selected)).for_each(|idx| {
-                            if self.grid.selected_tiles.contains(&idx) {
+                    if let Some(last_selected) = self.grid.selected.last {
+                        // if anchor is not set, set it right away
+                        let anchor = self
+                            .grid
+                            .selected
+                            .anchor
+                            .get_or_insert(last_selected)
+                            .to_owned();
+
+                        // deselect from anchor to last_selected
+                        ((anchor.min(last_selected))..=(anchor.max(last_selected))).for_each(
+                            |idx| {
                                 let _ = self.update(WaddyMessage::DeselectTile(idx));
-                            } else {
-                                let _ = self.update(WaddyMessage::SelectTile(idx));
-                            }
+                            },
+                        );
+
+                        // select from anchor to idx
+                        ((anchor.min(idx))..=(anchor.max(idx))).for_each(|idx| {
+                            let _ = self.update(WaddyMessage::SelectTile(idx));
                         });
-
-                        // keep last selected
-                        self.grid.last_selected = last_selected.into();
                     }
-
-                    // then select the tile
-                    let _ = self.update(WaddyMessage::SelectTile(idx));
                 } else {
                     // normal select is unselecting everything then select new one
                     let _ = self.update(WaddyMessage::ClearSelected);
                     let _ = self.update(WaddyMessage::SelectTile(idx));
+
+                    // clear anchor just in case
+                    self.grid.selected.anchor = None;
                 }
 
                 Task::none()
             }
             WaddyMessage::SelectTile(idx) => {
-                self.grid.selected_tiles.insert(idx);
+                self.grid.selected.tiles.insert(idx);
 
-                self.grid.last_selected = idx.into();
+                self.grid.selected.last = idx.into();
 
                 Task::none()
             }
             WaddyMessage::DeselectTile(idx) => {
-                self.grid.selected_tiles.remove(&idx);
+                self.grid.selected.tiles.remove(&idx);
 
-                // self.last_selected = self.selected_tiles().pop();
-                self.grid.last_selected = None;
+                self.grid.selected.last = None;
 
                 Task::none()
             }
             WaddyMessage::ClearSelected => {
-                self.grid.selected_tiles.clear();
+                self.grid.selected.tiles.clear();
+
+                self.grid.selected.last = None;
 
                 Task::none()
             }
             WaddyMessage::SelectAllTiles => {
-                self.grid.selected_tiles = HashSet::from_iter(0..self.grid.tiles.len());
+                self.grid.selected.tiles = HashSet::from_iter(0..self.grid.tiles.len());
 
                 Task::none()
             }
