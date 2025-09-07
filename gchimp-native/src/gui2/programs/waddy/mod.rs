@@ -38,18 +38,25 @@ struct WaddyGridSelect {
     tiles: HashSet<usize>,
 }
 
+#[derive(Default)]
+struct WaddyGridEdit {
+    tile: Option<usize>,
+    prev_label: String,
+    should_focus: bool,
+}
+
 pub struct WaddyGrid {
     tiles: Vec<WaddyTile>,
-    in_edit_tile: Option<usize>,
     selected: WaddyGridSelect,
+    edit: WaddyGridEdit,
 }
 
 impl WaddyGrid {
     fn new(texture_tiles: Vec<WaddyTile>) -> Self {
         Self {
             tiles: texture_tiles,
-            in_edit_tile: None,
             selected: WaddyGridSelect::default(),
+            edit: WaddyGridEdit::default(),
         }
     }
 }
@@ -180,12 +187,10 @@ impl WaddyProgram {
                 })
                 .map(|(idx, tile)| {
                     let is_selected = self.grid.selected.tiles.contains(&idx);
+                    let is_in_edit = self.grid.edit.tile.map(|x| x == idx).unwrap_or(false);
 
-                    tile.view(
-                        is_selected,
-                        self.grid.in_edit_tile.map(|x| x == idx).unwrap_or(false),
-                    )
-                    .map(move |message| WaddyMessage::TileMessage(idx, message))
+                    tile.view(is_selected, is_in_edit)
+                        .map(move |message| WaddyMessage::TileMessage(idx, message))
                 }),
         )
         .width(Length::Fill)
@@ -267,15 +272,27 @@ impl WaddyProgram {
     }
 
     pub fn update(&mut self, message: WaddyMessage) -> Task<WaddyMessage> {
+        // focus on the next frame
+        // TODO maybe there is a better way to do this
+        if self.grid.edit.should_focus {
+            self.grid.edit.should_focus = false;
+
+            let idx = self.grid.edit.tile.unwrap();
+
+            return iced::widget::text_input::focus(self.grid.tiles[idx].id.clone());
+        }
+
+        // in the future we might need to chain with this. whatever.
+        // TODO maybe chain this
         match message {
-            WaddyMessage::None => Task::none(),
-            WaddyMessage::GetWindowSize => iced::window::get_latest()
-                .and_then(iced::window::get_size)
-                .map(WaddyMessage::SetWindowSize),
+            WaddyMessage::None => {}
+            WaddyMessage::GetWindowSize => {
+                return iced::window::get_latest()
+                    .and_then(iced::window::get_size)
+                    .map(WaddyMessage::SetWindowSize);
+            }
             WaddyMessage::SetWindowSize(size) => {
                 self.window_size = size.into();
-
-                Task::none()
             }
             WaddyMessage::TileMessage(idx, TileMessage::RightClick) => {
                 let _ = self.update(WaddyMessage::UpdateRightClickPos);
@@ -302,8 +319,6 @@ impl WaddyProgram {
                     let _ = self.update(WaddyMessage::SelectLogic(idx));
                     let _ = self.update(WaddyMessage::ContextMenuToggle(true));
                 }
-
-                Task::none()
             }
             WaddyMessage::TileMessage(idx, TileMessage::LeftClick) => {
                 // if there is any context menu, that means we cannot select the tile
@@ -315,8 +330,6 @@ impl WaddyProgram {
                 }
 
                 let _ = self.update(WaddyMessage::SelectLogic(idx));
-
-                return Task::none();
             }
             WaddyMessage::TileMessage(idx, TileMessage::EditRequest) => {
                 // last_click_time is only concerned with editing the name so no need to have it
@@ -324,56 +337,71 @@ impl WaddyProgram {
                 // TODO: maybe make self.last_click_time work properly in the application scope
                 let now = Instant::now();
 
+                // select the tile before doing anything else
+                let _ = self.update(WaddyMessage::SelectLogic(idx));
+
                 if let Some(last_click_time) = self.last_click_time {
                     let duration = now.duration_since(last_click_time);
 
                     // enter edit if double click fast enough
-                    if duration <= Duration::from_millis(DOUBLE_CLICK_TIME) {
+                    // and also clicking on the same tile
+                    let clicked_fast = duration <= Duration::from_millis(DOUBLE_CLICK_TIME);
+                    let clicked_on_same_tile = self.grid.selected.last.is_some_and(|x| x == idx);
+
+                    if clicked_fast && clicked_on_same_tile {
                         let _ = self.update(WaddyMessage::TileMessage(idx, TileMessage::EditEnter));
                     }
                 }
 
                 self.last_click_time = now.into();
 
-                // disable context menu always
-                let _ = self.update(WaddyMessage::ContextMenuToggle(false));
+                // selecting title wont select the tile, so things are simpler
+                // // disable context menu always
+                // let _ = self.update(WaddyMessage::ContextMenuToggle(false));
 
-                // this counts as clicking something so select logic applies
-                let _ = self.update(WaddyMessage::SelectLogic(idx));
-
-                Task::none()
+                // // this counts as clicking something so select logic applies
+                // let _ = self.update(WaddyMessage::SelectLogic(idx));
             }
             WaddyMessage::TileMessage(idx, TileMessage::EditEnter) => {
                 let _ = self.update(WaddyMessage::ClearSelected);
-                // let _ = self.update(WaddyMessage::SelectLogic(idx));
                 let _ = self.update(WaddyMessage::ContextMenuToggle(false));
 
-                let tile_id = self.grid.tiles[idx].id.clone();
+                self.grid.edit.tile = Some(idx);
 
-                iced::widget::text_input::focus(tile_id)
+                let tile = &self.grid.tiles[idx];
+
+                self.grid.edit.prev_label = tile.label.clone();
+
+                // the element is not rendered yet to focus on
+                // iced::widget::text_input::focus(tile_id)
+                self.grid.edit.should_focus = true;
             }
-            WaddyMessage::TileMessage(idx, texture_tile_mesage) => {
-                if let Some(tile) = self.grid.tiles.get_mut(idx) {
-                    // intercepting the message to do more things
-                    let task = match texture_tile_mesage {
-                        TileMessage::EditEnter => {
-                            self.context_menu.is_enable = false;
-
-                            iced::widget::text_input::focus(tile.id.clone())
-                        }
-                        _ => Task::none(),
-                    };
-
-                    tile.update(texture_tile_mesage);
-
-                    return task;
-                };
-
-                Task::none()
+            WaddyMessage::TileMessage(_, TileMessage::EditFinish) => {
+                self.grid.edit.tile = None;
             }
-            // TODO does this count as abusing?
-            // this is like writing small methods but they are not methods
+            WaddyMessage::TileMessage(idx, TileMessage::EditCancel) => {
+                let prev_labbel = self.grid.edit.prev_label.to_owned();
+
+                // idx must be self.grid.in_edit
+                assert_eq!(idx, self.grid.edit.tile.unwrap());
+
+                self.grid.tiles.get_mut(idx).map(|x| {
+                    x.label = prev_labbel;
+                });
+
+                self.grid.edit.tile = None;
+            }
+            WaddyMessage::TileMessage(idx, TileMessage::EditChange(text)) => {
+                self.grid.tiles.get_mut(idx).map(|x| {
+                    x.label = text;
+                    x.label.truncate(15);
+                });
+            }
             WaddyMessage::SelectLogic(idx) => {
+                // confirm edit before selecting tiles
+                // tile number doesnt matter here
+                let _ = self.update(WaddyMessage::TileMessage(0, TileMessage::EditFinish));
+
                 if self.modifiers.control() {
                     // if current tile is selected and is ctrl seleted then unselect it
                     if self.grid.selected.tiles.contains(&idx) {
@@ -419,39 +447,24 @@ impl WaddyProgram {
                     // clear anchor just in case
                     self.grid.selected.anchor = None;
                 }
-
-                Task::none()
             }
             WaddyMessage::SelectTile(idx) => {
                 self.grid.selected.tiles.insert(idx);
-
                 self.grid.selected.last = idx.into();
-
-                Task::none()
             }
             WaddyMessage::DeselectTile(idx) => {
                 self.grid.selected.tiles.remove(&idx);
-
                 self.grid.selected.last = None;
-
-                Task::none()
             }
             WaddyMessage::ClearSelected => {
                 self.grid.selected.tiles.clear();
-
                 self.grid.selected.last = None;
-
-                Task::none()
             }
             WaddyMessage::SelectAllTiles => {
                 self.grid.selected.tiles = HashSet::from_iter(0..self.grid.tiles.len());
-
-                Task::none()
             }
             WaddyMessage::UpdateModifier(modifiers) => {
                 self.modifiers = modifiers;
-
-                Task::none()
             }
             WaddyMessage::SearchToggle => {
                 self.is_search_enabled = !self.is_search_enabled;
@@ -462,18 +475,12 @@ impl WaddyProgram {
 
                     return iced::widget::text_input::focus(self.id.clone());
                 }
-
-                Task::none()
             }
             WaddyMessage::SearchText(string) => {
                 self.search_text = string;
-
-                Task::none()
             }
             WaddyMessage::ContextMenuToggle(bool) => {
                 self.context_menu.update(ContextMenuMessage::Toggle(bool));
-
-                Task::none()
             }
             WaddyMessage::LeftClick(status) => {
                 // proceed with normal click
@@ -489,8 +496,6 @@ impl WaddyProgram {
                         let _ = self.update(WaddyMessage::ClearSelected);
                     }
                 }
-
-                Task::none()
             }
             WaddyMessage::RightClick(status) => {
                 // right click where the click is not captured
@@ -509,27 +514,19 @@ impl WaddyProgram {
                 }
 
                 let _ = self.update(WaddyMessage::UpdateRightClickPos);
-
-                Task::none()
             }
-            WaddyMessage::DoubleClick(status) => Task::none(),
+            WaddyMessage::DoubleClick(status) => {}
             WaddyMessage::Debug(msg) => {
                 println!("{}", msg);
-
-                Task::none()
             }
             WaddyMessage::UpdateCursorPos(point) => {
                 self.last_cursor_pos = point.into();
-
-                Task::none()
             }
             WaddyMessage::UpdateRightClickPos => {
                 if let Some(last_cursor_pos) = self.last_cursor_pos {
                     self.context_menu
                         .update(ContextMenuMessage::UpdateLastRightClick(last_cursor_pos));
                 }
-
-                Task::none()
             }
             WaddyMessage::WadSave => {
                 #[cfg(not(target_arch = "wasm32"))]
@@ -590,17 +587,15 @@ impl WaddyProgram {
                     wad.header.num_dirs += 1;
                 });
 
-                Task::perform(async move { wad.write_to_file(wad_path) }, |res| {
+                return Task::perform(async move { wad.write_to_file(wad_path) }, |res| {
                     println!("it is done writing");
                     WaddyMessage::WadSaved(res.err().map(|f| f.to_string()))
-                })
+                });
             }
             WaddyMessage::WadSaved(err) => {
                 if let Some(err) = err {
                     println!("cannot write wad file: {}", err);
                 }
-
-                Task::none()
             }
             WaddyMessage::FileDropped(path_buf) => {
                 let Some(ext) = path_buf.extension() else {
@@ -615,24 +610,25 @@ impl WaddyProgram {
                 } else if ext == BSP_EXTENSION {
                     todo!()
                 } else if IMAGE_FORMATS.iter().any(|&x| x == ext) {
-                    Task::done(WaddyMessage::TextureAddRequest(path_buf))
+                    return Task::done(WaddyMessage::TextureAddRequest(path_buf));
                 } else {
-                    Task::none()
                 }
             }
-            WaddyMessage::TextureAddRequest(path_buf) => Task::perform(
-                async move { image::open(path_buf.as_path()).map(|res| (path_buf, res.to_rgba8())) },
-                |res| match res {
-                    Ok((path_buf, image)) => WaddyMessage::TextureAdd((
-                        path_buf.file_stem().unwrap().to_str().unwrap().to_string(),
-                        image,
-                    )),
-                    Err(err) => {
-                        println!("cannot open image: {}", err);
-                        WaddyMessage::None
-                    }
-                },
-            ),
+            WaddyMessage::TextureAddRequest(path_buf) => {
+                return Task::perform(
+                    async move { image::open(path_buf.as_path()).map(|res| (path_buf, res.to_rgba8())) },
+                    |res| match res {
+                        Ok((path_buf, image)) => WaddyMessage::TextureAdd((
+                            path_buf.file_stem().unwrap().to_str().unwrap().to_string(),
+                            image,
+                        )),
+                        Err(err) => {
+                            println!("cannot open image: {}", err);
+                            WaddyMessage::None
+                        }
+                    },
+                )
+            }
             WaddyMessage::TextureAdd((texture_name, image_buffer)) => {
                 let new_tile = WaddyTile {
                     id: iced::widget::text_input::Id::unique(),
@@ -646,8 +642,6 @@ impl WaddyProgram {
                 };
 
                 self.grid.tiles.push(new_tile);
-
-                Task::none()
             }
             WaddyMessage::EscapePressed => {
                 // if there is context menu, close it
@@ -661,7 +655,7 @@ impl WaddyProgram {
                 }
 
                 // if there is a tile in edit, cancel edit
-                if let Some(in_edit_tile) = self.grid.in_edit_tile {
+                if let Some(in_edit_tile) = self.grid.edit.tile {
                     let _ = self.update(WaddyMessage::TileMessage(
                         in_edit_tile,
                         TileMessage::EditCancel,
@@ -673,10 +667,10 @@ impl WaddyProgram {
                 // otherwise, reset all tile states and deselect all
                 // reset tile states
                 let _ = self.update(WaddyMessage::ClearSelected);
-
-                Task::none()
             }
-        }
+        };
+
+        Task::none()
     }
 
     pub fn subscription(&self) -> Subscription<WaddyMessage> {

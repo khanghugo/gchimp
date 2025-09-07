@@ -1,6 +1,7 @@
 use iced::{
+    border::Radius,
     widget::{column, container, mouse_area, row, text, text_input},
-    ContentFit, Element, Length, Padding,
+    Border, ContentFit, Element, Length, Padding,
 };
 use wad::types::Wad;
 
@@ -30,9 +31,6 @@ impl WaddyTile {
             .width(Length::Fixed(TILE_DIMENSION))
             .height(Length::Fixed(TILE_DIMENSION))
             .content_fit(ContentFit::ScaleDown);
-        // let image_button = button(image)
-        //     .on_press(TileMessage::)
-        //     .style(iced::widget::button::text);
 
         let image_button = iced::widget::mouse_area(image)
             .on_press(TileMessage::LeftClick)
@@ -42,12 +40,6 @@ impl WaddyTile {
 
         let dimensions = text(format!("{}x{}", self.dimensions.0, self.dimensions.1));
 
-        // let a =text_input("texture name", self.name.as_str())
-        // .on_input(TileMessage::EditChange)
-        // .on_submit(TileMessage::EditFinish)
-        // // padding zero so it doesn't get bigger
-        // .padding(Padding::ZERO)
-        // .id(self.id.clone())
         let name = if in_edit {
             row![text_input("texture name", self.label.as_str())
                 .on_input(TileMessage::EditChange)
@@ -56,7 +48,10 @@ impl WaddyTile {
                 .padding(Padding::ZERO)
                 .id(self.id.clone())]
         } else {
-            row![mouse_area(self.label.as_str())]
+            let label_clickable =
+                mouse_area(self.label.as_str()).on_press(TileMessage::EditRequest);
+
+            row![label_clickable]
         };
 
         let tile = container(column![image_button, name, dimensions])
@@ -65,13 +60,21 @@ impl WaddyTile {
 
                 iced::widget::container::Style {
                     text_color: palette.text.into(),
-                    background: Some(iced::Background::Color(if selected {
-                        palette.primary
-                    } else if in_edit {
-                        palette.danger
-                    } else {
-                        palette.background
-                    })),
+                    background: Some(iced::Background::Color(
+                        // branch in_edit first
+                        if in_edit {
+                            palette.danger
+                        } else if selected {
+                            palette.primary
+                        } else {
+                            palette.background
+                        },
+                    )),
+                    border: Border {
+                        color: iced::Color::WHITE.scale_alpha(0.1),
+                        width: 0.5,
+                        radius: Radius::new(1.).bottom(4.),
+                    },
                     ..Default::default()
                 }
             })
@@ -86,21 +89,8 @@ impl WaddyTile {
         tile.into()
     }
 
-    // a tile can only update intrinsic data
-    pub fn update(&mut self, message: TileMessage) {
-        match message {
-            TileMessage::EditChange(string) => {
-                self.label = string;
-                self.label.truncate(15);
-            }
-            TileMessage::EditFinish
-            | TileMessage::EditCancel
-            | TileMessage::EditRequest
-            | TileMessage::EditEnter => {}
-            // clicks should only change grid state, not tile state
-            TileMessage::LeftClick | TileMessage::RightClick => {}
-        }
-    }
+    // no update function
+    // pub fn update(&mut self, message: TileMessage) {}
 }
 
 pub fn get_texture_tiles_from_wad(wad: Wad) -> Vec<WaddyTile> {
