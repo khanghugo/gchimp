@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use bitflags::bitflags;
 use map::{Entity, Map};
 
 use crate::err;
@@ -85,12 +86,33 @@ impl GchimpInfo {
         self.entity.attributes.get(GCHIMP_INFO_GAMEDIR).unwrap()
     }
 
-    pub fn options(&self) -> usize {
+    pub fn options(&self) -> GchimpInfoOption {
         self.entity
             .attributes
             .get(GCHIMP_INFO_OPTIONS)
             .unwrap()
-            .parse::<usize>()
+            .parse::<u32>()
             .unwrap()
+            .into()
+    }
+}
+
+bitflags! {
+    #[derive(Default, Debug, Clone, Copy)]
+    pub struct GchimpInfoOption: u32 {
+        const None = 0;
+        /// Converts map file to a model
+        const Map2MdlConversion = 1 << 0;
+        /// Exports map2mdl entity into normal map entity
+        ///
+        /// Keep this option ticked if the model is already converted and model is not updated.
+        /// By doing that, model will not be re-converted on every compile.
+        const Map2MdlExport = 1 << 1;
+    }
+}
+
+impl From<u32> for GchimpInfoOption {
+    fn from(value: u32) -> Self {
+        Self::from_bits(value).unwrap_or_default()
     }
 }

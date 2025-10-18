@@ -4,7 +4,8 @@ use std::{
     path::{Path, PathBuf},
     process::Output,
     sync::{Arc, Mutex},
-    thread::JoinHandle,
+    thread::{self, JoinHandle},
+    time::Duration,
 };
 
 use entity::{
@@ -20,7 +21,7 @@ use wad::types::Wad;
 use rayon::{iter::Either, prelude::*};
 
 use crate::{
-    entity::{GchimpInfo, GCHIMP_INFO_ENTITY},
+    entity::{GchimpInfo, GchimpInfoOption, GCHIMP_INFO_ENTITY},
     err,
     utils::{
         constants::{
@@ -802,7 +803,10 @@ All missing textures have uppercase letters. If you use jack, make sure to have 
                 // check if the the info entity is there
                 let gchimp_info = GchimpInfo::from_map(map)?;
 
-                if gchimp_info.options() & 1 == 0 {
+                if !gchimp_info
+                    .options()
+                    .contains(GchimpInfoOption::Map2MdlConversion)
+                {
                     println!(
                         "map2mdl is not enabled as specified in {}",
                         GCHIMP_INFO_ENTITY
@@ -810,7 +814,9 @@ All missing textures have uppercase letters. If you use jack, make sure to have 
                     return Ok(());
                 }
 
-                let map2mdl_export_resource = gchimp_info.options() & 2 != 0;
+                let map2mdl_export_resource = gchimp_info
+                    .options()
+                    .contains(GchimpInfoOption::Map2MdlExport);
 
                 if !map2mdl_export_resource {
                     println!(
@@ -1435,15 +1441,24 @@ However, it will still turn {} into model displaying entities such as cycler_spr
             // hard code the dimensions
             let dimensions = (16, 16);
 
-            write_8bpp_to_file(
-                &img,
-                &palette,
-                dimensions,
-                output_path
-                    .with_file_name(celshade_texture_name.clone())
-                    .with_extension("bmp"),
-            )
-            .unwrap();
+            // write here is async for some reasons
+            // if everything is processed before file is written, the process fails
+            let texture_output_path = output_path
+                .with_file_name(celshade_texture_name.clone())
+                .with_extension("bmp");
+
+            write_8bpp_to_file(&img, &palette, dimensions, texture_output_path.as_path()).unwrap();
+
+            // need to sleep, otherwise, file does not exist
+            // and then studiomdl has nothing to work with
+            // our program is too fast
+            loop {
+                if texture_output_path.exists() {
+                    break;
+                }
+
+                thread::sleep(Duration::from_millis(100));
+            }
 
             let triangles: Vec<Triangle> = brushes
                 .iter_mut()
