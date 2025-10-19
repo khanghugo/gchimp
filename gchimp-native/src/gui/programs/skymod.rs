@@ -146,7 +146,7 @@ impl SkyModGui {
 
             ui.add_sized(
                 [FACE_SIZE, FACE_SIZE],
-                egui::ImageButton::new(image).frame(false),
+                egui::Button::image(image).frame(false),
             )
         };
 
