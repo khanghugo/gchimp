@@ -23,12 +23,16 @@ image = { version = "0.25.1", features = ["png"] }
 rayon = "1.10.0"
 
 # egui stuffs
-eframe = { version = "0.33.0", features = ["accesskit", "default_fonts", "wayland", "x11"] }
+eframe = { version = "0.33.0", features = ["accesskit", "default_fonts", "wayland", "x11", "wgpu"] }
 egui_tiles = "0.14.0"
 rfd = "0.14.1"
 egui_extras = {version = "0.33.0", features = ["all_loaders", "http"]}
 egui-wgpu = "0.33.0"
 walkdir = "2.5.0"
+cgmath = "0.18.0"
+mdl = { version = "0.3.5", path = "../mdl" }
+common = { version = "0.3.5", path = "../common" }
+bytemuck = "1.24.0"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 arboard = "3.4.0" # is not available on wasm32

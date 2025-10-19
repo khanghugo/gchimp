@@ -1,5 +1,7 @@
 use nom::{combinator::fail, IResult as _IResult};
 
+pub mod setup_studio_model_transformations;
+
 pub type IResult<'a, T> = _IResult<&'a str, T>;
 
 // https://github.com/getreu/parse-hyperlinks/blob/5af034d14aa72ffb9e705da13bf557a564b1bebf/parse-hyperlinks/src/lib.rs#L41

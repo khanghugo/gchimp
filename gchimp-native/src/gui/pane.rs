@@ -3,12 +3,12 @@ use std::sync::{Arc, Mutex};
 use eframe::egui::{self, vec2, Id, Response, Sense, Stroke, TextStyle, Ui, Vec2, WidgetText};
 use egui_tiles::{TabState, TileId, Tiles, UiResponse};
 
-use crate::{config::Config, persistent_storage::PersistentStorage};
+use crate::{config::Config, gui::CustomRenderer, persistent_storage::PersistentStorage};
 
 use super::{
     programs::{
-        blbh::BLBHGui, map2mdl::Map2MdlGui, misc::Misc, s2g::S2GGui, skymod::SkyModGui,
-        textile::TexTileGui, waddy::WaddyGui,
+        blbh::BLBHGui, map2mdl::Map2MdlGui, mdlscrub::MdlScrub, misc::Misc, s2g::S2GGui,
+        skymod::SkyModGui, textile::TexTileGui, waddy::WaddyGui,
     },
     TabProgram,
 };
@@ -22,6 +22,7 @@ pub enum Pane {
     Blbh(BLBHGui),
     // DemDoc(DemDoc),
     Misc(Misc),
+    MdlScrub(MdlScrub),
 }
 
 impl Pane {
@@ -34,6 +35,7 @@ impl Pane {
             Pane::Waddy(a) => a.tab_title(),
             // Pane::DemDoc(a) => a.tab_title(),
             Pane::Blbh(a) => a.tab_title(),
+            Pane::MdlScrub(a) => a.tab_title(),
             Pane::Misc(misc) => misc.tab_title(),
         }
     }
@@ -47,6 +49,7 @@ impl Pane {
             Pane::Waddy(a) => a.tab_ui(ui),
             // Pane::DemDoc(a) => a.tab_ui(ui),
             Pane::Blbh(a) => a.tab_ui(ui),
+            Pane::MdlScrub(a) => a.tab_ui(ui),
             Pane::Misc(misc) => misc.tab_ui(ui),
         }
     }
@@ -55,6 +58,7 @@ impl Pane {
 pub fn create_tree(
     app_config: Config,
     persistent_storage: Arc<Mutex<PersistentStorage>>,
+    custom_renderer: CustomRenderer,
 ) -> egui_tiles::Tree<Pane> {
     let mut tiles = egui_tiles::Tiles::default();
 
@@ -67,6 +71,9 @@ pub fn create_tree(
         tiles.insert_pane(Pane::Waddy(WaddyGui::new(persistent_storage))),
         tiles.insert_pane(Pane::Map2Prop(Map2MdlGui::new(app_config.clone()))),
         tiles.insert_pane(Pane::Blbh(BLBHGui::new(app_config.clone()))),
+        tiles.insert_pane(Pane::MdlScrub(MdlScrub::new(Arc::new(
+            custom_renderer.mdlscrub_renderer,
+        )))),
         // tiles.insert_pane(Pane::DemDoc(DemDoc::default())),
         tiles.insert_pane(Pane::Misc(Misc::default())),
     ];
