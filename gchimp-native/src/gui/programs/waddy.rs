@@ -3,7 +3,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use eframe::egui::{self, Context, Modifiers, RichText, ScrollArea, Sense, Ui};
+use eframe::egui::{
+    self, scroll_area::ScrollSource, Context, Modifiers, RichText, ScrollArea, Sense, Ui,
+};
 use gchimp::modules::waddy::Waddy;
 use image::{ImageBuffer, RgbaImage};
 use wad::types::FileEntry;
@@ -136,8 +138,14 @@ impl WaddyGui {
                 .on_hover_text("Click to copy name")
                 .clicked()
             {
-                ui.output_mut(|o| o.copied_text = effective_tile.name().to_string());
-                ui.close_menu();
+                // ui.output_mut(|o| o.co = effective_tile.name().to_string());
+                ui.output_mut(|o| {
+                    let copy_text_command =
+                        egui::OutputCommand::CopyText(effective_tile.name().to_string());
+
+                    o.commands.push(copy_text_command);
+                });
+                ui.close();
             }
 
             ui.separator();
@@ -145,7 +153,7 @@ impl WaddyGui {
             if ui.button("View").clicked() {
                 self.extra_image_viewports
                     .push(effective_tile.wad_image.clone());
-                ui.close_menu();
+                ui.close();
             }
 
             ui.separator();
@@ -157,7 +165,7 @@ impl WaddyGui {
                 effective_tile
                     .prev_name
                     .clone_from(&effective_tile.name().clone());
-                ui.close_menu();
+                ui.close();
             }
         }
 
@@ -178,13 +186,13 @@ impl WaddyGui {
                     }
                 }
 
-                ui.close_menu();
+                ui.close();
             }
         } else {
             // when lots of selected there will be option to deselect
             if ui.button("Deselect all").clicked() {
                 self.instances[instance_index].selected.clear();
-                ui.close_menu();
+                ui.close();
             }
 
             if ui
@@ -215,7 +223,7 @@ impl WaddyGui {
                     );
                 }
 
-                ui.close_menu();
+                ui.close();
             }
         }
 
@@ -262,7 +270,7 @@ impl WaddyGui {
                     }
                 }
 
-                ui.close_menu();
+                ui.close();
             }
 
             // very fucky rust borrow checker shit so it is like this way
@@ -279,7 +287,7 @@ impl WaddyGui {
                         .unwrap_or(format!("New WAD ({})", idx));
 
                     if ui.button(instance_name).clicked() {
-                        ui.close_menu();
+                        ui.close();
                         Some(idx)
                     } else {
                         acc
@@ -332,7 +340,7 @@ impl WaddyGui {
                     .to_delete
                     .push(effective_tile_index);
 
-                ui.close_menu();
+                ui.close();
             }
         } else if ui
             .button(format!(
@@ -346,7 +354,7 @@ impl WaddyGui {
                 .to_delete
                 .append(&mut to_deletes);
 
-            ui.close_menu()
+            ui.close()
         }
 
         context_menu_clicked
@@ -406,7 +414,7 @@ impl WaddyGui {
 
                 let clickable_image = ui.add_sized(
                     [image_tile_size, image_tile_size],
-                    egui::ImageButton::new(egui::Image::new((texture.id(), dimensions)))
+                    egui::Button::image(egui::Image::new((texture.id(), dimensions)))
                         .frame(false)
                         .selected(false),
                 );
@@ -606,11 +614,9 @@ impl WaddyGui {
 
         let total_rows = filtered_tiles.len().div_ceil(texture_per_row);
 
-        ScrollArea::vertical().drag_to_scroll(false).show_rows(
-            ui,
-            row_height,
-            total_rows,
-            |ui, row_range| {
+        ScrollArea::vertical()
+            .scroll_source(ScrollSource::MOUSE_WHEEL)
+            .show_rows(ui, row_height, total_rows, |ui, row_range| {
                 // each row is one grid of grids
                 row_range.for_each(|row| {
                     egui::Grid::new(format!("waddy_grid_row{}", row))
@@ -632,8 +638,7 @@ impl WaddyGui {
                                 });
                         });
                 });
-            },
-        );
+            });
     }
 
     // gui when there's WAD loaded
@@ -787,7 +792,7 @@ impl WaddyGui {
         // ESC to clear selected and close menu
         // if search bar is enabled, don't clear selected yet
         if is_escape_pressed && !self.instances[instance_index].search.enable {
-            ui.close_menu();
+            ui.close();
             self.instances[instance_index].selected.clear();
         }
 
@@ -989,13 +994,13 @@ impl WaddyGui {
             if ui.button("New").clicked() {
                 let _ = self.start_waddy_instance(ui, None);
 
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.button("Open").clicked() {
                 should_close = self.menu_open(ui);
 
-                ui.close_menu();
+                ui.close();
             }
 
             self.open_recent_menu_button(ui);
@@ -1005,13 +1010,13 @@ impl WaddyGui {
             if ui.button("Save (Ctrl+S)").clicked() {
                 self.menu_save(instance_index);
 
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.button("Save As").clicked() {
                 self.menu_save_as_dialogue(instance_index);
 
-                ui.close_menu();
+                ui.close();
             }
 
             ui.separator();
@@ -1025,7 +1030,7 @@ impl WaddyGui {
                 }
 
                 self.instances[instance_index].search.text.clear();
-                ui.close_menu();
+                ui.close();
             }
 
             ui.separator();
@@ -1049,7 +1054,7 @@ impl WaddyGui {
                     }
                 }
 
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.button("Export All").clicked() {
@@ -1063,14 +1068,14 @@ impl WaddyGui {
                     }
                 }
 
-                ui.close_menu();
+                ui.close();
             }
 
             ui.separator();
 
             ui.menu_button("Options", |ui| {
                 if ui.checkbox(&mut self.fit_texture, "Fit texture").clicked() {
-                    ui.close_menu();
+                    ui.close();
                 }
 
                 if ui.button("To UPPERCASE").clicked() {
@@ -1086,7 +1091,7 @@ impl WaddyGui {
                             .expect("cannot rename texture");
 
                         self.instances[instance_index].is_changed = true;
-                        ui.close_menu();
+                        ui.close();
                     });
                 }
 
@@ -1103,7 +1108,7 @@ impl WaddyGui {
                             .expect("cannot rename texture");
 
                         self.instances[instance_index].is_changed = true;
-                        ui.close_menu();
+                        ui.close();
                     });
                 }
             });
@@ -1115,7 +1120,7 @@ impl WaddyGui {
 
                 should_close = true;
 
-                ui.close_menu();
+                ui.close();
             }
         });
 
@@ -1188,13 +1193,13 @@ impl WaddyGui {
             if ui.button("New").clicked() {
                 let _ = self.start_waddy_instance(ui, None);
 
-                ui.close_menu();
+                ui.close();
             }
 
             if ui.button("Open").clicked() {
                 self.menu_open(ui);
 
-                ui.close_menu();
+                ui.close();
             }
 
             self.open_recent_menu_button(ui);
@@ -1252,7 +1257,7 @@ impl WaddyGui {
                             self.start_waddy_instance(ui, Some(Path::new(recent_wad.as_str())))
                                 .expect("cannot start a Waddy instance");
 
-                            ui.close_menu();
+                            ui.close();
                         } else {
                             return true;
                         }
