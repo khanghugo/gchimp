@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use dem::bitvec::view;
 use eframe::{
     egui::{self, PaintCallbackInfo},
     emath,
@@ -7,10 +8,7 @@ use eframe::{
 use egui_wgpu::wgpu;
 
 use crate::gui::programs::mdlscrub::render::{
-    camera::ScrubCamera,
-    mdl_buffer::{dynamic_buffer::WorldDynamicBuffer, MdlVertexBuffer},
-    mvp::MvpBuffer,
-    texture_array::TextureArrayBuffer,
+    camera::ScrubCamera, mdl_buffer::dynamic_buffer::WorldDynamicBuffer,
 };
 
 pub mod camera;
@@ -24,6 +22,7 @@ pub struct TileRenderCallback {
     pub pipeline: Arc<wgpu::RenderPipeline>,
     pub buffer: Arc<WorldDynamicBuffer>,
     pub camera: ScrubCamera,
+    pub name: String,
 }
 
 impl egui_wgpu::CallbackTrait for TileRenderCallback {
@@ -46,9 +45,27 @@ impl egui_wgpu::CallbackTrait for TileRenderCallback {
         let viewport = info.viewport_in_pixels();
         let rect = info.clip_rect_in_pixels();
 
+        // if self.name == "chain5.mdl" {
+        //     let a = &viewport;
+
+        //     println!(
+        //         "viewport {} {} {} {}",
+        //         a.left_px, a.top_px, a.width_px, a.height_px
+        //     );
+        //     let a = &rect;
+
+        //     println!(
+        //         "rect {} {} {} {}",
+        //         a.left_px, a.top_px, a.width_px, a.height_px
+        //     );
+        //     println!("self.rect {:?}", self.rect);
+
+        //     println!("");
+        // }
+
         render_pass.set_viewport(
-            viewport.left_px as f32,
-            viewport.top_px as f32,
+            self.rect.min.x * info.pixels_per_point,
+            self.rect.min.y * info.pixels_per_point,
             // not sure why viewport.width_px doesn't just work
             self.rect.width() * info.pixels_per_point,
             self.rect.height() * info.pixels_per_point,

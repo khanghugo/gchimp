@@ -10,7 +10,7 @@ use crate::gui::programs::mdlscrub::render::{
     pipeline::MdlScrubRenderer, TileRenderCallback,
 };
 
-pub const SCRUB_TILE_SIZE: f32 = 96.;
+pub const SCRUB_TILE_SIZE: f32 = 192.;
 
 #[derive(Debug)]
 pub struct ScrubTile {
@@ -33,6 +33,7 @@ impl ScrubTile {
                     pipeline: Arc::new(tile_renderer.pipeline.clone()),
                     buffer: self.buffer.clone(),
                     camera: self.camera.clone(),
+                    name: self.name.clone(),
                 };
 
                 let callback = egui_wgpu::Callback::new_paint_callback(rect, callback_passin);

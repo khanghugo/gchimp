@@ -71,8 +71,10 @@ impl MdlScrub {
     fn scrub_grid(&mut self, ui: &mut Ui) {
         let tile_count = self.tiles.len();
 
-        let image_tile_size = SCRUB_TILE_SIZE * ui.ctx().options(|options| options.zoom_factor);
-        let tile_per_row = ((ui.min_size().x / image_tile_size).floor() as usize).max(4);
+        // let image_tile_size = SCRUB_TILE_SIZE * ui.ctx().options(|options| options.zoom_factor);
+        let image_tile_size = SCRUB_TILE_SIZE * ui.pixels_per_point();
+        let tile_per_row =
+            ((ui.min_size().x * ui.pixels_per_point() / image_tile_size).floor() as usize).max(2);
         let row_height = 4. // margin
             + 18. // 1 labels
             + image_tile_size;
