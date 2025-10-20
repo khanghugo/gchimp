@@ -6,6 +6,8 @@ use std::{
 use eframe::egui::{self, scroll_area::ScrollSource, ScrollArea, Ui};
 use walkdir::WalkDir;
 
+use rayon::prelude::*;
+
 use crate::gui::{
     programs::mdlscrub::{
         render::{camera::ScrubCamera, pipeline::MdlScrubRenderer},
@@ -38,7 +40,7 @@ impl MdlScrub {
             let mdl_paths = get_mdl_paths_recursively(&path);
 
             let mut tiles: Vec<ScrubTile> = mdl_paths
-                .into_iter()
+                .into_par_iter()
                 .map(|path| {
                     let file_name = path.file_name().unwrap().to_str().unwrap();
                     let mdl = mdl::Mdl::open_from_file(path.as_path()).unwrap();
@@ -71,7 +73,7 @@ impl MdlScrub {
 
         let image_tile_size = SCRUB_TILE_SIZE * ui.ctx().options(|options| options.zoom_factor);
         let tile_per_row = ((ui.min_size().x / image_tile_size).floor() as usize).max(4);
-        let row_height = 2. // margin
+        let row_height = 4. // margin
             + 18. // 1 labels
             + image_tile_size;
 
@@ -93,13 +95,13 @@ impl MdlScrub {
         let total_rows = tile_count.div_ceil(tile_per_row);
 
         ScrollArea::vertical()
-            .scroll_source(ScrollSource::MOUSE_WHEEL)
+            .scroll_source(ScrollSource::MOUSE_WHEEL | ScrollSource::SCROLL_BAR)
             .show_rows(ui, row_height, total_rows, |ui, row_range| {
                 // each row is one grid of grids
                 row_range.for_each(|row| {
                     egui::Grid::new(format!("mdlscrub_grid_row{}", row))
                         .num_columns(tile_per_row)
-                        .spacing([2., 2.])
+                        .spacing([4., 4.])
                         .show(ui, |ui| {
                             self.tiles
                                 .chunks_mut(tile_per_row)

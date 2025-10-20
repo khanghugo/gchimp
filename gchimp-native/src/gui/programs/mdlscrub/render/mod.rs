@@ -41,22 +41,26 @@ impl egui_wgpu::CallbackTrait for TileRenderCallback {
         &self,
         info: PaintCallbackInfo,
         render_pass: &mut egui_wgpu::wgpu::RenderPass<'static>,
-        callback_resources: &egui_wgpu::CallbackResources,
+        _callback_resources: &egui_wgpu::CallbackResources,
     ) {
-        let vp = info.viewport_in_pixels();
+        let viewport = info.viewport_in_pixels();
+        let rect = info.clip_rect_in_pixels();
+
         render_pass.set_viewport(
-            vp.left_px as f32,
-            vp.top_px as f32,
-            vp.width_px as f32,
-            vp.height_px as f32,
+            viewport.left_px as f32,
+            viewport.top_px as f32,
+            // not sure why viewport.width_px doesn't just work
+            self.rect.width() * info.pixels_per_point,
+            self.rect.height() * info.pixels_per_point,
             0.,
             1.,
         );
+
         render_pass.set_scissor_rect(
-            vp.left_px as u32,
-            vp.top_px as u32,
-            vp.width_px as u32,
-            vp.height_px as u32,
+            rect.left_px as u32,
+            rect.top_px as u32,
+            rect.width_px as u32,
+            rect.height_px as u32,
         );
 
         render_pass.set_pipeline(&self.pipeline);
