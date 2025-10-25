@@ -1,12 +1,18 @@
 use std::collections::HashMap;
 
+use cgmath::EuclideanSpace;
 use eframe::wgpu::util::DeviceExt;
 use egui_wgpu::wgpu;
 use image::RgbaImage;
 use mdl::Trivert;
 
-use crate::gui::programs::mdlscrub::render::mdl_buffer::{
-    dynamic_buffer::BatchLookup, MdlVertexBuffer,
+use crate::gui::programs::mdlscrub::{
+    render::{
+        camera::ScrubCamera,
+        mdl_buffer::{dynamic_buffer::BatchLookup, MdlVertexBuffer},
+        mipmap_array::MipmapTexture,
+    },
+    tile::SCRUB_TILE_SIZE,
 };
 
 pub fn triangulate_mdl_triverts(
@@ -43,17 +49,14 @@ pub fn triangulate_mdl_triverts(
     }
 }
 
-pub fn get_mdl_textures(mdl: &mdl::Mdl) -> Vec<RgbaImage> {
+pub fn get_mdl_mipmaps(mdl: &mdl::Mdl) -> Vec<MipmapTexture> {
     mdl.textures
         .iter()
-        .map(|texture| {
-            eightbpp_to_rgba8(
-                &texture.image,
-                &texture.palette,
-                texture.dimensions().0,
-                texture.dimensions().1,
-                None,
-            )
+        .map(|texture| MipmapTexture {
+            image: texture.image.clone(),
+            palette: texture.palette,
+            width: texture.dimensions().0,
+            height: texture.dimensions().1,
         })
         .collect()
 }
@@ -144,4 +147,74 @@ pub fn create_mdl_vertex_buffer(
             }
         })
         .collect()
+}
+
+pub fn set_up_camera_values_for_mdl(mdl: &mdl::Mdl) -> ScrubCamera {
+    let (lowest, highest) = mdl
+        .bodyparts
+        .iter()
+        .flat_map(|bodypart| &bodypart.models)
+        .take(1)
+        .flat_map(|model| &model.meshes)
+        .flat_map(|mesh| &mesh.triangles)
+        .flat_map(|mesh_triangle| mesh_triangle.get_triverts())
+        .fold(
+            (
+                cgmath::Vector3::<f32>::new(f32::MAX, f32::MAX, f32::MAX),
+                cgmath::Vector3::<f32>::new(f32::MIN, f32::MIN, f32::MIN),
+            ),
+            |(low, high), trivert| {
+                let vertex = trivert.vertex;
+
+                (
+                    cgmath::Vector3 {
+                        x: low.x.min(vertex.x),
+                        y: low.y.min(vertex.y),
+                        z: low.z.min(vertex.z),
+                    },
+                    cgmath::Vector3 {
+                        x: high.x.max(vertex.x),
+                        y: high.y.max(vertex.y),
+                        z: high.z.max(vertex.z),
+                    },
+                )
+            },
+        );
+
+    // basic target to look at
+    let mut camera = ScrubCamera::default();
+
+    let center = (highest + lowest) / 2.;
+    camera.target = cgmath::Point3::from_vec(center);
+
+    // now i want to change things a bit so that it looks nicer, will be moving the camera position on a sphere with "center" as the center
+    // and "distance" as the radius
+    let box_size = highest - lowest;
+    let max_dimension = box_size.x.max(box_size.y).max(box_size.z);
+    const FOV_Y: f32 = 90.;
+
+    let distance = max_dimension
+        / 2.
+        / (FOV_Y / 2.)
+            .to_radians()
+            // use sin for the worst case
+            .sin();
+    let distance = distance * 1.2; // add some more padding
+
+    const VERTICAL_ROT: f32 = 45f32.to_radians();
+    const HORIZONTAL_ROT: f32 = 45f32.to_radians();
+
+    let camera_pos = cgmath::point3(
+        center.x + distance * VERTICAL_ROT.sin() * HORIZONTAL_ROT.cos(),
+        center.y + distance * VERTICAL_ROT.cos() * HORIZONTAL_ROT.sin(),
+        center.z + distance * VERTICAL_ROT.cos(),
+    );
+
+    camera.pos = camera_pos;
+
+    // now i have to make sure other values are correct
+    camera.fovy = cgmath::Deg(FOV_Y);
+    camera.aspect = SCRUB_TILE_SIZE / SCRUB_TILE_SIZE;
+
+    camera
 }

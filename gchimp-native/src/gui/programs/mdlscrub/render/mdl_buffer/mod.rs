@@ -2,7 +2,7 @@ use bytemuck::{Pod, Zeroable};
 use egui_wgpu::wgpu;
 
 pub mod dynamic_buffer;
-mod util;
+pub mod util;
 
 #[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy)]

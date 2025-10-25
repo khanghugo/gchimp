@@ -10,7 +10,7 @@ use rayon::prelude::*;
 
 use crate::gui::{
     programs::mdlscrub::{
-        render::{camera::ScrubCamera, pipeline::MdlScrubRenderer},
+        render::{mdl_buffer::util::set_up_camera_values_for_mdl, pipeline::MdlScrubRenderer},
         tile::{ScrubTile, SCRUB_TILE_SIZE},
     },
     TabProgram,
@@ -46,10 +46,7 @@ impl MdlScrub {
                     let mdl = mdl::Mdl::open_from_file(path.as_path()).unwrap();
 
                     let buffer = Arc::new(self.renderer.load_dynamic_world(file_name, &mdl, 0));
-
-                    let mut camera = ScrubCamera::default();
-
-                    camera.pos = cgmath::point3(0., -100., 100.);
+                    let camera = set_up_camera_values_for_mdl(&mdl);
 
                     ScrubTile {
                         id: egui::Id::new(path.display().to_string()),

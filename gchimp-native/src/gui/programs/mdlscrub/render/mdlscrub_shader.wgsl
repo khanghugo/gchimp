@@ -46,8 +46,8 @@ fn vs_main(
 }
 
 // fragment shader
-@group(1) @binding(0) var texture: texture_2d_array<f32>;
-@group(1) @binding(1) var linear_sampler: sampler;
+@group(1) @binding(0) var mipmap: texture_2d_array<f32>;
+@group(1) @binding(1) var palette: texture_2d<f32>;
 @group(1) @binding(2) var nearest_sampler: sampler;
 
 fn calculate_base_color(
@@ -58,8 +58,11 @@ fn calculate_base_color(
     bone_idx: u32,
 ) -> vec4f {
     var albedo: vec4f;
+    let palette_index = textureSample(mipmap, nearest_sampler, tex_coord, layer_idx).r;
+    let palette_uv = vec2<f32>(palette_index, f32(layer_idx));
 
-    albedo = textureSample(texture, linear_sampler, tex_coord, layer_idx);
+    albedo = textureSample(palette, nearest_sampler, palette_uv);
+    
     // albedo = bicubic_filtering(tex_coord, layer_idx);
     // albedo = nearest_aa_filtering(tex_coord, layer_idx);
     // albedo = pixel_art_filter2(tex_coord, layer_idx);

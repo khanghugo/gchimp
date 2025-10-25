@@ -13,17 +13,16 @@ use common::setup_studio_model_transformations::{
 };
 use egui_wgpu::wgpu;
 
-use image::RgbaImage;
 use mdl::{Mdl, SequenceFlag};
 
 use crate::gui::programs::mdlscrub::render::{
     mdl_buffer::{
-        util::{create_mdl_vertex_buffer, get_mdl_textures, triangulate_mdl_triverts},
+        util::{create_mdl_vertex_buffer, get_mdl_mipmaps, triangulate_mdl_triverts},
         MdlVertex, MdlVertexBuffer,
     },
+    mipmap_array::{create_mipmap_array, MipmapArrayBuffer, MipmapTexture},
     mvp::MvpBuffer,
     pipeline::MdlScrubRenderer,
-    texture_array::{create_texture_array, TextureArrayBuffer},
 };
 
 #[derive(Debug, Clone)]
@@ -31,7 +30,7 @@ pub struct WorldDynamicBuffer {
     pub name: String,
     // there is only 1 entity...
     pub opaque: Vec<MdlVertexBuffer>,
-    pub textures: Vec<TextureArrayBuffer>,
+    pub textures: Vec<MipmapArrayBuffer>,
     pub mvp_buffer: MvpBuffer,
     pub transformations: WorldTransformationSkeletal,
 }
@@ -51,10 +50,10 @@ impl MdlScrubRenderer {
         let device = &self.wgpu_context.device;
         let queue = &self.wgpu_context.queue;
 
-        let mdl_textures = get_mdl_textures(mdl);
+        let mdl_mipmaps = get_mdl_mipmaps(mdl);
 
         let (texture_arrays, lookup_table) =
-            Self::load_dynamic_world_textures(device, queue, mdl_textures);
+            Self::load_dynamic_world_textures(device, queue, mdl_mipmaps);
 
         let mut batch_lookup = BatchLookup::new();
 
@@ -158,8 +157,8 @@ impl MdlScrubRenderer {
     fn load_dynamic_world_textures(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        mdl_textures: Vec<RgbaImage>,
-    ) -> (Vec<TextureArrayBuffer>, TextureTableLookup) {
+        mdl_textures: Vec<MipmapTexture>,
+    ) -> (Vec<MipmapArrayBuffer>, TextureTableLookup) {
         // grouping all the textures in its own samey dimensions first
         let mut texture_arrays_lookup: HashMap<(u32, u32), Vec<usize>> = HashMap::new();
 
@@ -193,15 +192,15 @@ impl MdlScrubRenderer {
             });
 
         // now create texture arrays
-        let texture_arrays: Vec<TextureArrayBuffer> = texture_arrays_lookup
+        let texture_arrays: Vec<MipmapArrayBuffer> = texture_arrays_lookup
             .iter()
             .map(|textures| {
-                let ref_vec: Vec<&RgbaImage> = textures
+                let ref_vec: Vec<&MipmapTexture> = textures
                     .iter()
                     .filter_map(|&texture_idx| mdl_textures.get(texture_idx))
                     .collect();
 
-                create_texture_array(device, queue, &ref_vec)
+                create_mipmap_array(device, queue, &ref_vec)
                     .expect("cannot load dynamic world buffer texture")
             })
             .collect();

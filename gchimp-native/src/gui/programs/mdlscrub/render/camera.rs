@@ -147,6 +147,14 @@ const CAM_START_POS: [f32; 3] = [0f32; 3];
 
 impl Default for ScrubCamera {
     fn default() -> Self {
+        Self::new()
+    }
+}
+
+const MAX_PITCH: f32 = 89.0;
+
+impl ScrubCamera {
+    pub fn new() -> Self {
         let up = Vector3::unit_z(); // using the game up vector
         let start_pos = Point3::<f32>::from(CAM_START_POS);
         let target_pos = start_pos + Vector3::unit_x();
@@ -172,11 +180,7 @@ impl Default for ScrubCamera {
 
         res
     }
-}
 
-const MAX_PITCH: f32 = 89.0;
-
-impl ScrubCamera {
     pub fn view(&self) -> Matrix4<f32> {
         Matrix4::look_at_rh(self.pos, self.target, self.up)
     }

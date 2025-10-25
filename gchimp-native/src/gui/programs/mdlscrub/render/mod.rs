@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
-use dem::bitvec::view;
-use eframe::{
-    egui::{self, PaintCallbackInfo},
-    emath,
-};
+use eframe::{egui::PaintCallbackInfo, emath};
 use egui_wgpu::wgpu;
 
 use crate::gui::programs::mdlscrub::render::{
@@ -13,9 +9,9 @@ use crate::gui::programs::mdlscrub::render::{
 
 pub mod camera;
 pub mod mdl_buffer;
+mod mipmap_array;
 mod mvp;
 pub mod pipeline;
-mod texture_array;
 
 pub struct TileRenderCallback {
     pub rect: emath::Rect,

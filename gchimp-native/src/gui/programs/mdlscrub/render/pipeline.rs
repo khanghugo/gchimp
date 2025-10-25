@@ -2,8 +2,8 @@ use egui_wgpu::wgpu;
 
 use crate::gui::{
     programs::mdlscrub::render::{
-        camera::CameraPushConstant, mdl_buffer::MdlVertex, mvp::MvpBuffer,
-        texture_array::TextureArrayBuffer,
+        camera::CameraPushConstant, mdl_buffer::MdlVertex, mipmap_array::MipmapArrayBuffer,
+        mvp::MvpBuffer,
     },
     WgpuContext,
 };
@@ -29,8 +29,8 @@ impl MdlScrubRenderer {
         let mvp_bind_group_layout =
             device.create_bind_group_layout(&MvpBuffer::bind_group_layout_descriptor());
 
-        let texture_array_bind_group_layout =
-            device.create_bind_group_layout(&TextureArrayBuffer::bind_group_layout_descriptor());
+        let mipmap_array_bind_group_layout =
+            device.create_bind_group_layout(&MipmapArrayBuffer::bind_group_layout_descriptor());
 
         let push_constant_ranges = vec![wgpu::PushConstantRange {
             stages: wgpu::ShaderStages::VERTEX,
@@ -40,8 +40,8 @@ impl MdlScrubRenderer {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[
-                &mvp_bind_group_layout,           // 0
-                &texture_array_bind_group_layout, // 1
+                &mvp_bind_group_layout,          // 0
+                &mipmap_array_bind_group_layout, // 1
             ],
             push_constant_ranges: &push_constant_ranges,
         });
