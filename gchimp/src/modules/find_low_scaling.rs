@@ -12,8 +12,12 @@ pub fn find_low_scaling(map: &Map) {
                     let mut is_low = false;
                     let mut low_u = 0.;
                     let mut low_v = 0.;
-                    let mut texture_name = "";
-                    brush.planes.iter().for_each(|plane| if !NO_RENDER_TEXTURE.contains(&plane.texture_name.as_str()) {
+                    let mut texture_name = String::new();
+                    brush.planes.iter().for_each(|plane| {
+                        
+                        let plane_texture = plane.texture_name.get_string();
+
+                        if !NO_RENDER_TEXTURE.contains(&plane_texture.as_str()) {
                         // hardcoded to care about default layer only
                         if entity.attributes.contains_key("_tb_layer") || entity.attributes.contains_key("_tb_id") {
                             return;
@@ -23,9 +27,9 @@ pub fn find_low_scaling(map: &Map) {
                             low_u = plane.u_scale;
                             low_v = plane.v_scale;
                             is_low = true;
-                            texture_name = &plane.texture_name;
+                            texture_name = plane_texture;
                         }
-                    });
+                    }});
 
                     if is_low {
                         println!("Entity {} Brush {} ( {} {} {} ) ( {} {} {} ) ( {} {} {} ) has low scaling {} {} {}", entity_idx, brush_idx,
