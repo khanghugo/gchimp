@@ -153,10 +153,18 @@ impl TabProgram for Map2MdlGui {
                     ui.end_row();
                     ui.checkbox(&mut self.use_entity, "Entity");
                     ui.add_enabled_ui(self.use_entity, |ui| {
-                        ui.add(
-                            egui::TextEdit::singleline(&mut self.entity)
-                                .hint_text("Worldbrush entity copied from TrechBroom"),
-                        );
+                        egui::ScrollArea::vertical()
+                            .scroll_bar_visibility(
+                                egui::scroll_area::ScrollBarVisibility::AlwaysHidden,
+                            )
+                            .show(ui, |ui| {
+                                ui.add(
+                                    egui::TextEdit::multiline(&mut self.entity)
+                                        .hint_text("Worldbrush entity copied from TrechBroom")
+                                        .desired_rows(1)
+                                        .cursor_at_end(true),
+                                );
+                            });
                     });
                     if ui.button("Clear").clicked() {
                         self.entity.clear();
@@ -219,10 +227,10 @@ This option is to coerce every texture in this process to be upper case.")
         let binding = self.sync.stdout().lock().unwrap();
         let mut readonly_buffer = binding.as_str();
 
-        ScrollArea::vertical().show(ui, |ui| {
+        ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
             ui.add_sized(
                 egui::vec2(PROGRAM_WIDTH, PROGRAM_HEIGHT / 3.),
-                egui::TextEdit::multiline(&mut readonly_buffer),
+                egui::TextEdit::multiline(&mut readonly_buffer).cursor_at_end(true),
             );
         });
 
