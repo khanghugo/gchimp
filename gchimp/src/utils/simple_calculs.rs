@@ -969,9 +969,9 @@ impl From<[Point3D; 3]> for Triangle3D {
 }
 
 #[derive(Debug, Default)]
-pub struct ConvexPolytope(Vec<Polygon3D>);
+pub struct ConvexHull(Vec<Polygon3D>);
 
-impl ConvexPolytope {
+impl ConvexHull {
     pub fn with_face_count(count: usize) -> Self {
         Self(vec![Polygon3D::default(); count])
     }

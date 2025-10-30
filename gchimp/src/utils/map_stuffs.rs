@@ -7,7 +7,7 @@ use smd::{Triangle, Vertex};
 use crate::utils::simple_calculs::Solid3D;
 
 use super::{
-    simple_calculs::{ConvexPolytope, Plane3D, Triangle3D},
+    simple_calculs::{ConvexHull, Plane3D, Triangle3D},
     wad_stuffs::SimpleWad,
 };
 
@@ -45,6 +45,8 @@ pub fn map_to_triangulated_smd(
         .flatten()
         .collect())
 }
+
+pub fn map_to_triangulated_smd2(map: &Map, wads: &SimpleWad, three_planes: bool) {}
 
 /// Remember to check if texture exists.
 pub fn entity_to_triangulated_smd(
@@ -106,6 +108,8 @@ pub fn brush_to_solid3d(brush: &Brush) -> Solid3D {
         .into()
 }
 
+pub fn solid_3d_to_convex_hull() {}
+
 // technical debt
 pub fn solid3d_to_triangulated_smd(
     // brush is still needed here so we can get correct triangle data
@@ -117,12 +121,12 @@ pub fn solid3d_to_triangulated_smd(
     three_planes: bool,
 ) -> eyre::Result<Vec<Triangle>> {
     // TODO maybe phase out three_planes
-    let polytope = if three_planes {
+    let convex_hull = if three_planes {
         // https://3707026871-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2F-LtVT8pJjInrrHVCovzy%2Fuploads%2FEukkFYJLwfafFXUMpsI2%2FMAPFiles_2001_StefanHajnoczi.pdf?alt=media&token=51471685-bf69-42ae-a015-a474c0b95165
         // https://github.com/pwitvoet/mess/blob/master/MESS/Mapping/Brush.cs#L38
         let plane_count = solid.face_count();
 
-        let mut polytope = ConvexPolytope::with_face_count(plane_count);
+        let mut convex_hull = ConvexHull::with_face_count(plane_count);
 
         for i in 0..plane_count {
             for j in (i + 1)..plane_count {
@@ -137,18 +141,18 @@ pub fn solid3d_to_triangulated_smd(
                     let new_vertex = new_vertex.unwrap();
 
                     if solid.contains_point(new_vertex) {
-                        polytope.polygons_mut()[i].add_vertex(new_vertex);
-                        polytope.polygons_mut()[j].add_vertex(new_vertex);
-                        polytope.polygons_mut()[k].add_vertex(new_vertex);
+                        convex_hull.polygons_mut()[i].add_vertex(new_vertex);
+                        convex_hull.polygons_mut()[j].add_vertex(new_vertex);
+                        convex_hull.polygons_mut()[k].add_vertex(new_vertex);
                     }
                 }
             }
         }
 
-        polytope
+        convex_hull
     } else {
         // i am very proud that i came up with this shit myself
-        let mut polytope = ConvexPolytope::cube(SUBTRACTIVE_CUBE_SIZE);
+        let mut polytope = ConvexHull::cube(SUBTRACTIVE_CUBE_SIZE);
 
         solid.faces().iter().for_each(|plane| {
             polytope.cut(plane);
@@ -158,9 +162,9 @@ pub fn solid3d_to_triangulated_smd(
     };
 
     // it is convex so no worry that the center is outside the brush
-    let polytope_centroid = polytope.centroid()?;
+    let polytope_centroid = convex_hull.centroid()?;
 
-    let triangulatable = polytope
+    let triangulatable = convex_hull
         .polygons()
         .iter()
         .map(|polygon| {
@@ -221,7 +225,12 @@ pub fn solid3d_to_triangulated_smd(
 
                     // make sure to check the texture exists before running the function
                     // seems very inefficient to do check here instead
-                    let tex_dimensions = wads.get(&brush_plane.texture_name).unwrap().dimensions();
+                    // using get_string_standard() because the assumption is that
+                    // all textures are uppercase
+                    let tex_dimensions = wads
+                        .get(&brush_plane.texture_name.get_string_standard())
+                        .unwrap()
+                        .dimensions();
 
                     let p1: DVec3 = triangle_3d.get_triangle()[0].into();
                     let p2: DVec3 = triangle_3d.get_triangle()[1].into();
@@ -234,7 +243,7 @@ pub fn solid3d_to_triangulated_smd(
                     let v3_uv = convert_uv_origin(p3, brush_plane, tex_dimensions);
 
                     Triangle {
-                        material: brush_plane.texture_name.to_owned(),
+                        material: brush_plane.texture_name.get_string_standard().to_owned(),
                         vertices: vec![
                             Vertex {
                                 parent,
@@ -296,7 +305,7 @@ pub fn textures_used_in_map(map: &Map) -> HashSet<String> {
             if let Some(brushes) = &entity.brushes {
                 for brush in brushes.iter() {
                     for plane in brush.planes.iter() {
-                        acc.insert(plane.texture_name.clone());
+                        acc.insert(plane.texture_name.get_string_standard());
                     }
                 }
             }
@@ -311,7 +320,7 @@ pub fn textures_used_in_entity(entity: &Entity) -> HashSet<String> {
     if let Some(brushes) = &entity.brushes {
         for brush in brushes.iter() {
             for plane in brush.planes.iter() {
-                acc.insert(plane.texture_name.clone());
+                acc.insert(plane.texture_name.get_string_standard());
             }
         }
     }
@@ -327,7 +336,7 @@ pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush 
         p1: DVec3::from([mins[0], mins[1], mins[2]]),
         p2: DVec3::from([mins[0], mins[1] + 1., mins[2]]),
         p3: DVec3::from([mins[0], mins[1], mins[2] + 1.]),
-        texture_name: texture.to_owned(),
+        texture_name: map::TextureName::new(texture.to_owned()),
         u: DVec4 {
             x: 0.,
             y: -1.,
@@ -349,7 +358,7 @@ pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush 
         p1: DVec3::from([mins[0], mins[1], mins[2]]),
         p2: DVec3::from([mins[0], mins[1], mins[2] + 1.]),
         p3: DVec3::from([mins[0] + 1., mins[1], mins[2]]),
-        texture_name: texture.to_owned(),
+        texture_name: map::TextureName::new(texture.to_owned()),
         u: DVec4 {
             x: 1.,
             y: 0.,
@@ -371,7 +380,7 @@ pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush 
         p1: DVec3::from([mins[0], mins[1], mins[2]]),
         p2: DVec3::from([mins[0] + 1., mins[1], mins[2]]),
         p3: DVec3::from([mins[0], mins[1] + 1., mins[2]]),
-        texture_name: texture.to_owned(),
+        texture_name: map::TextureName::new(texture.to_owned()),
         u: DVec4 {
             x: -1.,
             y: 0.,
@@ -393,7 +402,7 @@ pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush 
         p1: DVec3::from([maxs[0], maxs[1], maxs[2]]),
         p2: DVec3::from([maxs[0], maxs[1] + 1., maxs[2]]),
         p3: DVec3::from([maxs[0] + 1., maxs[1], maxs[2]]),
-        texture_name: texture.to_owned(),
+        texture_name: map::TextureName::new(texture.to_owned()),
         u: DVec4 {
             x: 1.,
             y: 0.,
@@ -415,7 +424,7 @@ pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush 
         p1: DVec3::from([maxs[0], maxs[1], maxs[2]]),
         p2: DVec3::from([maxs[0] + 1., maxs[1], maxs[2]]),
         p3: DVec3::from([maxs[0], maxs[1], maxs[2] + 1.]),
-        texture_name: texture.to_owned(),
+        texture_name: map::TextureName::new(texture.to_owned()),
         u: DVec4 {
             x: -1.,
             y: 0.,
@@ -437,7 +446,7 @@ pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush 
         p1: DVec3::from([maxs[0], maxs[1], maxs[2]]),
         p2: DVec3::from([maxs[0], maxs[1], maxs[2] + 1.]),
         p3: DVec3::from([maxs[0], maxs[1] + 1., maxs[2]]),
-        texture_name: texture.to_owned(),
+        texture_name: map::TextureName::new(texture.to_owned()),
         u: DVec4 {
             x: 0.,
             y: 1.,
@@ -465,7 +474,8 @@ pub fn convert_used_texture_to_uppercase(mut map: Map) -> Map {
         if let Some(brushes) = entity.brushes.as_mut() {
             brushes.iter_mut().for_each(|brush| {
                 brush.planes.iter_mut().for_each(|plane| {
-                    plane.texture_name = plane.texture_name.to_uppercase();
+                    plane.texture_name =
+                        map::TextureName::new(plane.texture_name.get_string_standard());
                 });
             });
         }

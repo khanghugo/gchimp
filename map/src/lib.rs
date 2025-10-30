@@ -23,7 +23,7 @@ pub struct BrushPlane {
     pub p1: DVec3,
     pub p2: DVec3,
     pub p3: DVec3,
-    pub texture_name: String,
+    pub texture_name: TextureName,
     /// Ux Uy Uz Uoffset
     pub u: DVec4,
     /// Vx Vy Vz Voffset
@@ -31,6 +31,26 @@ pub struct BrushPlane {
     pub rotation: f64,
     pub u_scale: f64,
     pub v_scale: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TextureName(String);
+
+impl TextureName {
+    pub fn new(s: String) -> Self {
+        Self(s)
+    }
+    /// Texture name is uppercase
+    ///
+    /// Should use this method for doing comparison
+    pub fn get_string_standard(&self) -> String {
+        self.0.to_uppercase()
+    }
+
+    /// Simply returns the string
+    pub fn get_string(&self) -> String {
+        self.0.clone()
+    }
 }
 
 impl TryFrom<&str> for BrushPlane {
@@ -114,6 +134,13 @@ impl Map {
         Self::from_text(&text)
     }
 
+    pub fn parse_entities(text: &str) -> eyre::Result<Vec<Entity>> {
+        match parse_entities(text) {
+            Ok((_, res)) => Ok(res),
+            Err(err) => Err(eyre!("Cannot parse text: {}", err.to_string())),
+        }
+    }
+
     pub fn write(&self, path: impl AsRef<Path> + Into<PathBuf>) -> io::Result<()> {
         let file = OpenOptions::new()
             .create(true)
@@ -150,7 +177,7 @@ impl Map {
                     plane.p1.x,plane.p1.y,plane.p1.z,
                     plane.p2.x,plane.p2.y,plane.p2.z,
                     plane.p3.x,plane.p3.y,plane.p3.z,
-                    plane.texture_name,
+                    plane.texture_name.get_string(),
                     plane.u.x,plane.u.y,plane.u.z,plane.u.w,
                     plane.v.x,plane.v.y,plane.v.z,plane.v.w,
                     plane.rotation, plane.u_scale, plane.v_scale,
@@ -259,7 +286,7 @@ fn parse_brush_plane(i: &'_ str) -> IResult<'_, BrushPlane> {
             p1,
             p2,
             p3,
-            texture_name,
+            texture_name: TextureName(texture_name),
             u,
             v,
             rotation,
@@ -380,7 +407,7 @@ a
         let (_, a) = parse_brushes(i).unwrap();
         assert_eq!(a.len(), 2);
         assert_eq!(a[0].planes[0].p1, DVec3::new(-120., -136., 144.));
-        assert_eq!(a[0].planes[0].texture_name, "NULL");
+        assert_eq!(a[0].planes[0].texture_name.get_string(), "NULL");
         assert_eq!(a[0].planes[0].u.x, 2.220446049250313e-16);
     }
 
@@ -463,7 +490,7 @@ a
         let brush = &brushes[0];
 
         assert_eq!(brush.planes[3].p2, DVec3::new(64., 65., 192.));
-        assert_eq!(brush.planes[3].texture_name, "__TB_empty");
+        assert_eq!(brush.planes[3].texture_name.get_string(), "__TB_empty");
         assert_eq!(brush.planes[3].u.x, 1.);
     }
 
@@ -488,5 +515,49 @@ a
         let file = Map::from_file("./dunkin/do.nut");
 
         assert!(file.is_err());
+    }
+
+    #[test]
+    fn read_copied_tb_entity() {
+        let entity_text = "\
+// entity 0
+{
+\"classname\" \"func_detail\"
+\"zhlt_detaillevel\" \"1\"
+\"zhlt_chopdown\" \"0\"
+\"zhlt_chopup\" \"0\"
+\"zhlt_coplanarpriority\" \"0\"
+\"zhlt_clipnodedetaillevel\" \"1\"
+// brush 0
+{
+( 6080 2256 -7552 ) ( 6080 2064 -7680 ) ( 6080 2064 -7808 ) measure128_01 [ 0 -1 0 108 ] [ 0 0 -1 0 ] 0 8 8
+( 6080 2064 -7680 ) ( 6496 2064 -7680 ) ( 6496 2064 -7808 ) measure128_01 [ -1 0 0 -204 ] [ 0 0 -2 -208 ] 90 8 8
+( 6496 2064 -7680 ) ( 6080 2064 -7680 ) ( 6080 2256 -7552 ) measure128_01 [ 1 0 0 204 ] [ 0 -0.692307692307634 -0.4615384615385487 -158.46155 ] 90 8 8
+( 6496 2064 -7808 ) ( 6496 2256 -7808 ) ( 6080 2256 -7808 ) measure128_01 [ 1 0 0 204 ] [ 0 -1 0 108 ] 0 8 8
+( 6496 2256 -7808 ) ( 6496 2256 -7552 ) ( 6080 2256 -7552 ) measure128_01 [ -1 0 0 -204 ] [ 0 0 -1 0 ] 0 8 8
+( 6496 2064 -7680 ) ( 6496 2256 -7552 ) ( 6496 2256 -7808 ) NULL [ -2.220446049250313e-16 -1 0 0 ] [ 0 0 -1 0 ] 180 8 8
+}
+// brush 1
+{
+( 6080 2064 -7680 ) ( 6080 1872 -7552 ) ( 6080 1872 -7808 ) measure128_01 [ 0 -1 0 108 ] [ 0 0 -1 0 ] 0 8 8
+( 6080 1872 -7552 ) ( 6496 1872 -7552 ) ( 6496 1872 -7808 ) measure128_01 [ -1 0 0 -204 ] [ 0 0 -1 0 ] 90 8 8
+( 6496 1872 -7808 ) ( 6496 2064 -7808 ) ( 6080 2064 -7808 ) measure128_01 [ 1 0 0 204 ] [ 0 -1 0 108 ] 0 8 8
+( 6080 2064 -7680 ) ( 6496 2064 -7680 ) ( 6496 1872 -7552 ) measure128_01 [ 1 0 0 204 ] [ 0 -0.6923076923077213 0.4615384615384178 215.69229 ] 90 8 8
+( 6496 2064 -7808 ) ( 6496 2064 -7680 ) ( 6080 2064 -7680 ) measure128_01 [ -1 0 0 -204 ] [ 0 0 -2 -208 ] 270 8 8
+( 6496 1872 -7552 ) ( 6496 2064 -7680 ) ( 6496 2064 -7808 ) NULL [ -2.220446049250313e-16 -1 0 0 ] [ 0 0 -1 0 ] 180 8 8
+}
+// brush 2
+{
+( 6080 2704 -6560 ) ( 6080 2688 -6560 ) ( 6080 2704 -8192 ) measure128_01 [ 0 -1 0 108 ] [ 0 0 -1 0 ] 0 8 8
+( 6496 1872 -6560 ) ( 6496 1872 -8192 ) ( 5248 1872 -6560 ) measure128_01 [ -1 0 0 -204 ] [ 0 0 -1 0 ] 90 8 8
+( 5248 2704 -8176 ) ( 5248 2688 -8176 ) ( 6496 2704 -8176 ) NULL [ -1 0 0 -12 ] [ 0 -1 0 12 ] 90 8 8
+( 6496 2704 -7808 ) ( 6496 2688 -7808 ) ( 5248 2704 -7808 ) measure128_01 [ 1 0 0 204 ] [ 0 -1 0 108 ] 0 8 8
+( 6496 2256 -6560 ) ( 5248 2256 -6560 ) ( 6496 2256 -8192 ) measure128_01 [ -1 0 0 -204 ] [ 0 0 -1 0 ] 0 8 8
+( 6160 2704 -8192 ) ( 6160 2688 -8192 ) ( 6160 2704 -6560 ) measure128_01 [ -2.220446049250313e-16 -1 0 -166 ] [ 0 0 -1 0 ] 0 8 8
+}
+}
+";
+
+        let (_, _entities) = parse_map(entity_text).unwrap();
     }
 }

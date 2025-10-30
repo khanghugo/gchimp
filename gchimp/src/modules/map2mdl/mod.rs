@@ -1370,7 +1370,8 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                         if let Some(brushes) = &mut clip_brush_entity.brushes {
                             brushes.iter_mut().for_each(|brush| {
                                 brush.planes.iter_mut().for_each(|plane| {
-                                    plane.texture_name = CLIP_TEXTURE.to_string();
+                                    plane.texture_name =
+                                        map::TextureName::new(CLIP_TEXTURE.to_owned());
                                 })
                             })
                         }
@@ -1443,6 +1444,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
 
         Ok(())
     }
+
     fn maybe_process_celshade(
         &self,
         entity_options: &Map2MdlEntityOptions,
