@@ -12,18 +12,23 @@ use gchimp::modules::{
     split_model::split_model,
 };
 
-use crate::gui::{utils::preview_file_being_dropped, TabProgram};
+use crate::{
+    cli::{self},
+    gui::{utils::preview_file_being_dropped, TabProgram},
+};
 
 pub struct Misc {
     qc: String,
     wav: String,
     bsp: String,
+    smd: String,
     resmake_options: ResMakeOptions,
     split_model_status: Arc<Mutex<String>>,
     loop_wave_loop: bool,
     loop_wave_16_bit: bool,
     loop_wave_status: Arc<Mutex<String>>,
     resmake_status: Arc<Mutex<String>>,
+    smd_compile_status: Arc<Mutex<String>>,
 }
 
 impl Default for Misc {
@@ -32,10 +37,12 @@ impl Default for Misc {
             qc: Default::default(),
             wav: Default::default(),
             bsp: Default::default(),
+            smd: Default::default(),
             resmake_options: Default::default(),
             split_model_status: Arc::new(Mutex::new(String::from("Idle"))),
             loop_wave_status: Arc::new(Mutex::new(String::from("Idle"))),
             resmake_status: Arc::new(Mutex::new(String::from("Idle"))),
+            smd_compile_status: Arc::new(Mutex::new(String::from("Idle"))),
             loop_wave_loop: true,
             loop_wave_16_bit: true,
         }
@@ -180,6 +187,36 @@ If there are external WADs found, this option will create a new WAD file contain
         });
     }
 
+    fn smd_compile(&mut self, ui: &mut eframe::egui::Ui) {
+        ui.label("SMD Compile")
+            .on_hover_text("Compiles a model based on the SMD file and texture files around it");
+        egui::Grid::new("smd_compile")
+            .num_columns(2)
+            .show(ui, |ui| {
+                ui.label("SMD:");
+                ui.add(egui::TextEdit::singleline(&mut self.smd).hint_text("Choose .smd file"));
+                if ui.button("Add").clicked() {
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("SMD", &["smd"])
+                        .pick_file()
+                    {
+                        if path.extension().is_some_and(|ext| ext == "smd") {
+                            self.smd = path.display().to_string();
+                        }
+                    }
+                }
+                ui.end_row();
+
+                if ui.button("Run").clicked() {
+                    self.run_smd_compile();
+                }
+
+                let binding = self.smd_compile_status.lock().unwrap();
+                let mut status_text = binding.as_str();
+                ui.text_edit_singleline(&mut status_text)
+            });
+    }
+
     fn run_split_model(&mut self) {
         let qc = self.qc.clone();
         let status = self.split_model_status.clone();
@@ -246,6 +283,20 @@ If there are external WADs found, this option will create a new WAD file contain
             }
         });
     }
+
+    fn run_smd_compile(&mut self) {
+        let smd = self.smd.clone();
+        let status = self.smd_compile_status.clone();
+        "Running".clone_into(&mut status.lock().unwrap());
+
+        thread::spawn(move || {
+            if let Err(err) = cli::smd_compile::smd_compile(smd) {
+                err.to_string().clone_into(&mut status.lock().unwrap());
+            } else {
+                "Done".clone_into(&mut status.lock().unwrap());
+            }
+        });
+    }
 }
 
 impl TabProgram for Misc {
@@ -265,6 +316,9 @@ impl TabProgram for Misc {
         self.resmake(ui);
         ui.separator();
 
+        self.smd_compile(ui);
+        ui.separator();
+
         let ctx = ui.ctx();
         preview_file_being_dropped(ctx);
 
@@ -273,11 +327,17 @@ impl TabProgram for Misc {
             for item in i.raw.dropped_files.clone() {
                 if let Some(item) = item.path {
                     if item.is_file() {
-                        if item.extension().is_some_and(|ext| ext == "qc") {
-                            self.qc = item.to_str().unwrap().to_string();
-                        } else if item.extension().is_some_and(|ext| ext == "wav") {
-                            self.wav = item.to_str().unwrap().to_string();
-                        }
+                        item.extension().map(|ext| {
+                            if ext == "qc" {
+                                self.qc = item.to_str().unwrap().to_string();
+                            } else if ext == "wav" {
+                                self.wav = item.to_str().unwrap().to_string();
+                            } else if ext == "bsp" {
+                                self.bsp = item.to_str().unwrap().to_string();
+                            } else if ext == "smd" {
+                                self.smd = item.to_str().unwrap().to_string();
+                            }
+                        });
                     }
                 }
             }
