@@ -9,7 +9,7 @@ mod map2mdl;
 mod resmake;
 mod rotate_prop_static;
 mod s2g;
-mod smd_compile;
+pub mod smd_compile;
 mod split_model;
 mod texture_scale;
 
