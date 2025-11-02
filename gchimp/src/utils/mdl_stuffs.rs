@@ -6,7 +6,7 @@ use super::constants::STUDIOMDL_ERROR_PATTERN;
 
 pub fn handle_studiomdl_output(
     res: Result<Result<Output, eyre::Report>, Box<dyn Any + Send>>,
-    path: Option<&Path>,
+    _path: Option<&Path>,
 ) -> eyre::Result<()> {
     match res {
         Ok(res) => {
@@ -18,11 +18,14 @@ pub fn handle_studiomdl_output(
             if let Some(err_index) = maybe_err {
                 let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
 
-                let err_str = if let Some(path) = path {
-                    format!("cannot compile {}: {}", path.display(), err.trim())
-                } else {
-                    format!("cannot compile mdl: {}", err.trim())
-                };
+                // this message makes it too long and too redundant
+                // let err_str = if let Some(path) = path {
+                //     format!("cannot compile {}: {}", path.display(), err.trim())
+                // } else {
+                //     format!("cannot compile mdl: {}", err.trim())
+                // };
+
+                let err_str = err.trim().to_owned();
 
                 return Err(eyre!(err_str));
             }
