@@ -178,6 +178,11 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
         .triangles
         .into_iter()
         .flat_map(|to_split| {
+            // if the material does not match the image file, don't process the triangle
+            if to_split.material != texture_file_name {
+                return vec![to_split];
+            }
+
             // check if triangle fits
             let v1 = find_w_h_block(to_split.vertices[0].uv);
             let v2 = find_w_h_block(to_split.vertices[1].uv);
@@ -534,6 +539,16 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                     if let Some(err_index) = maybe_err {
                         let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
                         let err_str = format!("cannot compile: {}", err.trim());
+
+                        // it is a sin to propagate  text like this i know
+                        // but i hope rust ezro cosst absraction will save me
+                        let err_str = if err.contains("not found") {
+                            format!("{}
+If the mentioned texture file is the baked texture, make sure the texture name matches the texture file name.", err_str)
+                        } else {
+                            err_str
+                        };
+
                         return Err(eyre!(err_str));
                     }
                 }
