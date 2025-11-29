@@ -156,6 +156,12 @@ impl SkyModGui {
                 .pick_file()
             {
                 self.texture_paths[index] = path.display().to_string();
+
+                // load new texture
+                let handle =
+                    load_egui_image_to_texture(ui, self.texture_paths[index].clone()).unwrap();
+
+                self.texture_handles[index] = Some(handle);
             }
         };
     }
