@@ -7,10 +7,15 @@ use nom::{
 };
 use rgb8::{bgr888::Bgr888, rgb888::Rgb888};
 
-use crate::{formats::u8::U8, IResult, ImageData};
+use crate::{
+    formats::{rg8::uv88::Uv88, rgba8::bgra8888::Bgra8888, u8::U8},
+    IResult, ImageData,
+};
 
 pub mod dxt;
+pub mod rg8;
 pub mod rgb8;
+pub mod rgba8;
 pub mod u8;
 
 mod utils;
@@ -112,6 +117,8 @@ impl VtfImage {
             VtfImageFormat::I8 => U8::parse(i, dimensions),
             VtfImageFormat::A8 => U8::parse(i, dimensions),
             VtfImageFormat::P8 => U8::parse(i, dimensions),
+            VtfImageFormat::Bgra8888 => Bgra8888::parse(i, dimensions),
+            VtfImageFormat::Uv88 => Uv88::parse(i, dimensions),
             not_supported => {
                 println!("image format not supported {:?}", not_supported);
                 return context("vtf image format not supported", cut(fail)).parse(&[]);
@@ -137,6 +144,8 @@ impl VtfImage {
             VtfImageFormat::I8 => U8::to_image(&self.bytes, self.dimensions),
             VtfImageFormat::A8 => U8::to_image(&self.bytes, self.dimensions),
             VtfImageFormat::P8 => U8::to_image(&self.bytes, self.dimensions),
+            VtfImageFormat::Bgra8888 => Bgra8888::to_image(&self.bytes, self.dimensions),
+            VtfImageFormat::Uv88 => Uv88::to_image(&self.bytes, self.dimensions),
             _ => todo!(),
         }
     }

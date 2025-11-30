@@ -124,24 +124,36 @@ fn parse_vtf73_data<'a>(
     let mut res: Vec<Resource> = vec![];
 
     for entry in entries {
-        let i = &i[(entry.offset as usize)..];
-
         match entry.tag {
             ResourceEntryTag::LowRes => {
-                let (_, image) = parse_low_res_mipmap(i, header)?;
+                let offset = &i[(entry.offset as usize)..];
+
+                let (_, image) = parse_low_res_mipmap(offset, header)?;
 
                 res.push(Resource::LowRes(image));
             }
             ResourceEntryTag::HighRes => {
+                let i = &i[(entry.offset as usize)..];
+
                 let (_, mipmaps) = parse_high_res_mipmaps(i, header)?;
 
                 res.push(Resource::HighRes(VtfHighResImage { mipmaps }));
             }
-            ResourceEntryTag::AnimatedParticleSheet => todo!(),
-            ResourceEntryTag::CRC => todo!(),
-            ResourceEntryTag::TextureLODControl => todo!(),
-            ResourceEntryTag::ExtendedVTF => todo!(),
-            ResourceEntryTag::KeyValues => todo!(),
+            ResourceEntryTag::AnimatedParticleSheet => {
+                println!("ResourceEntryTag::AnimatedParticleSheet not implemented")
+            }
+            ResourceEntryTag::CRC => {
+                println!("ResourceEntryTag::CRC not implemented")
+            }
+            ResourceEntryTag::TextureLODControl => {
+                println!("ResourceEntryTag::TextureLODControl not implemented")
+            }
+            ResourceEntryTag::ExtendedVTF => {
+                println!("ResourceEntryTag::ExtendedVTF not implemented")
+            }
+            ResourceEntryTag::KeyValues => {
+                println!("ResourceEntryTag::KeyValues not implemented")
+            }
         }
     }
 
