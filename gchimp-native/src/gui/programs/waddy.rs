@@ -6,7 +6,7 @@ use std::{
 use eframe::egui::{
     self, scroll_area::ScrollSource, Context, Modifiers, RichText, ScrollArea, Sense, Ui,
 };
-use gchimp::modules::waddy::Waddy;
+use gchimp::{modules::waddy::Waddy, utils::misc::find_files_recursively};
 use image::{ImageBuffer, RgbaImage};
 use wad::types::FileEntry;
 
@@ -1054,6 +1054,26 @@ impl WaddyGui {
                     }
                 }
 
+                ui.close();
+            }
+
+            if ui.button("Recursive Import").clicked() {
+                if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                    let images_paths = find_files_recursively(&path, IMAGE_FORMATS);
+
+                    if !images_paths.is_empty() {
+                        for path in images_paths {
+                            if let Err(err) = self.instances[instance_index]
+                                .waddy
+                                .add_texture_from_image_path(&path)
+                            {
+                                println!("{}", err);
+                            } else {
+                                self.update_after_add_image(ui, instance_index);
+                            }
+                        }
+                    }
+                }
                 ui.close();
             }
 
