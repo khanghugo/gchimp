@@ -4,7 +4,11 @@ use image::{imageops, RgbaImage};
 use qc::Qc;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use smd::{Smd, Triangle, Vertex};
-use std::{f64::consts::PI, path::PathBuf, str::from_utf8};
+use std::{
+    f64::consts::PI,
+    path::{Path, PathBuf},
+    str::from_utf8,
+};
 
 use ndarray::prelude::*;
 
@@ -615,11 +619,52 @@ fn rotate_matrix_by_index_relative_to_down(
     }
 }
 
+#[allow(dead_code)]
+// fix output from https://matheowis.github.io/HDRI-to-CubeMap/ individual texture save option
+fn fix_matheowis_hdri_to_cubemap_rotation(folder: impl Into<PathBuf> + AsRef<Path>) {
+    let folder = folder.as_ref();
+
+    // pz: up
+    std::fs::copy(folder.join("pz.png"), folder.join("outup.png")).unwrap();
+
+    // nz: down + 180*
+    image::open(folder.join("nz.png"))
+        .unwrap()
+        .rotate180()
+        .save(folder.join("outdn.png"))
+        .unwrap();
+
+    // py: left + 180*
+    image::open(folder.join("py.png"))
+        .unwrap()
+        .rotate180()
+        .save(folder.join("outlf.png"))
+        .unwrap();
+
+    // ny: right
+    std::fs::rename(folder.join("ny.png"), folder.join("outrt.png")).unwrap();
+
+    // px: front -90 *(like the normal coordinate)
+    image::open(folder.join("px.png"))
+        .unwrap()
+        .rotate90() // -90 degrees is the same as +270 degrees rotation
+        .save(folder.join("outft.png"))
+        .unwrap();
+
+    // nx: back + 90*
+    image::open(folder.join("nx.png"))
+        .unwrap()
+        .rotate270()
+        .save(folder.join("outbk.png"))
+        .unwrap();
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
+    #[ignore]
     fn run() {
         let mut binding = SkyModBuilder::new();
         let builder = binding
@@ -646,7 +691,8 @@ mod test {
     }
 
     #[test]
-    fn run2() {
+    #[ignore]
+    fn _run2() {
         let mut binding = SkyModBuilder::new();
         let builder = binding
             .bk("examples/skybox/cyberwaveBK.png")
@@ -669,5 +715,13 @@ mod test {
         println!("{:?}", res);
 
         assert!(res.is_ok());
+    }
+
+    #[test]
+    #[ignore]
+    fn fix_skybox_rotation() {
+        let folder = "/home/khang/map/arte_dela/skybox/";
+
+        fix_matheowis_hdri_to_cubemap_rotation(folder);
     }
 }
