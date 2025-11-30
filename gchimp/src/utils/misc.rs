@@ -9,6 +9,8 @@ use super::constants::TEXTURE_PREFIXES;
 
 use crate::err;
 
+use walkdir::WalkDir;
+
 pub fn maybe_add_extension_to_string(s: &str, ext: &str) -> String {
     let ext_with_dot = format!(".{}", ext);
 
@@ -27,6 +29,22 @@ pub fn find_files_with_ext_in_folder(path: &Path, ext: &str) -> std::io::Result<
         .collect();
 
     Ok(ext_paths)
+}
+
+pub fn find_files_recursively(dir: &Path, extensions: &[&str]) -> Vec<PathBuf> {
+    WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .filter_map(|e| {
+            let path = e.path();
+            let ext = path.extension()?.to_str()?;
+            extensions
+                .iter()
+                .any(|&target| ext.eq_ignore_ascii_case(target))
+                .then(|| path.to_path_buf())
+        })
+        .collect()
 }
 
 pub fn relative_to_less_relative(root: &Path, relative: &Path) -> PathBuf {

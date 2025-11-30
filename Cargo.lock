@@ -1753,6 +1753,7 @@ dependencies = [
  "toml",
  "vtf",
  "wad",
+ "walkdir",
  "wav_io",
  "zip",
 ]
