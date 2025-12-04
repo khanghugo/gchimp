@@ -156,7 +156,7 @@ pub fn parse_miptex(i: &'_ [u8]) -> IResult<'_, MipTex> {
 }
 
 fn parse_font(i: &'_ [u8]) -> IResult<'_, Font> {
-    let (i, (width, height)) = tuple((le_u32, le_u32))(i)?;
+    let (i, (unknown, height)) = tuple((le_u32, le_u32))(i)?;
     let (i, (row_count, row_height)) = tuple((le_u32, le_u32))(i)?;
 
     let (i, font_info) = count(
@@ -171,7 +171,8 @@ fn parse_font(i: &'_ [u8]) -> IResult<'_, Font> {
         256,
     )(i)?;
 
-    let (i, data) = count(le_u8, (width * height) as usize)(i)?;
+    // width is hardcoded to 256
+    let (i, data) = count(le_u8, (256 * height) as usize)(i)?;
     let (i, colors_used) = le_i16(i)?;
 
     // println!("color used is {}", colors_used);
@@ -186,7 +187,7 @@ fn parse_font(i: &'_ [u8]) -> IResult<'_, Font> {
     Ok((
         i,
         Font {
-            width,
+            unknown,
             height,
             row_count,
             row_height,

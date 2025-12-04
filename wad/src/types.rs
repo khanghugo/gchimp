@@ -174,6 +174,12 @@ pub struct Qpic {
     pub palette: Palette,
 }
 
+impl Qpic {
+    pub fn dimensions(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MipMap {
     // [[u8; width]; height]
@@ -278,7 +284,7 @@ pub struct CharInfo {
 
 #[derive(Debug, Clone)]
 pub struct Font {
-    pub width: u32,
+    pub unknown: u32,
     pub height: u32,
     pub row_count: u32,
     pub row_height: u32,
@@ -287,6 +293,13 @@ pub struct Font {
     pub data: Image,
     pub colors_used: i16,
     pub palette: Palette,
+}
+
+impl Font {
+    pub fn dimensions(&self) -> (u32, u32) {
+        // width is always 256
+        (256, self.height)
+    }
 }
 
 // this is not how it looks in file
@@ -359,7 +372,7 @@ impl FileEntry {
         match &self {
             Self::Qpic(qpic) => (qpic.width, qpic.height),
             Self::MipTex(miptex) => (miptex.width, miptex.height),
-            Self::Font(font) => (font.width, font.height),
+            Self::Font(font) => (font.unknown, font.height),
         }
     }
 
