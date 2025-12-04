@@ -236,28 +236,57 @@ impl Waddy {
             .wad
             .entries
             .par_iter()
-            .filter_map(|entry| match &entry.file_entry {
-                FileEntry::Qpic(_) => unimplemented!(),
-                FileEntry::MipTex(miptex) => {
-                    let out_path = path
-                        .as_ref()
-                        .join(miptex.texture_name.get_string())
-                        .with_extension("bmp");
-                    let res = write_8bpp_to_file(
-                        miptex.mip_images[0].data.get_bytes(),
-                        miptex.palette.get_bytes(),
-                        (miptex.width, miptex.height),
-                        &out_path,
-                    );
+            .filter_map(|entry| {
+                let out_file_name = entry.texture_name();
+                let out_path = path.as_ref().join(out_file_name).with_extension("bmp");
 
-                    if let Err(err) = res {
-                        let err_str = format!("Error writing {}: {}", out_path.display(), err);
-                        return Some(err_str);
+                match &entry.file_entry {
+                    FileEntry::Qpic(qpic) => {
+                        let res = write_8bpp_to_file(
+                            qpic.data.get_bytes(),
+                            qpic.palette.get_bytes(),
+                            qpic.dimensions(),
+                            &out_path,
+                        );
+
+                        if let Err(err) = res {
+                            let err_str = format!("Error writing {}: {}", out_path.display(), err);
+                            return Some(err_str);
+                        }
+
+                        None
                     }
+                    FileEntry::MipTex(miptex) => {
+                        let res = write_8bpp_to_file(
+                            miptex.mip_images[0].data.get_bytes(),
+                            miptex.palette.get_bytes(),
+                            (miptex.width, miptex.height),
+                            &out_path,
+                        );
 
-                    None
+                        if let Err(err) = res {
+                            let err_str = format!("Error writing {}: {}", out_path.display(), err);
+                            return Some(err_str);
+                        }
+
+                        None
+                    }
+                    FileEntry::Font(font) => {
+                        let res = write_8bpp_to_file(
+                            font.data.get_bytes(),
+                            font.palette.get_bytes(),
+                            font.dimensions(),
+                            &out_path,
+                        );
+
+                        if let Err(err) = res {
+                            let err_str = format!("Error writing {}: {}", out_path.display(), err);
+                            return Some(err_str);
+                        }
+
+                        None
+                    }
                 }
-                FileEntry::Font(_) => unimplemented!(),
             })
             .collect::<Vec<String>>();
 
@@ -408,5 +437,15 @@ mod test {
 
         assert_eq!(waddy.wad.entries.len(), 83);
         assert!(waddy.wad.entries.iter().all(|entry| !entry.is_external()))
+    }
+
+    #[ignore]
+    #[test]
+    fn dump_tx() {
+        let bytes = include_bytes!("/home/khang/bxt/_game_native/valve/gfx.wad");
+
+        let waddy = Waddy::from_wad_bytes(bytes).unwrap();
+
+        waddy.dump_textures_to_files("/tmp/aaaa/").unwrap();
     }
 }
