@@ -130,6 +130,9 @@ fn parse_vtf73_data<'a>(
 
                 let (_, image) = parse_low_res_mipmap(offset, header)?;
 
+                // if there is low res entry, then there should be low res image
+                let image = image.expect("low res entry with UNKNOWN format");
+
                 res.push(Resource::LowRes(image));
             }
             ResourceEntryTag::HighRes => {
@@ -160,7 +163,7 @@ fn parse_vtf73_data<'a>(
     Ok((i, res))
 }
 
-fn parse_low_res_mipmap<'a>(i: &'a [u8], header: &Header) -> IResult<'a, VtfImage> {
+fn parse_low_res_mipmap<'a>(i: &'a [u8], header: &Header) -> IResult<'a, Option<VtfImage>> {
     let format = VtfImageFormat::try_from(header.low_res_image_format);
 
     if let Err(err) = format {
@@ -168,6 +171,10 @@ fn parse_low_res_mipmap<'a>(i: &'a [u8], header: &Header) -> IResult<'a, VtfImag
     }
 
     let format = format.unwrap();
+
+    if matches!(format, VtfImageFormat::None) {
+        return Ok((i, None));
+    }
 
     VtfImage::parse_from_format(
         i,
@@ -177,6 +184,7 @@ fn parse_low_res_mipmap<'a>(i: &'a [u8], header: &Header) -> IResult<'a, VtfImag
             header.low_res_image_height as u32,
         ),
     )
+    .map(|(i, res)| (i, Some(res)))
 }
 
 // TODO: refactor this to just map(count, x)

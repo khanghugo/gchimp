@@ -26,4 +26,12 @@ mod test {
 
         assert_eq!((vtf.header.width, vtf.header.height), (512, 512));
     }
+
+    #[test]
+    fn parse3() {
+        let vtf_bytes = include_bytes!("tests/sea_sunsetbk.vtf");
+        let vtf = Vtf::from_bytes(vtf_bytes).unwrap();
+
+        assert_eq!((vtf.header.width, vtf.header.height), (2048, 2048));
+    }
 }

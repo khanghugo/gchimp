@@ -200,7 +200,7 @@ pub type Vtf73Data = Vec<Resource>;
 
 #[derive(Debug, Clone)]
 pub struct Vtf70Data {
-    pub low_res: VtfImage,
+    pub low_res: Option<VtfImage>,
     pub high_res: VtfHighResImage,
 }
 
