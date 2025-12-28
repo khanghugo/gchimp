@@ -7,7 +7,6 @@ mod sequence_group;
 
 impl WriteToWriter for &[Sequence] {
     fn write_to_writer(&self, mut writer: &mut ByteWriter) -> usize {
-        
         // write sequence data and then sequence headers next
         let anim_indices = self
             .iter()

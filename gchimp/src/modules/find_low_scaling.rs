@@ -14,7 +14,6 @@ pub fn find_low_scaling(map: &Map) {
                     let mut low_v = 0.;
                     let mut texture_name = String::new();
                     brush.planes.iter().for_each(|plane| {
-                        
                         let plane_texture = plane.texture_name.get_string();
 
                         if !NO_RENDER_TEXTURE.contains(&plane_texture.as_str()) {
