@@ -531,6 +531,22 @@ pub fn generate_mipmaps_from_path(
     generate_mipmaps_from_rgba_image(img)
 }
 
+pub fn generate_rgba8_from_image_path(
+    img_path: impl AsRef<Path> + Into<PathBuf>,
+) -> eyre::Result<image::RgbaImage> {
+    let ext = img_path.as_ref().extension().unwrap();
+
+    let img = if ext == "vtf" {
+        Vtf::from_file(img_path.as_ref())?
+            .get_high_res_image()?
+            .into_rgba8()
+    } else {
+        image::open(img_path.as_ref())?.into_rgba8()
+    };
+
+    Ok(img)
+}
+
 #[derive(Debug)]
 pub struct GoldSrcBmp {
     pub image: Vec<u8>,
