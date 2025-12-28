@@ -4,6 +4,8 @@ use eframe::egui::{
     self, Align2, Color32, ColorImage, Context, Id, LayerId, Order, TextStyle, TextureHandle,
 };
 
+use gchimp::utils::img_stuffs::generate_rgba8_from_image_path;
+
 /// Preview hovering files:
 pub fn preview_file_being_dropped(ctx: &egui::Context) {
     preview_files_being_dropped_min_max_file(ctx, 1, 1);
@@ -152,11 +154,10 @@ pub fn load_egui_image_to_texture(
     ui: &mut egui::Ui,
     path: impl Into<PathBuf> + AsRef<Path>,
 ) -> eyre::Result<egui::TextureHandle> {
-    let image = image::open(path.as_ref())?;
+    let image_buffer = generate_rgba8_from_image_path(path.as_ref())?;
     let path: PathBuf = path.into();
 
-    let size = [image.width() as _, image.height() as _];
-    let image_buffer = image.to_rgba8();
+    let size = [image_buffer.width() as _, image_buffer.height() as _];
     let pixels: image::FlatSamples<&[u8]> = image_buffer.as_flat_samples();
     let color_image = ColorImage::from_rgba_unmultiplied(size, pixels.as_slice());
 
