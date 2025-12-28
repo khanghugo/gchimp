@@ -16,7 +16,9 @@ use crate::{
     err,
     utils::{
         constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
-        img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
+        img_stuffs::{
+            generate_rgba8_from_image_path, rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp,
+        },
     },
 };
 
@@ -155,9 +157,8 @@ impl SkyModBuilder {
         let textures = self
             .textures
             .iter()
-            .filter_map(|path| image::open(path).ok())
-            .map(|img| img.into_rgba8())
-            .collect::<Vec<RgbaImage>>();
+            .map(|path| generate_rgba8_from_image_path(path))
+            .collect::<Result<Vec<RgbaImage>, _>>()?;
 
         if textures.len() != 6 {
             return Err(eyre!(
