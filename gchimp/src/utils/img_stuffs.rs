@@ -144,7 +144,7 @@ fn rgb8_to_8bpp(img: RgbImage, palette: &[[u8; 3]]) -> Vec<u8> {
 pub fn any_format_to_bmp_write_to_file(
     img_path: impl AsRef<Path> + Into<PathBuf>,
 ) -> eyre::Result<()> {
-    let img = image::open(img_path.as_ref())?.into_rgba8();
+    let img = generate_rgba8_from_image_path(img_path.as_ref())?;
     let rgba8 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
     let GoldSrcBmp {
         image: img,
@@ -187,7 +187,7 @@ pub fn any_format_to_png(
 }
 
 pub fn any_format_to_8bpp(img_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<GoldSrcBmp> {
-    let img = image::open(img_path.as_ref())?.into_rgba8();
+    let img = generate_rgba8_from_image_path(img_path.as_ref())?;
     let rgba8 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
     let res = rgba8_to_8bpp(rgba8)?;
 
@@ -520,13 +520,7 @@ pub fn generate_mipmaps_from_path(
         }
     };
 
-    let img = if ext == "vtf" {
-        Vtf::from_file(img_path.as_ref())?
-            .get_high_res_image()?
-            .into_rgba8()
-    } else {
-        image::open(img_path.as_ref())?.into_rgba8()
-    };
+    let img = generate_rgba8_from_image_path(img_path.as_ref())?;
 
     generate_mipmaps_from_rgba_image(img)
 }
