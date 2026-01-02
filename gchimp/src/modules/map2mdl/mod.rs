@@ -16,7 +16,7 @@ use entity::{
 use map::{Attributes, Entity, Map};
 use qc::Qc;
 use smd::{Smd, Triangle};
-use wad::types::Wad;
+use wad::{error::WadError, types::Wad};
 
 use rayon::{iter::Either, prelude::*};
 
@@ -652,7 +652,7 @@ impl Map2Mdl {
             self.wads
                 .iter()
                 .map(|path| (path.to_str().unwrap().to_owned(), Wad::from_file(path)))
-                .collect::<Vec<(String, eyre::Result<Wad>)>>()
+                .collect::<Vec<(String, Result<Wad, WadError>)>>()
         } else if valid_autopickup_wad {
             let hashset = if let Some(entity_entity) = &entity_entity {
                 &entity_entity.attributes
@@ -691,7 +691,7 @@ impl Map2Mdl {
 
                     (path_as_string.clone(), Wad::from_file(path_as_string))
                 })
-                .collect::<Vec<(String, eyre::Result<Wad>)>>()
+                .collect::<Vec<(String, Result<Wad, WadError>)>>()
         } else {
             unreachable!()
         };

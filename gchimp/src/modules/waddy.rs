@@ -308,7 +308,9 @@ impl Waddy {
         texture_index: usize,
         s: impl AsRef<str> + Into<String> + Clone,
     ) -> eyre::Result<()> {
-        self.wad.entries[texture_index].set_name(s)
+        self.wad.entries[texture_index]
+            .set_name(s)
+            .map_err(|op| eyre!(op))
     }
 
     pub fn remove_texture(&mut self, texture_index: usize) {
@@ -367,7 +369,7 @@ impl Waddy {
     }
 
     pub fn save_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
-        self.wad.write_to_file(path)
+        self.wad.write_to_file(path).map_err(|op| eyre!(op))
     }
 }
 
