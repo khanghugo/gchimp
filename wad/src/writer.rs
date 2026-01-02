@@ -35,7 +35,8 @@ impl Wad {
         // write header
         let header = &self.header;
 
-        writer.append_u8_slice(&header.magic);
+        // forces wad3
+        writer.append_u8_slice("WAD3".as_bytes());
 
         // TODO:write num_dirs with the count of entries
         // doing this will help with forgetting to update num_dirs when new MipMap is added
@@ -99,7 +100,15 @@ impl Wad {
                 writer.append_i32(offset as i32);
                 writer.append_i32(length as i32);
                 writer.append_i32(length as i32);
-                writer.append_i8(*file_type);
+
+                // need to write the correct file type
+                // if we have wad2 then the entry must be wad3 entry compatible
+                let file_type = match *file_type {
+                    0x44 => 0x43,
+                    x => x,
+                };
+
+                writer.append_i8(file_type);
                 writer.append_i8(0); // not compressed
                 writer.append_i16(256); // hard coded number of colors
 

@@ -185,4 +185,27 @@ mod test {
             };
         });
     }
+
+    #[test]
+    fn wad2_to_wad3() {
+        let wad2 = Wad::from_file("test/makkon_gore.wad");
+
+        assert!(wad2.is_ok());
+
+        let wad2 = wad2.unwrap();
+
+        let wad2_written = wad2.write_to_bytes();
+        let wad3_test = Wad::from_bytes(&wad2_written);
+
+        assert!(wad3_test.is_ok());
+
+        let wad3 = wad3_test.unwrap();
+
+        assert_eq!(wad3.header.magic, "WAD3".as_bytes());
+
+        assert!(wad3
+            .entries
+            .iter()
+            .all(|x| x.directory_entry.file_type != 0x44))
+    }
 }
