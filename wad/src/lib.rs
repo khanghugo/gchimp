@@ -2,6 +2,7 @@
 //!
 //! Based of specification from this webpage: https://twhl.info/wiki/page/Specification%3A_WAD3
 mod constants;
+pub mod error;
 mod parser;
 pub mod types;
 pub mod utils;

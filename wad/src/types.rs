@@ -5,9 +5,7 @@ use std::{
     str::from_utf8,
 };
 
-use eyre::eyre;
-
-use crate::{constants::MAX_TEXTURE_NAME_LENGTH, parser::parse_wad};
+use crate::{constants::MAX_TEXTURE_NAME_LENGTH, error::WadError, parser::parse_wad};
 
 #[derive(Debug)]
 pub struct Header {
@@ -105,13 +103,17 @@ impl TextureName {
         &self.0
     }
 
-    pub fn set_name(&mut self, s: impl AsRef<str> + Into<String>) -> eyre::Result<()> {
+    pub fn set_name(&mut self, s: impl AsRef<str> + Into<String>) -> Result<(), WadError> {
         if s.as_ref().len() >= 16 {
-            return Err(eyre!("max length for name is 15 characters."));
+            return Err(WadError::GenericError {
+                message: "max length for name is 15 characters".into(),
+            });
         }
 
         if s.as_ref().contains(" ") {
-            return Err(eyre!("name should not contain empty space"));
+            return Err(WadError::GenericError {
+                message: "name should not contain empty space".into(),
+            });
         }
 
         self.0[..s.as_ref().len()].copy_from_slice(s.as_ref().as_bytes());
@@ -330,7 +332,7 @@ impl Entry {
         self.directory_entry.texture_name.get_string_standard()
     }
 
-    pub fn set_name(&mut self, s: impl AsRef<str> + Into<String> + Clone) -> eyre::Result<()> {
+    pub fn set_name(&mut self, s: impl AsRef<str> + Into<String> + Clone) -> Result<(), WadError> {
         self.directory_entry.texture_name.set_name(s.clone())?;
 
         match &mut self.file_entry {
@@ -422,20 +424,13 @@ impl Wad {
         }
     }
 
-    pub fn from_bytes(bytes: &[u8]) -> eyre::Result<Self> {
-        match parse_wad(bytes) {
-            Ok((_, res)) => Ok(res),
-            Err(err) => Err(eyre!("Cannot parse bytes: {}", err)),
-        }
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, WadError> {
+        parse_wad(bytes)
     }
 
-    pub fn from_file(path: impl AsRef<Path> + AsRef<OsStr>) -> eyre::Result<Self> {
+    pub fn from_file(path: impl AsRef<Path> + AsRef<OsStr>) -> Result<Self, WadError> {
         let bytes = std::fs::read(path)?;
-
         let res = Self::from_bytes(&bytes);
-
-        drop(bytes);
-
         res
     }
 }

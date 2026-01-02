@@ -8,11 +8,12 @@ use byte_writer::ByteWriter;
 
 use crate::{
     constants::MIPTEX_HEADER_LENGTH,
+    error::WadError,
     types::{DirectoryEntry, FileEntry, MipTex, Wad},
 };
 
 impl Wad {
-    pub fn write_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
+    pub fn write_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> Result<(), WadError> {
         let bytes = self.write_to_bytes();
 
         let mut file = OpenOptions::new()

@@ -1,17 +1,18 @@
-use eyre::eyre;
 use nom::{
     bytes::complete::take,
-    combinator::{fail, map},
-    error::context,
+    combinator::map,
     multi::count,
     number::complete::{le_i16, le_i32, le_i8, le_u32, le_u8},
     sequence::tuple,
     IResult as _IResult,
 };
 
-use crate::types::{
-    CharInfo, DirectoryEntry, Entry, FileEntry, Font, Header, Image, MipMap, MipTex, Palette, Qpic,
-    TextureName, Wad,
+use crate::{
+    error::WadError,
+    types::{
+        CharInfo, DirectoryEntry, Entry, FileEntry, Font, Header, Image, MipMap, MipTex, Palette,
+        Qpic, TextureName, Wad,
+    },
 };
 
 type IResult<'a, T> = _IResult<&'a [u8], T>;
@@ -201,47 +202,39 @@ fn parse_font(i: &'_ [u8]) -> IResult<'_, Font> {
 
 static FILE_TYPES: &[i8] = &[0x40, 0x42, 0x43, 0x44, 0x45, 0x46];
 
-pub fn parse_wad(i: &'_ [u8]) -> IResult<'_, Wad> {
+pub fn parse_wad(i: &'_ [u8]) -> Result<Wad, WadError> {
     let file_start = i;
 
-    let (_, header) = parse_header(i)?;
+    let (_, header) = parse_header(i).map_err(|_| WadError::ParseHeader)?;
 
     if header.magic != "WAD3".as_bytes() {
-        return context("wad file is not WAD3", fail)(&[]);
+        return Err(WadError::UnknownWadVersion {
+            magic: header.magic,
+        });
     }
 
     let dir_start = &i[(header.dir_offset as usize)..];
-    let (_, directory_entries) = count(parse_directory_entry, header.num_dirs as usize)(dir_start)?;
+    let (_, directory_entries) = count(parse_directory_entry, header.num_dirs as usize)(dir_start)
+        .map_err(|_| WadError::ParseDirectoryEntry)?;
 
     if directory_entries.len() != header.num_dirs as usize {
-        let err_str = "Mismatched number of entries in header and number of parsed entries.";
-
-        println!("{}", err_str);
-
-        return context(err_str, fail)(b"");
+        return Err(WadError::MismatchedEntryCount {
+            expect: header.num_dirs as usize,
+            have: directory_entries.len(),
+        });
     }
 
     if directory_entries.iter().any(|entry| entry.compressed) {
-        let err_str = "Does not support parsing compressed textures.";
-
-        println!("{}", err_str);
-
-        return context(err_str, fail)(b"");
+        return Err(WadError::CompressedTexture);
     }
 
     if let Some(unknown_file_entry) = directory_entries
         .iter()
         .find(|entry| !FILE_TYPES.contains(&entry.file_type))
     {
-        let err_str = format!(
-            "unknown texture file type: {:#02x}",
-            unknown_file_entry.file_type
-        )
-        .leak();
-
-        println!("{}", err_str);
-
-        return context(err_str, fail)(b"");
+        return Err(WadError::UnknownFileType {
+            file_type: unknown_file_entry.file_type,
+        });
     };
 
     let file_entries = directory_entries
@@ -254,21 +247,21 @@ pub fn parse_wad(i: &'_ [u8]) -> IResult<'_, Wad> {
             match directory_entry.file_type {
                 0x42 => {
                     let Ok((_, res)) = parse_qpic(file_entry_start) else {
-                        return Err(eyre!("cannot parse qpic (entry {entry_index})"));
+                        return Err(WadError::ParseFileEntry { entry_index });
                     };
 
                     Ok(FileEntry::Qpic(res))
                 }
                 0x43 | 0x40 => {
                     let Ok((_, res)) = parse_miptex(file_entry_start) else {
-                        return Err(eyre!("cannot parse miptex (entry {entry_index})"));
+                        return Err(WadError::ParseFileEntry { entry_index });
                     };
 
                     Ok(FileEntry::MipTex(res))
                 }
                 0x45 | 0x46 => {
                     let Ok((_, res)) = parse_font(file_entry_start) else {
-                        return Err(eyre!("cannot parse font (entry {entry_index})"));
+                        return Err(WadError::ParseFileEntry { entry_index });
                     };
                     Ok(FileEntry::Font(res))
                 }
@@ -277,7 +270,7 @@ pub fn parse_wad(i: &'_ [u8]) -> IResult<'_, Wad> {
                     println!("found WAD2 miptex (0x44). attempting to parse anyway");
 
                     let Ok((_, res)) = parse_miptex(file_entry_start) else {
-                        return Err(eyre!("cannot parse miptex (entry {entry_index})"));
+                        return Err(WadError::ParseFileEntry { entry_index });
                     };
 
                     Ok(FileEntry::MipTex(res))
@@ -285,7 +278,7 @@ pub fn parse_wad(i: &'_ [u8]) -> IResult<'_, Wad> {
                 _ => unreachable!(""),
             }
         })
-        .collect::<Vec<eyre::Result<FileEntry>>>();
+        .collect::<Vec<Result<FileEntry, WadError>>>();
 
     let err_str = file_entries
         .iter()
@@ -294,7 +287,7 @@ pub fn parse_wad(i: &'_ [u8]) -> IResult<'_, Wad> {
 
     // second clause is just to make sure
     if !err_str.is_empty() && file_entries.iter().any(|e| e.is_err()) {
-        return context(err_str.leak(), fail)(b"");
+        return Err(WadError::GenericError { message: err_str });
     }
 
     let file_entries: Vec<FileEntry> = file_entries.into_iter().filter_map(|e| e.ok()).collect();
@@ -308,8 +301,5 @@ pub fn parse_wad(i: &'_ [u8]) -> IResult<'_, Wad> {
         })
         .collect::<Vec<Entry>>();
 
-    Ok((
-        i, // this is useless
-        Wad { header, entries },
-    ))
+    Ok(Wad { header, entries })
 }
