@@ -100,6 +100,28 @@ mod test {
     }
 
     #[test]
+    fn parse_wad_quake() {
+        let file = Wad::from_file("test/makkon_gore.wad");
+
+        assert!(file.is_ok());
+
+        let _file = file.unwrap();
+
+        // assert!(file.header.num_dirs == 2);
+        // assert!(file.entries.len() == 2);
+
+        // let entry = &file.entries[0];
+
+        // assert!(entry.directory_entry.file_type == 0x43);
+        // assert!(entry.directory_entry.texture_name.get_string() == "white");
+
+        // let entry = &file.entries[1];
+
+        // assert!(entry.directory_entry.file_type == 0x43);
+        // assert!(entry.directory_entry.texture_name.get_string() == "black");
+    }
+
+    #[test]
     fn parse_write() {
         let wad = Wad::from_file("test/wad_test.wad");
 

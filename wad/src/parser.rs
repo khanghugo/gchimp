@@ -13,6 +13,7 @@ use crate::{
         CharInfo, DirectoryEntry, Entry, FileEntry, Font, Header, Image, MipMap, MipTex, Palette,
         Qpic, TextureName, Wad,
     },
+    utils::get_quake_palette,
 };
 
 type IResult<'a, T> = _IResult<&'a [u8], T>;
@@ -74,7 +75,7 @@ fn parse_qpic(i: &'_ [u8]) -> IResult<'_, Qpic> {
     ))
 }
 
-pub fn parse_miptex(i: &'_ [u8]) -> IResult<'_, MipTex> {
+pub fn parse_miptex(i: &'_ [u8], is_wad2: bool) -> IResult<'_, MipTex> {
     let struct_start = i;
 
     let (i, texture_name) = count(le_u8, 16)(i)?;
@@ -111,6 +112,34 @@ pub fn parse_miptex(i: &'_ [u8]) -> IResult<'_, MipTex> {
     let (palette_start, miptex3) = count(le_u8, (width * height / 4 / 4 / 4) as usize)(
         &struct_start[(mip_offsets[3] as usize)..],
     )?;
+
+    if is_wad2 {
+        return Ok((
+            i, // i here is pretty useless
+            MipTex {
+                texture_name: TextureName(texture_name),
+                width,
+                height,
+                mip_offsets,
+                mip_images: vec![
+                    MipMap {
+                        data: Image(miptex0),
+                    },
+                    MipMap {
+                        data: Image(miptex1),
+                    },
+                    MipMap {
+                        data: Image(miptex2),
+                    },
+                    MipMap {
+                        data: Image(miptex3),
+                    },
+                ],
+                colors_used: 256,
+                palette: Palette(get_quake_palette()),
+            },
+        ));
+    }
 
     // colors_used is always 256
     let (palette_start, colors_used) = le_i16(palette_start)?;
@@ -200,18 +229,21 @@ fn parse_font(i: &'_ [u8]) -> IResult<'_, Font> {
     ))
 }
 
-static FILE_TYPES: &[i8] = &[0x40, 0x42, 0x43, 0x44, 0x45, 0x46];
+const FILE_TYPES: &[i8] = &[0x40, 0x42, 0x43, 0x44, 0x45, 0x46];
+const SUPPORTED_WADS: &[&str] = &["WAD2", "WAD3"];
 
 pub fn parse_wad(i: &'_ [u8]) -> Result<Wad, WadError> {
     let file_start = i;
 
     let (_, header) = parse_header(i).map_err(|_| WadError::ParseHeader)?;
 
-    if header.magic != "WAD3".as_bytes() {
+    if SUPPORTED_WADS.iter().all(|x| x.as_bytes() != header.magic) {
         return Err(WadError::UnknownWadVersion {
             magic: header.magic,
         });
     }
+
+    let is_wad2 = header.magic == "WAD2".as_bytes();
 
     let dir_start = &i[(header.dir_offset as usize)..];
     let (_, directory_entries) = count(parse_directory_entry, header.num_dirs as usize)(dir_start)
@@ -253,7 +285,7 @@ pub fn parse_wad(i: &'_ [u8]) -> Result<Wad, WadError> {
                     Ok(FileEntry::Qpic(res))
                 }
                 0x43 | 0x40 => {
-                    let Ok((_, res)) = parse_miptex(file_entry_start) else {
+                    let Ok((_, res)) = parse_miptex(file_entry_start, is_wad2) else {
                         return Err(WadError::ParseFileEntry { entry_index });
                     };
 
@@ -269,7 +301,7 @@ pub fn parse_wad(i: &'_ [u8]) -> Result<Wad, WadError> {
                     // https://github.com/Ty-Matthews-VisualStudio/Wally/blob/a05d3a11ac69aa81725fc7d4c6497b0523e92657/Source/Wally/WADList.h#L18
                     println!("found WAD2 miptex (0x44). attempting to parse anyway");
 
-                    let Ok((_, res)) = parse_miptex(file_entry_start) else {
+                    let Ok((_, res)) = parse_miptex(file_entry_start, is_wad2) else {
                         return Err(WadError::ParseFileEntry { entry_index });
                     };
 

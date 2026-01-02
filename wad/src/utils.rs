@@ -45,3 +45,12 @@ pub fn create_blue_miptex(width: u32, height: u32, name: &str) -> MipTex {
         palette: Palette::new(palette),
     }
 }
+
+const QUAKE_PALETTE: &[u8] = include_bytes!("../data/quake.pal");
+
+pub fn get_quake_palette() -> Vec<[u8; 3]> {
+    QUAKE_PALETTE
+        .chunks(3)
+        .map(|x| [x[0], x[1], x[2]])
+        .collect()
+}
