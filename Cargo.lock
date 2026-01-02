@@ -4633,8 +4633,8 @@ name = "wad"
 version = "0.1.0"
 dependencies = [
  "byte_writer",
- "eyre",
  "nom 7.1.3",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
