@@ -615,7 +615,7 @@ impl WaddyGui {
         let total_rows = filtered_tiles.len().div_ceil(texture_per_row);
 
         ScrollArea::vertical()
-            .scroll_source(ScrollSource::MOUSE_WHEEL)
+            .scroll_source(ScrollSource::MOUSE_WHEEL | ScrollSource::SCROLL_BAR)
             .show_rows(ui, row_height, total_rows, |ui, row_range| {
                 // each row is one grid of grids
                 row_range.for_each(|row| {
