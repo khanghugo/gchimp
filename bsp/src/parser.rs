@@ -87,7 +87,7 @@ fn parse_textures(i: &'_ [u8]) -> IResult<'_, Vec<Texture>> {
             continue;
         }
 
-        let (_, res) = parse_miptex(&i[(offset as usize)..])?;
+        let (_, res) = parse_miptex(&i[(offset as usize)..], false)?;
 
         miptexes.push(res);
     }
