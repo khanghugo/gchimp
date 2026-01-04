@@ -6,6 +6,7 @@ mod custom_script;
 mod light_scale;
 mod loop_wave;
 mod map2mdl;
+mod rename_texture;
 mod resmake;
 mod rotate_prop_static;
 mod s2g;
@@ -26,6 +27,14 @@ pub trait Cli {
 
     /// Each module has to handle the arguments by itself.
     fn cli(&self) -> CliRes {
+        // Example. Skips "gchimp" "<module name>". Third argument is the input
+        let args: Vec<String> = std::env::args().skip(2).collect();
+
+        if args.len() != 1 {
+            self.cli_help();
+            return CliRes::Err;
+        }
+
         CliRes::Ok
     }
 
@@ -65,6 +74,7 @@ pub fn cli() -> CliRes {
         &loop_wave::LoopWave,
         &resmake::ResMake,
         &smd_compile::SmdCompile,
+        &rename_texture::RenameTexture,
     ];
 
     let help = || {

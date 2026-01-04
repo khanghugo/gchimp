@@ -31,3 +31,9 @@
 	celshade_color(color255) : "CelShade Color" : "0 0 0"
 	celshade_distance(string) : "CelShade Distance" : "4.0"
 ]
+
+@PointClass size(-8 -8 -8, 8 8 8) color(255 0 255) = gchimp_renametex : "Swaps texture before compile"
+[
+    example(string) : "Texture with name `example` will be replaced with corresponding value field"
+	example2(string) : "Add more fields to swap more textures"
+] 
