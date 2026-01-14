@@ -25,7 +25,9 @@ impl Cli for RenameTexture {
             return CliRes::Err;
         };
 
-        rename_texture(&mut map);
+        let count = rename_texture(&mut map);
+
+        println!("Renamed {count} faces");
 
         if let Err(err) = map.write(map_path) {
             println!("Error writing map: {err}");

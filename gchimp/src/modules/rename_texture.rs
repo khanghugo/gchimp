@@ -8,7 +8,7 @@ const DEFAULT_ORIGIN_KEY: &str = "origin";
 const DEFAULT_ANGLES_KEY: &str = "angles";
 
 // rename textures based on `gchimp_renametex` entity
-pub fn rename_texture(map: &mut Map) {
+pub fn rename_texture(map: &mut Map) -> usize {
     // get mapping
     let mapping: HashMap<String, String> = map
         .entities
@@ -25,13 +25,21 @@ pub fn rename_texture(map: &mut Map) {
                 .filter(|(&ref key, _)| {
                     !(key == DEFAULT_ANGLES_KEY || key == DEFAULT_ORIGIN_KEY || key == "classname")
                 })
-                .map(|(key, value)| (key.to_owned(), value.to_owned()))
+                .map(|(key, value)| {
+                    // to uppercase because map2mdl
+                    (
+                        key.to_uppercase().to_owned(),
+                        value.to_uppercase().to_owned(),
+                    )
+                })
         })
         .collect();
 
     if mapping.is_empty() {
-        return;
+        return 0;
     }
+
+    let mut count = 0;
 
     // then map
     map.entities
@@ -41,9 +49,14 @@ pub fn rename_texture(map: &mut Map) {
             brushes.iter_mut().for_each(|brush| {
                 brush.planes.iter_mut().for_each(|plane| {
                     mapping
-                        .get(&plane.texture_name.get_string())
-                        .map(|value| plane.texture_name = TextureName::new(value.to_owned()));
+                        .get(&plane.texture_name.get_string_standard())
+                        .map(|value| {
+                            count += 1;
+                            plane.texture_name = TextureName::new(value.to_owned())
+                        });
                 })
             })
         });
+
+    return count;
 }
