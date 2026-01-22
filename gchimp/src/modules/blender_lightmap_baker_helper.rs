@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::from_utf8};
+use std::{collections::HashSet, path::PathBuf, str::from_utf8};
 
 use glam::{DVec2, DVec3};
 use image::GenericImageView;
@@ -77,6 +77,20 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
     let texture_file_name = texture_path.file_stem().unwrap().to_str().unwrap();
     let smd_file_name = smd_path.file_stem().unwrap().to_str().unwrap();
+
+    // scan through the smd first to see if the texture is there
+    // then warn the user that they need to change material names for reasons
+    let unique_textures = smd
+        .triangles
+        .iter()
+        .map(|x| x.material.as_str())
+        .collect::<HashSet<&str>>();
+
+    if !unique_textures.contains(texture_file_name) {
+        return Err(eyre!("Cannot find atlas file inside SMD. Make sure material name matches the image file name. 
+Found textures in SMD: {:?}
+Atlas file name: `{}`", unique_textures, texture_file_name));
+    }
 
     // split the images
     if options.convert_texture {
