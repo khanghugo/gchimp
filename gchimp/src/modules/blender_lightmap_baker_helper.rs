@@ -183,13 +183,37 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                 return vec![to_split];
             }
 
+            // our polygon
+            let polygon = Polygon3D::from(vec![
+                to_split.vertices[0].pos,
+                to_split.vertices[1].pos,
+                to_split.vertices[2].pos,
+            ]);
+
+            let anchor_vertex = &to_split.vertices[0];
+            let anchor_vector_uv0 = to_split.vertices[1].uv - anchor_vertex.uv;
+            let anchor_vector_uv1 = to_split.vertices[2].uv - anchor_vertex.uv;
+            let anchor_vector_pos0 = to_split.vertices[1].pos - anchor_vertex.pos;
+            let anchor_vector_pos1 = to_split.vertices[2].pos - anchor_vertex.pos;
+
+            let uv_mat = Matrix2x2::from([
+                anchor_vector_uv0.x,
+                anchor_vector_uv1.x,
+                anchor_vector_uv0.y,
+                anchor_vector_uv1.y,
+            ]);
+
             // check if triangle fits
             let v1 = find_w_h_block(to_split.vertices[0].uv);
             let v2 = find_w_h_block(to_split.vertices[1].uv);
             let v3 = find_w_h_block(to_split.vertices[2].uv);
+            let fits_in_one_block = v1 == v2 && v2 == v3;
 
-            // if fits inside a texture, add it into the result and continue
-            if v1.0 == v2.0 && v2.0 == v3.0 && v1.1 == v2.1 && v2.1 == v3.1 {
+            // check if the triangle is degenerate
+            let is_degenerate = uv_mat.determinant().abs() < EPSILON;
+
+            // if edge case, skip
+            if fits_in_one_block || is_degenerate {
                 let weird_overflow = h_count.saturating_sub(v1.1).saturating_sub(1);
 
                 let material = format!("{}{}{}.bmp", texture_file_name, v1.0, weird_overflow);
@@ -202,13 +226,6 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                 return vec![new_triangle];
             }
 
-            // now we do big stuffs
-            let polygon = Polygon3D::from(vec![
-                to_split.vertices[0].pos,
-                to_split.vertices[1].pos,
-                to_split.vertices[2].pos,
-            ]);
-
             // dumb fuck this normal doesnt' do shit
             // let triangle_normal = to_split.vertices[0].norm;
             let triangle_normal: DVec3 = polygon.normal().unwrap().into();
@@ -218,41 +235,25 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
             // so world coordinate would be coplanar with the triangle
             // represent the uv coordinate with the basis of two vectors
             let uv_to_world = |uv: DVec2| {
-                let anchor_vertex = &to_split.vertices[0];
-                let anchor_vector_uv0 = to_split.vertices[1].uv - anchor_vertex.uv;
-                let anchor_vector_uv1 = to_split.vertices[2].uv - anchor_vertex.uv;
-                let anchor_vector_pos0 = to_split.vertices[1].pos - anchor_vertex.pos;
-                let anchor_vector_pos1 = to_split.vertices[2].pos - anchor_vertex.pos;
-
                 let target_vector_uv = uv - anchor_vertex.uv;
 
-                let coefficients: [f64; 2] = Matrix2x2::from([
-                    anchor_vector_uv0.x,
-                    anchor_vector_uv1.x,
-                    anchor_vector_uv0.y,
-                    anchor_vector_uv1.y,
-                ])
-                .solve_cramer([target_vector_uv.x, target_vector_uv.y])
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "cannot solve by cramer's rule {} {} {:?}",
-                        anchor_vector_uv0,
-                        anchor_vector_uv1,
-                        [target_vector_uv.x, target_vector_uv.y]
-                    )
-                });
+                let coefficients: [f64; 2] = uv_mat
+                    .solve_cramer([target_vector_uv.x, target_vector_uv.y])
+                    .unwrap_or_else(|_| {
+                        panic!(
+                            "cannot solve by cramer's rule {} {} {:?} {:?}",
+                            anchor_vector_uv0,
+                            anchor_vector_uv1,
+                            [target_vector_uv.x, target_vector_uv.y],
+                            to_split
+                        )
+                    });
 
                 (anchor_vector_pos0 * coefficients[0] + anchor_vector_pos1 * coefficients[1])
                     + anchor_vertex.pos
             };
 
             let world_to_uv = |p: DVec3| {
-                let anchor_vertex = &to_split.vertices[0];
-                let anchor_vector_uv0 = to_split.vertices[1].uv - anchor_vertex.uv;
-                let anchor_vector_uv1 = to_split.vertices[2].uv - anchor_vertex.uv;
-                let anchor_vector_pos0 = to_split.vertices[1].pos - anchor_vertex.pos;
-                let anchor_vector_pos1 = to_split.vertices[2].pos - anchor_vertex.pos;
-
                 let target_vector_pos = p - anchor_vertex.pos;
 
                 // need to solve cramer's rule 3 times
@@ -284,7 +285,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
                 {
                     res
                 } else {
-                    unreachable!("cannot solve by cramer's rule")
+                    unreachable!("cannot solve by cramer's rule. will this come back bite me in the ass like the other case?")
                 };
 
                 (anchor_vector_uv0 * coefficients[0] + anchor_vector_uv1 * coefficients[1])
