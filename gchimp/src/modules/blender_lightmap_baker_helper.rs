@@ -11,7 +11,7 @@ use eyre::eyre;
 use crate::{
     err,
     utils::{
-        constants::{EPSILON, STUDIOMDL_ERROR_PATTERN},
+        constants::{EPSILON, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
         img_stuffs::{rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp},
         simple_calculs::{Matrix2x2, Plane3D, Polygon3D},
         smd_stuffs::{maybe_split_smd, textures_used_in_triangles},
@@ -110,7 +110,9 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
                     dimensions,
                 } = rgba8_to_8bpp(curr_image.to_rgba8()).unwrap();
 
-                let out_file_name = format!("{}{}{}.bmp", texture_file_name, w_block, h_block);
+                // FORMAT STRING
+                let out_file_name =
+                    format!("{}{:02}{:02}.bmp", texture_file_name, w_block, h_block);
                 write_8bpp_to_file(
                     &image,
                     &palette,
@@ -230,7 +232,8 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
             if fits_in_one_block || is_degenerate {
                 let weird_overflow = h_count.saturating_sub(v1.1).saturating_sub(1);
 
-                let material = format!("{}{}{}.bmp", texture_file_name, v1.0, weird_overflow);
+                // FORMAT STRING
+                let material = format!("{}{:02}{:02}.bmp", texture_file_name, v1.0, weird_overflow);
                 let mut new_triangle = to_split.clone();
                 new_triangle.material = material;
                 new_triangle.vertices.iter_mut().for_each(|vertex| {
@@ -445,7 +448,8 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
 
                     let weird_overflow = h_count.saturating_sub(h).saturating_sub(1);
                     // let h = h_count - h - 1; // the texture is exported from top left while uv is bottom left
-                    let material = format!("{}{}{}.bmp", texture_file_name, w, weird_overflow);
+                    // FORMAT STRING
+                    let material = format!("{}{:02}{:02}.bmp", texture_file_name, w, weird_overflow);
 
                     Triangle {
                         material,
@@ -456,128 +460,163 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
         })
         .collect::<Vec<Triangle>>();
 
-    smd.triangles = new_triangles;
-
     // split smds
-    // TODO: split model, maybe too much
-    let smds = maybe_split_smd(&smd);
+    // and also split smds by max count of texture per model
+    // collect unique textures again
+    let unique_textures = new_triangles
+        .iter()
+        .map(|x| x.material.as_str())
+        .collect::<HashSet<&str>>()
+        .into_iter()
+        .collect::<Vec<&str>>();
 
-    smds.iter().enumerate().for_each(|(idx, smd)| {
-        smd.write(smd_path.with_file_name(format!("{}{}_blbh.smd", smd_file_name, idx)))
+    // [[triangles; count]; model_count]
+    let models_triangles = unique_textures
+        .chunks(MAX_GOLDSRC_MODEL_TEXTURE_COUNT)
+        .map(|model_texture| {
+            new_triangles
+                .iter()
+                .filter(|triangle| model_texture.contains(&triangle.material.as_str()))
+                .cloned()
+                .collect()
+        })
+        .collect::<Vec<Vec<Triangle>>>();
+
+    // only works for static models, wouldn't work for models with bones...
+    // would be nice to compile models in parallel, but for now, no need
+    for (model_index, model_triangles) in models_triangles.into_iter().enumerate() {
+        // reuse the main smd file because this is cool i guess?
+        smd.triangles = model_triangles;
+
+        let smds = maybe_split_smd(&smd);
+
+        smds.iter().enumerate().for_each(|(smd_idx, smd)| {
+            // FORMAT STRING
+            smd.write(smd_path.with_file_name(format!(
+                "{}{:02}{:02}_blbh.smd",
+                smd_file_name, model_index, smd_idx
+            )))
             .expect("cannot write smd file");
-    });
-
-    if options.compile_model {
-        let idle_smd = Smd::new_basic();
-        let smd_root = smd_path.parent().unwrap();
-        let texture_file_root = smd_path.parent().unwrap();
-
-        idle_smd.write(smd_path.with_file_name("idle.smd"))?;
-
-        let mut qc = Qc::new_basic();
-        qc.set_model_name(
-            smd_path
-                .with_file_name(format!("{}_blbh.mdl", smd_file_name))
-                .to_str()
-                .unwrap(),
-        );
-        qc.set_cd(smd_root.to_str().unwrap());
-        qc.set_cd_texture(texture_file_root.to_str().unwrap());
-
-        // // 270 rotation is needed.
-        // qc.add_origin(
-        //     options.origin.x * -1.,
-        //     options.origin.y * -1.,
-        //     options.origin.z * -1.,
-        //     Some(270.),
-        // );
-
-        // cannot just add texture indiscriminately
-        // it is possible that UV does not cover some texture
-        // if that happens and we still add texrendermode for that unused texture
-        // there will be "Texture too large!" error.
-        let used_textures = textures_used_in_triangles(smd.triangles.as_slice());
-
-        // add some texture flags
-        used_textures.iter().for_each(|tex| {
-            // always add mipmapping
-            qc.add_texrendermode(tex, qc::RenderMode::NoMips);
-
-            if options.flat_shade {
-                qc.add_texrendermode(tex, qc::RenderMode::FlatShade);
-            }
         });
 
-        smds.iter().enumerate().for_each(|(idx, _smd)| {
-            qc.add_body(
-                format!("studio{}", idx).as_str(),
-                format!("{}{}_blbh", smd_file_name, idx).as_str(),
-                false,
-                None,
+        if options.compile_model {
+            let idle_smd = Smd::new_basic();
+            let smd_root = smd_path.parent().unwrap();
+            let texture_file_root = smd_path.parent().unwrap();
+
+            idle_smd.write(smd_path.with_file_name("idle.smd"))?;
+
+            let mut qc = Qc::new_basic();
+            qc.set_model_name(
+                // FORMAT STRING
+                smd_path
+                    .with_file_name(format!("{}{:02}_blbh.mdl", smd_file_name, model_index))
+                    .to_str()
+                    .unwrap(),
             );
-        });
+            qc.set_cd(smd_root.to_str().unwrap());
+            qc.set_cd_texture(texture_file_root.to_str().unwrap());
 
-        qc.add_sequence("idle", "idle", vec![]);
+            // // 270 rotation is needed.
+            // qc.add_origin(
+            //     options.origin.x * -1.,
+            //     options.origin.y * -1.,
+            //     options.origin.z * -1.,
+            //     Some(270.),
+            // );
 
-        let qc_path = smd_path.with_file_name(format!("{}_blbh.qc", smd_file_name));
-        qc.write(qc_path.as_path())?;
+            // cannot just add texture indiscriminately
+            // it is possible that UV does not cover some texture
+            // if that happens and we still add texrendermode for that unused texture
+            // there will be "Texture too large!" error.
+            let used_textures = textures_used_in_triangles(smd.triangles.as_slice());
 
-        // run studiomdl
-        #[cfg(target_arch = "x86_64")]
-        {
-            #[cfg(target_os = "windows")]
-            let handle = run_studiomdl(
-                qc_path.as_path(),
-                PathBuf::from(options.studiomdl.as_str()).as_path(),
-            );
+            // add some texture flags
+            used_textures.iter().for_each(|tex| {
+                // always add mipmapping
+                qc.add_texrendermode(tex, qc::RenderMode::NoMips);
 
-            #[cfg(target_os = "linux")]
-            let handle = run_studiomdl(
-                qc_path.as_path(),
-                PathBuf::from(options.studiomdl.as_str()).as_path(),
-                options.wineprefix.as_str(),
-            );
+                if options.flat_shade {
+                    qc.add_texrendermode(tex, qc::RenderMode::FlatShade);
+                }
+            });
 
-            match handle.join() {
-                Ok(res) => {
-                    const DEFAULT_STDOUT_ERROR: &str = "Cannot get stdout. This is not an error.";
+            smds.iter().enumerate().for_each(|(smd_idx, _smd)| {
+                qc.add_body(
+                    format!("studio{}", smd_idx).as_str(),
+                    // FORMAT STRING
+                    format!("{}{:02}{:02}_blbh", smd_file_name, model_index, smd_idx).as_str(),
+                    false,
+                    None,
+                );
+            });
 
-                    let output = res?;
-                    #[cfg(target_os = "linux")]
-                    let stdout = from_utf8(&output.stdout).unwrap_or(DEFAULT_STDOUT_ERROR);
+            qc.add_sequence("idle", "idle", vec![]);
 
-                    #[cfg(target_os = "windows")]
-                    let stdout = String::from_utf8_lossy(&output.stdout);
+            // FORMAT STRING
+            let qc_path =
+                smd_path.with_file_name(format!("{}{:02}_blbh.qc", smd_file_name, model_index));
+            qc.write(qc_path.as_path())?;
 
-                    let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
+            // run studiomdl
+            #[cfg(target_arch = "x86_64")]
+            {
+                #[cfg(target_os = "windows")]
+                let handle = run_studiomdl(
+                    qc_path.as_path(),
+                    PathBuf::from(options.studiomdl.as_str()).as_path(),
+                );
 
-                    if let Some(err_index) = maybe_err {
-                        let err = stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
-                        let err_str = format!("cannot compile: {}", err.trim());
+                #[cfg(target_os = "linux")]
+                let handle = run_studiomdl(
+                    qc_path.as_path(),
+                    PathBuf::from(options.studiomdl.as_str()).as_path(),
+                    options.wineprefix.as_str(),
+                );
 
-                        // it is a sin to propagate  text like this i know
-                        // but i hope rust ezro cosst absraction will save me
-                        let err_str = if err.contains("not found") {
-                            format!("{}
+                match handle.join() {
+                    Ok(res) => {
+                        const DEFAULT_STDOUT_ERROR: &str =
+                            "Cannot get stdout. This is not an error.";
+
+                        let output = res?;
+                        #[cfg(target_os = "linux")]
+                        let stdout = from_utf8(&output.stdout).unwrap_or(DEFAULT_STDOUT_ERROR);
+
+                        #[cfg(target_os = "windows")]
+                        let stdout = String::from_utf8_lossy(&output.stdout);
+
+                        let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
+
+                        if let Some(err_index) = maybe_err {
+                            let err =
+                                stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
+                            let err_str = format!("cannot compile: {}", err.trim());
+
+                            // it is a sin to propagate  text like this i know
+                            // but i hope rust ezro cosst absraction will save me
+                            let err_str = if err.contains("not found") {
+                                format!("{}
 If the mentioned texture file is the baked texture, make sure the texture name matches the texture file name.", err_str)
-                        } else {
-                            err_str
-                        };
+                            } else {
+                                err_str
+                            };
+
+                            return Err(eyre!(err_str));
+                        }
+                    }
+                    Err(_) => {
+                        let err_str =
+                            "No idea what happens with running studiomdl. Probably just a dream.";
 
                         return Err(eyre!(err_str));
                     }
-                }
-                Err(_) => {
-                    let err_str =
-                        "No idea what happens with running studiomdl. Probably just a dream.";
+                };
+            }
 
-                    return Err(eyre!(err_str));
-                }
-            };
+            #[cfg(target_arch = "wasm32")]
+            todo!("blbh wasm32");
         }
-
-        #[cfg(target_arch = "wasm32")]
-        todo!("blbh wasm32");
     }
 
     Ok(())
