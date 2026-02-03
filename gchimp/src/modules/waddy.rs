@@ -375,6 +375,8 @@ impl Waddy {
 
 #[cfg(test)]
 mod test {
+    use wad::types::Qpic;
+
     use super::*;
 
     #[test]
@@ -449,5 +451,40 @@ mod test {
         let waddy = Waddy::from_wad_bytes(bytes).unwrap();
 
         waddy.dump_textures_to_files("/tmp/aaaa/").unwrap();
+    }
+
+    #[ignore]
+    #[test]
+    fn replace_gfx_lambda() {
+        let path = "/home/khang/bxt/game_isolated/valve/gfx.wad";
+        let bytes = include_bytes!("/home/khang/bxt/game_isolated/valve/gfx.wad");
+        let mut waddy = Waddy::from_wad_bytes(bytes).unwrap();
+
+        let mipmap_res = generate_mipmaps_from_path(
+            "/home/khang/Pictures/Screenshots/Screenshot_20260202_191920.png",
+        )
+        .unwrap();
+        // waddy
+        //     .add_texture_from_image_path("/home/khang/Documents/29143195.bmp")
+        //     .unwrap();
+
+        let gfx_entry = waddy
+            .wad
+            .entries
+            .iter_mut()
+            .find(|x| x.texture_name_standard() == "LAMBDA")
+            .unwrap();
+
+        gfx_entry.file_entry = FileEntry::Qpic(Qpic {
+            width: mipmap_res.dimensions.0,
+            height: mipmap_res.dimensions.1,
+            data: wad::types::Image(mipmap_res.mips[0].clone()),
+            colors_used: 256,
+            palette: wad::types::Palette(mipmap_res.palette),
+        });
+
+        waddy.save_to_file(path).unwrap();
+
+        // waddy.dump_textures_to_files("/tmp/aaaa/").unwrap();
     }
 }
