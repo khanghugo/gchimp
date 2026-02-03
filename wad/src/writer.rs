@@ -9,7 +9,7 @@ use byte_writer::ByteWriter;
 use crate::{
     constants::MIPTEX_HEADER_LENGTH,
     error::WadError,
-    types::{DirectoryEntry, FileEntry, MipTex, Wad},
+    types::{DirectoryEntry, FileEntry, Font, MipTex, Qpic, Wad},
 };
 
 impl Wad {
@@ -60,11 +60,15 @@ impl Wad {
 
                 // write file entry
                 match file_entry {
-                    FileEntry::Qpic(_) => unimplemented!(),
+                    FileEntry::Qpic(qpic) => {
+                        qpic.write(&mut writer);
+                    }
                     FileEntry::MipTex(miptex) => {
                         miptex.write(&mut writer);
                     }
-                    FileEntry::Font(_) => todo!(),
+                    FileEntry::Font(font) => {
+                        font.write(&mut writer);
+                    }
                 }
 
                 // apparently, if we want compatibility with Wally, we need to align the bytes
@@ -169,5 +173,38 @@ impl MipTex {
 
         // pad palette to correctly have 256 colors
         writer.append_u8_slice(&vec![0u8; (256 - self.palette.get_bytes().len()) * 3]);
+    }
+}
+
+impl Qpic {
+    pub fn write(&self, writer: &mut ByteWriter) {
+        writer.append_u32(self.width);
+        writer.append_u32(self.height);
+        writer.append_u8_slice(&self.data.0);
+        writer.append_i16(self.colors_used);
+        for row in self.palette.get_bytes() {
+            writer.append_u8_slice(row);
+        }
+    }
+}
+
+impl Font {
+    pub fn write(&self, writer: &mut ByteWriter) {
+        writer.append_u32(self.unknown);
+        writer.append_u32(self.height);
+        writer.append_u32(self.row_count);
+        writer.append_u32(self.row_height);
+
+        for font in &self.font_info {
+            writer.append_i8(font.offset_y);
+            writer.append_i8(font.offset_x);
+            writer.append_i16(font.charwidth);
+        }
+
+        writer.append_u8_slice(self.data.get_bytes());
+        writer.append_i16(self.colors_used);
+        for row in self.palette.get_bytes() {
+            writer.append_u8_slice(row);
+        }
     }
 }
