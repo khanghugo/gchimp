@@ -36,6 +36,7 @@ pub struct BLBHOptions {
     pub uv_clamp_factor: f32,
     // pub origin: DVec3,
     pub studiomdl: String,
+    pub use_only_bake_texture: bool,
     #[cfg(target_os = "linux")]
     pub wineprefix: String,
 }
@@ -48,6 +49,7 @@ impl Default for BLBHOptions {
             compile_model: true,
             flat_shade: true,
             uv_clamp_factor: BLBH_DEFAULT_UV_CLAMP_FACTOR,
+            use_only_bake_texture: true,
             // origin: DVec3::ZERO,
             studiomdl: Default::default(),
             #[cfg(target_os = "linux")]
@@ -86,7 +88,8 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
         .map(|x| x.material.as_str())
         .collect::<HashSet<&str>>();
 
-    if !unique_textures.contains(texture_file_name) {
+    // unless the user opts into using only bake texture
+    if !options.use_only_bake_texture && !unique_textures.contains(texture_file_name) {
         return Err(eyre!("Cannot find atlas file inside SMD. Make sure material name matches the image file name. 
 Found textures in SMD: {:?}
 Atlas file name: `{}`", unique_textures, texture_file_name));
@@ -195,7 +198,8 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
         .into_iter()
         .flat_map(|to_split| {
             // if the material does not match the image file, don't process the triangle
-            if to_split.material != texture_file_name {
+            // unless it is intended to
+            if !options.use_only_bake_texture && to_split.material != texture_file_name {
                 return vec![to_split];
             }
 
@@ -632,6 +636,7 @@ mod test {
             convert_smd: true,
             compile_model: true,
             flat_shade: true,
+            use_only_bake_texture: true,
             // origin: DVec3::ZERO,
             uv_clamp_factor: BLBH_DEFAULT_UV_CLAMP_FACTOR,
             studiomdl: String::from("/home/khang/gchimp/dist/studiomdl.exe"),

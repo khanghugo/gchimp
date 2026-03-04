@@ -23,7 +23,6 @@ pub struct BLBHGui {
     options: BLBHOptions,
     clamp_value: String,
     check_clamp_value: bool,
-    // origin: String,
     status: Arc<Mutex<String>>,
 }
 
@@ -36,7 +35,6 @@ impl BLBHGui {
             options: BLBHOptions::default(),
             clamp_value: BLBH_DEFAULT_UV_CLAMP_FACTOR.to_string(),
             check_clamp_value: false,
-            // origin: "0 0 0".to_string(),
             status: Arc::new(Mutex::new("Idle".to_string())),
         }
     }
@@ -186,6 +184,16 @@ By default, it will \"shrink\" the UV in by 1 pixel wherever applicable.",
             if ui.button("Default").clicked() {
                 self.clamp_value = BLBH_DEFAULT_UV_CLAMP_FACTOR.to_string()
             }
+
+            ui.checkbox(
+                &mut self.options.use_only_bake_texture,
+                "Use only bake texture",
+            )
+            .on_hover_text(
+                "\
+Use only bake texture and nothing else.
+All materials in the mesh file are replaced by bake texture.",
+            );
 
             // origin
             // ui.label("Origin");
