@@ -203,6 +203,13 @@ All materials in the mesh file are replaced by bake texture.",
             //     .on_hover_text("Origin of the model. Space separated.");
         });
 
+        ui.horizontal(|ui| {
+            ui.checkbox(
+                &mut self.options.clean_up_generated_files,
+                "Clean up generated files",
+            );
+        });
+
         ui.separator();
 
         if ui.button("Run").clicked() {

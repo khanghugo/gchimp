@@ -1,4 +1,9 @@
-use std::{collections::HashSet, path::PathBuf, str::from_utf8};
+use std::{
+    collections::HashSet,
+    path::PathBuf,
+    str::from_utf8,
+    sync::{Arc, Mutex},
+};
 
 use glam::{DVec2, DVec3};
 use image::GenericImageView;
@@ -37,6 +42,7 @@ pub struct BLBHOptions {
     // pub origin: DVec3,
     pub studiomdl: String,
     pub use_only_bake_texture: bool,
+    pub clean_up_generated_files: bool,
     #[cfg(target_os = "linux")]
     pub wineprefix: String,
 }
@@ -50,6 +56,7 @@ impl Default for BLBHOptions {
             flat_shade: true,
             uv_clamp_factor: BLBH_DEFAULT_UV_CLAMP_FACTOR,
             use_only_bake_texture: true,
+            clean_up_generated_files: true,
             // origin: DVec3::ZERO,
             studiomdl: Default::default(),
             #[cfg(target_os = "linux")]
@@ -95,6 +102,8 @@ Found textures in SMD: {:?}
 Atlas file name: `{}`", unique_textures, texture_file_name));
     }
 
+    let generated_files = Arc::new(Mutex::new(vec![]));
+
     // split the images
     if options.convert_texture {
         (0..w_count).into_par_iter().for_each(|w_block| {
@@ -116,13 +125,14 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
                 // FORMAT STRING
                 let out_file_name =
                     format!("{}{:02}{:02}.bmp", texture_file_name, w_block, h_block);
-                write_8bpp_to_file(
-                    &image,
-                    &palette,
-                    dimensions,
-                    texture_path.with_file_name(out_file_name),
-                )
-                .unwrap();
+                let texture_full_path = texture_path.with_file_name(out_file_name);
+
+                generated_files
+                    .lock()
+                    .unwrap()
+                    .push(texture_full_path.clone());
+
+                write_8bpp_to_file(&image, &palette, dimensions, texture_full_path).unwrap();
             })
         });
     }
@@ -496,11 +506,16 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
 
         smds.iter().enumerate().for_each(|(smd_idx, smd)| {
             // FORMAT STRING
-            smd.write(smd_path.with_file_name(format!(
+            let smd_full_path = smd_path.with_file_name(format!(
                 "{}{:02}{:02}_blbh.smd",
                 smd_file_name, model_index, smd_idx
-            )))
-            .expect("cannot write smd file");
+            ));
+
+            {
+                generated_files.lock().unwrap().push(smd_full_path.clone());
+            }
+
+            smd.write(smd_full_path).expect("cannot write smd file");
         });
 
         if options.compile_model {
@@ -508,7 +523,13 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
             let smd_root = smd_path.parent().unwrap();
             let texture_file_root = smd_path.parent().unwrap();
 
-            idle_smd.write(smd_path.with_file_name("idle.smd"))?;
+            let idle_smd_path = smd_path.with_file_name("idle.smd");
+
+            {
+                generated_files.lock().unwrap().push(idle_smd_path.clone());
+            }
+
+            idle_smd.write(idle_smd_path)?;
 
             let mut qc = Qc::new_basic();
             qc.set_model_name(
@@ -560,6 +581,11 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
             // FORMAT STRING
             let qc_path =
                 smd_path.with_file_name(format!("{}{:02}_blbh.qc", smd_file_name, model_index));
+
+            {
+                generated_files.lock().unwrap().push(qc_path.clone());
+            }
+
             qc.write(qc_path.as_path())?;
 
             // run studiomdl
@@ -623,6 +649,17 @@ If the mentioned texture file is the baked texture, make sure the texture name m
         }
     }
 
+    // clean up generated files at the end if prompted
+    {
+        let written_textures = generated_files.lock().unwrap();
+
+        if !written_textures.is_empty() && options.clean_up_generated_files {
+            for texture in &*written_textures {
+                std::fs::remove_file(texture).unwrap();
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -637,7 +674,7 @@ mod test {
             compile_model: true,
             flat_shade: true,
             use_only_bake_texture: true,
-            // origin: DVec3::ZERO,
+            clean_up_generated_files: true,
             uv_clamp_factor: BLBH_DEFAULT_UV_CLAMP_FACTOR,
             studiomdl: String::from("/home/khang/gchimp/dist/studiomdl.exe"),
             #[cfg(target_os = "linux")]
