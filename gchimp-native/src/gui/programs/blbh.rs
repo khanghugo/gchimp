@@ -171,7 +171,12 @@ By default, it will \"shrink\" the UV in by 1 pixel wherever applicable.",
                 self.check_clamp_value = true;
             }
 
-            if text_editor_ui.lost_focus() && self.check_clamp_value {
+            if ui.button("Default").clicked() {
+                self.clamp_value = BLBH_DEFAULT_UV_CLAMP_FACTOR.to_string();
+                self.check_clamp_value = true;
+            }
+
+            if text_editor_ui.lost_focus() || self.check_clamp_value {
                 let shrink_value = self
                     .clamp_value
                     .parse::<f32>()
@@ -179,10 +184,6 @@ By default, it will \"shrink\" the UV in by 1 pixel wherever applicable.",
                 self.clamp_value = shrink_value.to_string();
                 self.options.uv_clamp_factor = shrink_value;
                 self.check_clamp_value = false;
-            }
-
-            if ui.button("Default").clicked() {
-                self.clamp_value = BLBH_DEFAULT_UV_CLAMP_FACTOR.to_string()
             }
 
             ui.checkbox(
