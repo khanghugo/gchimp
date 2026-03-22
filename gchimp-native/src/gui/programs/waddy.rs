@@ -375,6 +375,7 @@ impl WaddyGui {
         instance_index: usize,
         texture_tile_index: usize,
         image_tile_size: f32,
+        filtered_tiles: &Vec<usize>,
     ) {
         // FIXME: reduce ram usage by at least 4 times
         let current_id = egui::Id::new(format!(
@@ -455,8 +456,11 @@ impl WaddyGui {
                             let range_start = last_index.min(texture_tile_index);
                             let range_end = last_index.max(texture_tile_index);
 
+                            // only select within the filtered range
                             for idx in range_start..=range_end {
-                                if !self.instances[instance_index].selected.contains(&idx) {
+                                if !self.instances[instance_index].selected.contains(&idx)
+                                    && filtered_tiles.contains(&idx)
+                                {
                                     self.instances[instance_index].selected.push(idx);
                                 }
                             }
@@ -634,6 +638,7 @@ impl WaddyGui {
                                         instance_index,
                                         texture_tile_index,
                                         image_tile_size,
+                                        &filtered_tiles,
                                     );
                                 });
                         });
