@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use crate::config::parse_config;
 
@@ -68,6 +71,13 @@ pub fn smd_compile(smd_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<(
         }
     });
 
+    // get all the textures to mipmap them
+    let textures: HashSet<&str> = smd
+        .triangles
+        .iter()
+        .map(|tri| tri.material.as_str())
+        .collect();
+
     // split our smd and group with a new file name
     let split_smds = maybe_split_smd(&smd)
         .into_iter()
@@ -102,6 +112,11 @@ pub fn smd_compile(smd_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<(
     qc.set_model_name(smd_path0.with_extension("mdl").to_str().unwrap());
     qc.set_cd(root_dir);
     qc.set_cd_texture(root_dir);
+
+    // mipmap
+    textures.iter().for_each(|texture| {
+        qc.add_texrendermode(texture, qc::RenderMode::NoMips);
+    });
 
     split_smds
         .iter()
