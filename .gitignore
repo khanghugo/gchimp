@@ -27,3 +27,7 @@
 /dist/*.bmp
 /dist/*.smd
 /dist/*.qc
+*vkrad
+_studiomdl.exe
+studiomdl.zip
+*.zip
