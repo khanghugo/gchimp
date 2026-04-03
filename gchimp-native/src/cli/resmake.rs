@@ -29,6 +29,9 @@ enum Commands {
         /// There is something weird about reading files with lots of threads that results in incomplete data and crash ResMake
         #[arg(short)]
         folder_path: Option<PathBuf>,
+        /// Creates a zip archive for map files
+        #[arg(short, long, default_value_t = false)]
+        zip: bool,
         /// Checks for external WADs
         #[arg(long, default_value_t = false)]
         wad_check: bool,
@@ -43,6 +46,11 @@ enum Commands {
         /// Useful if you just up in some new maps and you want to update your archive without processing too much
         #[arg(long, default_value_t = false)]
         skip_created_res: bool,
+        /// Deletes auto-generated .wad file if --wad-check option is true
+        ///
+        /// This helps avoid clutter inside game mod folder
+        #[arg(long, default_value_t = true)]
+        cleanup_wad: bool,
     },
 }
 
@@ -62,6 +70,8 @@ impl Cli for ResMake {
             wad_check,
             include_default,
             skip_created_res,
+            cleanup_wad,
+            zip,
         } = cli.command;
 
         let mut resmake = ResMakeModule::new();
@@ -69,11 +79,12 @@ impl Cli for ResMake {
         resmake
             .wad_check(wad_check)
             .include_default_resource(include_default)
-            .zip(true)
+            .zip(zip)
             .res(true)
             .zip_ignore_missing(true)
             .skip_created_res(skip_created_res)
-            .create_linked_wad(true);
+            .create_linked_wad(true)
+            .cleanup_wad_file(cleanup_wad);
 
         if let Some(bsp_path) = bsp_path {
             match resmake.bsp_file(bsp_path).run() {

@@ -10,7 +10,7 @@ use bsp::Bsp;
 use chrono::Local;
 use eyre::OptionExt;
 use wad::types::Wad;
-use zip::{write::SimpleFileOptions, ZipWriter};
+use zip::{ZipWriter, write::SimpleFileOptions};
 
 use rayon::prelude::*;
 
@@ -18,7 +18,7 @@ use crate::{
     err,
     utils::{
         constants::{MODEL_ENTITIES, SOUND_ENTITIES, SPRITE_ENTITIES},
-        misc::{build_file_lookup, DefaultResource, FileLookup, COMMON_GAME_MODS},
+        misc::{COMMON_GAME_MODS, DefaultResource, FileLookup, build_file_lookup},
     },
 };
 
@@ -37,6 +37,10 @@ pub struct ResMakeOptions {
     pub create_linked_wad: bool,
     /// Whether to skip making resources for BSP that already has RES
     pub skip_created_res: bool,
+    /// Whether to clean up any generated files, notably .WAD
+    ///
+    /// This option only works when ZIP is enabled
+    pub cleanup: bool,
 }
 
 impl Default for ResMakeOptions {
@@ -55,6 +59,7 @@ impl ResMakeOptions {
             zip_ignore_missing: true,
             create_linked_wad: false,
             skip_created_res: false,
+            cleanup: false,
         }
     }
 }
@@ -146,6 +151,12 @@ impl ResMake {
 
     pub fn create_linked_wad(&mut self, v: bool) -> &mut Self {
         self.options.create_linked_wad = v;
+
+        self
+    }
+
+    pub fn cleanup_wad_file(&mut self, v: bool) -> &mut Self {
+        self.options.cleanup = v;
 
         self
     }
@@ -674,7 +685,7 @@ fn get_gfx(bsp: &Bsp, bsp_path: &Path, bsp_name: &str) -> eyre::Result<GetGfxRes
                         "cannot open detail texture file `{}` for bsp file `{}`: {err}",
                         detail_texture_file_path.display(),
                         bsp_path.display()
-                    )
+                    );
                 }
             };
 
@@ -1139,11 +1150,15 @@ fn resmake_zip_res(
     let gamedir_path = gamemod_path.parent().unwrap();
 
     // group all files in one
+    let mut created_wad_file: Option<String> = None; // self hatred
+
     let all_files = [models, sound, gfx, sprites].concat();
     let mut all_files = if !wads.is_empty() {
         // linked wad is already created in the .res step
         if options.create_linked_wad {
             let wad_path = [&bsp_name, ".wad"].concat();
+
+            created_wad_file = Some(wad_path.clone());
 
             [all_files, vec![wad_path]].concat()
         } else {
@@ -1184,7 +1199,7 @@ fn resmake_zip_res(
     let mut comment = resmake_zip_comment();
 
     // include typical resource files
-    for relative_path in all_files {
+    for relative_path in &all_files {
         // normalize relative path for easier search
         let normalized_relative_path = relative_path.to_lowercase();
         let absolute_path_not_normalized = gamedir_path.join(gamemod_name).join(&relative_path);
@@ -1246,6 +1261,15 @@ fn resmake_zip_res(
 
     zip.finish()?;
 
+    // clean up files
+    // bad but in the scheme of thing, this is nothing
+    if options.cleanup
+        && let Some(created_wad_file) = created_wad_file
+    {
+        let wad_file_path = gamemod_path.join(created_wad_file);
+        std::fs::remove_file(wad_file_path)?
+    }
+
     Ok(buf)
 }
 
@@ -1257,7 +1281,7 @@ mod test {
 
     use crate::{modules::resmake::ResMake, utils::misc::build_file_lookup};
 
-    use super::{resmake_zip_res, ResMakeOptions};
+    use super::{ResMakeOptions, resmake_zip_res};
 
     #[test]
     fn no_path() {
@@ -1310,6 +1334,7 @@ mod test {
                 zip_ignore_missing: true,
                 create_linked_wad: true,
                 skip_created_res: true,
+                cleanup: false,
             },
             &file_lookup_table,
         )
