@@ -2,7 +2,7 @@
 
 A collection of various GoldSrc mapping tools with both graphical and command line interface
 
-**You can check gchimp-web, a mini version of native application at your convenience, here [http://gchimp.romanian-jumpers.com/](http://gchimp.romanian-jumpers.com/)**
+**You can check gchimp-web, a mini version of native application at your convenience, here [https://gchimp.rs/](https://gchimp.rs/)**
 
 ![default](./docs/gchimp.gif)
 
