@@ -52,7 +52,7 @@ pub fn demo_ghost_parse(filename: &str, demo: &Demo) -> eyre::Result<GhostInfo> 
 
                 None
             }
-            FrameData::NetworkMessage(ref box_type) => {
+            FrameData::NetworkMessage(box_type) => {
                 let MessageData::Parsed(ref messages) = box_type.as_ref().1.messages else {
                     return None;
                 };

@@ -14,7 +14,7 @@ use gchimp::modules::{
 
 use crate::{
     cli::{self},
-    gui::{utils::preview_file_being_dropped, TabProgram},
+    gui::{TabProgram, utils::preview_file_being_dropped},
 };
 
 pub struct Misc {

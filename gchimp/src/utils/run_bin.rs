@@ -73,9 +73,15 @@ pub fn run_command_linux_with_wine(
     wine_prefix: String,
 ) -> JoinHandle<eyre::Result<Output>> {
     thread::spawn(move || {
-        Ok(Command::new("wine")
-            .args(command)
-            .env("WINEPREFIX", wine_prefix)
-            .output()?)
+        let mut command_builder = Command::new("wine");
+
+        let command_builder = command_builder.args(command);
+        let command_builder = if wine_prefix.trim().is_empty() {
+            command_builder
+        } else {
+            command_builder.env("WINEPREFIX", wine_prefix)
+        };
+
+        Ok(command_builder.output()?)
     })
 }

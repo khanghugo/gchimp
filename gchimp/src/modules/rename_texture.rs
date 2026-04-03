@@ -22,8 +22,10 @@ pub fn rename_texture(map: &mut Map) -> usize {
             entity
                 .attributes
                 .iter()
-                .filter(|(&ref key, _)| {
-                    !(key == DEFAULT_ANGLES_KEY || key == DEFAULT_ORIGIN_KEY || key == "classname")
+                .filter(|(key, _)| {
+                    !(*key == DEFAULT_ANGLES_KEY
+                        || *key == DEFAULT_ORIGIN_KEY
+                        || *key == "classname")
                 })
                 .map(|(key, value)| {
                     // to uppercase because map2mdl
