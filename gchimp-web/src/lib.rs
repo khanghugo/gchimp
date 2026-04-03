@@ -1,16 +1,16 @@
 use std::{path::Path, str::from_utf8};
 
 use smd::Smd;
-use utils::{zip_files, WasmFile};
+use utils::{WasmFile, zip_files};
 use wasm_bindgen::prelude::*;
 
 use bsp::Bsp;
 use gchimp::{
     modules::{
         bsp2wad::bsp2wad_bytes,
-        dem2cam::{Dem2CamOptions, _dem2cam_string},
+        dem2cam::{_dem2cam_string, Dem2CamOptions},
         loop_wave::loop_wave_from_wave_bytes as _loop_wave,
-        resmake::{resmake_single_bsp, ResMakeOptions},
+        resmake::{ResMakeOptions, resmake_single_bsp},
     },
     utils::smd_stuffs::maybe_split_smd,
 };
@@ -36,7 +36,7 @@ pub fn resmake(bsp_bytes: Vec<u8>, filename: &str) -> Result<String, JsValue> {
         Err(err) => {
             return Err(JsValue::from_str(
                 format!("cannot parse bsp: {}", err).as_str(),
-            ))
+            ));
         }
     };
 
@@ -50,6 +50,7 @@ pub fn resmake(bsp_bytes: Vec<u8>, filename: &str) -> Result<String, JsValue> {
         zip_ignore_missing: false,
         create_linked_wad: false,
         skip_created_res: false,
+        cleanup: false,
     };
 
     // does not include default resource by default
