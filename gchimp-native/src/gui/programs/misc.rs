@@ -260,6 +260,7 @@ If there are external WADs found, this option will create a new WAD file contain
             zip_ignore_missing,
             create_linked_wad,
             skip_created_res: _,
+            cleanup: _,
         } = self.resmake_options;
         "Running".clone_into(&mut status.lock().unwrap());
 
