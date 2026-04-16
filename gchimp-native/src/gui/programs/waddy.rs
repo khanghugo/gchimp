@@ -4,7 +4,7 @@ use std::{
 };
 
 use eframe::egui::{
-    self, scroll_area::ScrollSource, Context, Modifiers, RichText, ScrollArea, Sense, Ui,
+    self, Context, Modifiers, RichText, ScrollArea, Sense, Ui, scroll_area::ScrollSource,
 };
 use gchimp::{modules::waddy::Waddy, utils::misc::find_files_recursively};
 use image::{ImageBuffer, RgbaImage};
@@ -14,9 +14,9 @@ use rayon::prelude::*;
 
 use crate::{
     gui::{
-        constants::{IMAGE_FORMATS, PROGRAM_HEIGHT, PROGRAM_WIDTH},
-        utils::{display_image_viewport_from_texture, preview_file_being_dropped, WadImage},
         TabProgram,
+        constants::{IMAGE_FORMATS, PROGRAM_HEIGHT, PROGRAM_WIDTH},
+        utils::{WadImage, display_image_viewport_from_texture, preview_file_being_dropped},
     },
     persistent_storage::PersistentStorage,
 };
@@ -519,14 +519,16 @@ impl WaddyGui {
                         // this is the only case where the name is changed successfully
                         current_tile.in_rename = false;
 
-                        // make changes
-                        // then check the changes
-                        // then undo the changes
-                        // seems stupid, but whatever
-                        // I guess this means we can handle stuffs here without touching wad library
+                        // cleanup naming
+                        let new_name = {
+                            let mut res = current_tile.name().replace(" ", "_");
+                            res.truncate(15);
+                            res
+                        };
+
                         if let Err(err) = current_instance
                             .waddy
-                            .rename_texture(texture_tile_index, current_tile.name().clone())
+                            .rename_texture(texture_tile_index, new_name.clone())
                         {
                             // TODO learn how to do toast
                             println!("{:?}", err);
@@ -534,21 +536,10 @@ impl WaddyGui {
                             let prev_name = current_tile.prev_name.clone();
 
                             current_tile.name_mut().clone_from(&prev_name);
-                        } else if current_tile.name().len() >= 16 {
-                            println!("Texture name is too long");
-
-                            let prev_name = current_tile.prev_name.clone();
-
-                            current_tile.name_mut().clone_from(&prev_name);
-                        } else if current_tile.name().contains(" ") {
-                            println!("Texture should not have space in its name");
-
-                            let prev_name = current_tile.prev_name.clone();
-
-                            current_tile.name_mut().clone_from(&prev_name);
                         } else {
                             // this means things are good
-                            self.instances[instance_index].is_changed = true;
+                            current_instance.is_changed = true;
+                            current_tile.name_mut().clone_from(&new_name);
                         }
                     }
                 } else {
