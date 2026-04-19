@@ -17,7 +17,7 @@ vtf = { version = "0.1.0", path = "../vtf" }
 mdl = { version = "0.3.0", path = "../mdl" }
 
 # dependencies
-glam = "0.27.0"
+glam = "0.32.1"
 rayon = "1.10.0"
 rhai = "1.17.1"
 eyre = "0.6.12"
@@ -29,7 +29,7 @@ quantette = { version = "0.3.0", features = [
     "pipelines",
     "colorspaces",
 ] }
-image = { version = "0.25.1", features = ["png", "tga"] }
+image = { version = "0.25.10" }
 clap = { version = "4.5.4", features = ["derive"] }
 ndarray = "0.15.6"
 gcd = "2.3.0"
