@@ -5,6 +5,7 @@ use glam::Vec3;
 
 pub const VEC3_T_SIZE: usize = 3 * 4;
 
+#[derive(Debug, Clone)]
 pub struct Mdl {
     pub header: Header,
     pub sequences: Vec<Sequence>,
@@ -19,7 +20,7 @@ pub struct Mdl {
     pub transitions: Transitions,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Header {
     pub id: i32,
     pub version: i32,
@@ -59,14 +60,57 @@ pub struct Header {
     pub transition_index: i32,
 }
 
+impl Default for Header {
+    fn default() -> Self {
+        Self {
+            id: 1414743113, // TSDI
+            version: 10,
+            name: [0; 64],
+            length: 0,
+            eye_position: Default::default(),
+            min: Default::default(),
+            max: Default::default(),
+            bbmin: Default::default(),
+            bbmax: Default::default(),
+            flags: Default::default(),
+            num_bones: Default::default(),
+            bone_index: Default::default(),
+            num_bone_controllers: Default::default(),
+            bone_controller_index: Default::default(),
+            num_hitboxes: Default::default(),
+            hitbox_index: Default::default(),
+            num_seq: Default::default(),
+            seq_index: Default::default(),
+            num_seq_group: Default::default(),
+            seq_group_index: Default::default(),
+            num_textures: Default::default(),
+            texture_index: Default::default(),
+            texture_data_index: Default::default(),
+            num_skin_ref: Default::default(),
+            num_skin_families: Default::default(),
+            skin_index: Default::default(),
+            num_bodyparts: Default::default(),
+            bodypart_index: Default::default(),
+            num_attachments: Default::default(),
+            attachment_index: Default::default(),
+            sound_table: Default::default(),
+            sound_index: Default::default(),
+            sound_groups: Default::default(),
+            sound_group_index: Default::default(),
+            num_transitions: Default::default(),
+            transition_index: Default::default(),
+        }
+    }
+}
+
 bitflags! {
-    #[derive(Debug)]
+    #[derive(Debug, Default, Clone, Copy, PartialEq)]
     pub struct SequenceFlag: i32 {
         const LOOPING = 1 << 0;
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default, Clone)]
 pub struct SequenceHeader {
     pub label: [u8; 32],
     pub fps: f32,
@@ -131,7 +175,7 @@ impl IndexMut<usize> for AnimValues {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Sequence {
     pub header: SequenceHeader,
     /// `[[[[short animation value; frame count]; 6 motion types]; bone count]; blend count]`
@@ -139,7 +183,7 @@ pub struct Sequence {
 }
 
 bitflags! {
-    #[derive(Debug, PartialEq)]
+    #[derive(Debug, PartialEq, Clone)]
     #[repr(C)]
     pub struct TextureFlag: i32 {
         const FLATSHADE = 1;
@@ -152,7 +196,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct TextureHeader {
     pub name: [u8; 64],
@@ -173,7 +217,7 @@ impl PartialEq for TextureHeader {
 
 pub const PALETTE_COUNT: usize = 256;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Texture {
     pub header: TextureHeader,
     pub image: Vec<u8>,
@@ -193,6 +237,7 @@ impl Texture {
     }
 }
 
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct BodypartHeader {
     pub name: [u8; 64],
@@ -201,12 +246,13 @@ pub struct BodypartHeader {
     pub model_index: i32,
 }
 
+#[derive(Debug, Clone)]
 pub struct Bodypart {
     pub header: BodypartHeader,
     pub models: Vec<Model>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ModelHeader {
     pub name: [u8; 64],
     pub type_: i32,
@@ -225,6 +271,7 @@ pub struct ModelHeader {
     pub group_index: i32,
 }
 
+#[derive(Debug, Clone)]
 pub struct Model {
     pub header: ModelHeader,
     pub meshes: Vec<Mesh>,
@@ -242,7 +289,7 @@ pub struct Model {
     pub agnostic_mesh: Option<Vec<smd::Triangle>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MeshHeader {
     pub num_tris: i32,
     /// This points to the first trivert
@@ -254,7 +301,7 @@ pub struct MeshHeader {
     pub norm_index: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Mesh {
     pub header: MeshHeader,
     /// Each [`MeshTriangles`] could be multiple triangles.
@@ -266,7 +313,7 @@ pub struct Mesh {
 /// A strip/fan run
 ///
 /// Still uses the same material as described in the mesh
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MeshTriangles {
     Strip(Vec<Trivert>),
     Fan(Vec<Trivert>),
@@ -315,7 +362,7 @@ impl PartialEq for Trivert {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Bone {
     pub name: [u8; 32],
     pub parent: i32,
@@ -325,7 +372,7 @@ pub struct Bone {
     pub scale: [f32; 6],
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BoneController {
     pub bone: i32,
     pub type_: i32,
@@ -335,7 +382,7 @@ pub struct BoneController {
     pub index: i32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Hitbox {
     pub bone: i32,
     pub group: i32,
@@ -343,6 +390,7 @@ pub struct Hitbox {
     pub bbmax: Vec3,
 }
 
+#[derive(Debug, Clone)]
 pub struct SequenceGroup {
     pub label: [u8; 32],
     pub name: [u8; 64],
@@ -352,7 +400,7 @@ pub struct SequenceGroup {
 
 pub type SkinFamilies = Vec<Vec<i16>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Attachment {
     pub name: [u8; 32],
     pub type_: i32,

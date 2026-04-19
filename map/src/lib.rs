@@ -7,6 +7,7 @@ mod types;
 mod writer;
 
 pub use types::*;
+mod utils;
 
 use crate::parser::{parse_entities, parse_map};
 

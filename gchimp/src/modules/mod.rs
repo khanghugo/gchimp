@@ -7,6 +7,7 @@ pub mod dem2cam;
 pub mod bsp2wad;
 pub mod duplicate_triangle;
 pub mod find_low_scaling;
+pub mod join_mdl;
 pub mod light_scale;
 pub mod loop_wave;
 pub mod map2mdl;

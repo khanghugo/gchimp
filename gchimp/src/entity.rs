@@ -3,8 +3,6 @@ use std::path::PathBuf;
 use bitflags::bitflags;
 use map::{Entity, Map};
 
-use crate::err;
-
 pub static GCHIMP_INFO_ENTITY: &str = "gchimp_info";
 
 pub static GCHIMP_INFO_HL_PATH: &str = "hl_path";
@@ -15,48 +13,64 @@ pub struct GchimpInfo {
     entity: Entity,
 }
 
-fn check_gchimp_entity(entity: &Entity) -> eyre::Result<()> {
+#[derive(Debug, thiserror::Error)]
+pub enum GchimpInfoError {
+    #[error("gchimp_info does not exist in the map")]
+    NoGchimpInfo,
+    #[error("Path to Half-Life does not exist: {path}")]
+    PathToHL { path: String },
+    #[error("Path to Half-Life is empty")]
+    PathToHLEmpty,
+    #[error("Game mod does not exist: {gamemod}")]
+    GameMod { gamemod: String },
+    #[error("Game mod is empty")]
+    GameModEmpty,
+    #[error("\"options\" key is not a number")]
+    OptionsKeyNaN,
+    #[error("\"options\" key is not in gchimp_info")]
+    OptionsKeyNone,
+}
+
+fn check_gchimp_entity(entity: &Entity) -> Result<(), GchimpInfoError> {
     // check path
     if let Some(hl_path) = entity.attributes.get(GCHIMP_INFO_HL_PATH) {
         let game_path = PathBuf::from(hl_path);
 
         if !game_path.exists() {
-            return err!("gchimp_info: Path to Half-Life does not exist: {}", hl_path);
+            return Err(GchimpInfoError::PathToHL {
+                path: hl_path.to_owned(),
+            });
         }
 
         if let Some(gamedir) = entity.attributes.get(GCHIMP_INFO_GAMEDIR) {
             let mod_path = game_path.join(gamedir);
 
             if !mod_path.exists() {
-                return err!(
-                    "gchimp_info: Path to game mod does not exist: {}",
-                    mod_path.to_str().unwrap()
-                );
+                return Err(GchimpInfoError::GameMod {
+                    gamemod: mod_path.display().to_string(),
+                });
             }
         } else {
-            return err!("gchimp_info: No game mod provided");
+            return Err(GchimpInfoError::GameModEmpty);
         }
     } else {
-        return err!("gchimp_info: No path to Half-Life provided");
+        return Err(GchimpInfoError::PathToHLEmpty);
     }
 
     // check options
     if let Some(options) = entity.attributes.get("options") {
         if let Err(err) = options.parse::<usize>() {
-            return err!(
-                "gchimp_info: Value for \"options\" is not a number: {}",
-                err
-            );
+            return Err(GchimpInfoError::OptionsKeyNaN);
         }
     } else {
-        return err!("gchimp_info: Cannot find \"options\" key");
+        return Err(GchimpInfoError::OptionsKeyNone);
     };
 
     Ok(())
 }
 
 impl GchimpInfo {
-    pub fn from_map(map: &Map) -> eyre::Result<Self> {
+    pub fn from_map(map: &Map) -> Result<Self, GchimpInfoError> {
         let entity_index = map.entities.iter().position(|entity| {
             entity
                 .attributes
@@ -65,7 +79,7 @@ impl GchimpInfo {
         });
 
         if entity_index.is_none() {
-            return err!("gchimp_info: Cannot find {}", GCHIMP_INFO_ENTITY);
+            return Err(GchimpInfoError::NoGchimpInfo);
         }
 
         let entity_index = entity_index.unwrap();

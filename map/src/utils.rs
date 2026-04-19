@@ -1,0 +1,95 @@
+use glam::DVec3;
+
+use crate::{Entity, Map};
+
+impl Map {
+    pub fn get_entities<'a>(&'a self, classname: &'a str) -> impl Iterator<Item = &'a Entity> + 'a {
+        self.entities.iter().filter(move |x| {
+            x.attributes
+                .get("classname".into())
+                .is_some_and(|classname_curr| classname_curr == classname)
+        })
+    }
+
+    pub fn get_entities_mut<'a>(
+        &'a mut self,
+        classname: &'a str,
+    ) -> impl Iterator<Item = &'a mut Entity> + 'a {
+        self.entities.iter_mut().filter(move |x| {
+            x.attributes
+                .get("classname".into())
+                .is_some_and(|classname_curr| classname_curr == classname)
+        })
+    }
+
+    pub fn get_entity_first(&self, classname: &str) -> Option<usize> {
+        self.entities.iter().position(|x| {
+            x.attributes
+                .get("classname".into())
+                .is_some_and(|classname_curr| classname_curr == classname)
+        })
+    }
+
+    pub fn get_entities_all(&self, classname: &str) -> Vec<usize> {
+        self.entities
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, x)| {
+                if x.attributes
+                    .get("classname".into())
+                    .is_some_and(|classname_curr| classname_curr == classname)
+                {
+                    Some(idx)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn get_entity_by_targetname(&self, targetname: &str) -> Option<usize> {
+        self.entities.iter().position(|x| {
+            x.attributes
+                .get("targetname".into())
+                .is_some_and(|targetname_curr| targetname_curr == targetname)
+        })
+    }
+
+    pub fn get_entity_by_classname_and_targetname(
+        &self,
+        classname: &str,
+        targetname: &str,
+    ) -> Option<usize> {
+        self.entities.iter().position(|x| {
+            x.attributes
+                .get("classname".into())
+                .is_some_and(|classname_curr| classname_curr == classname)
+                && x.attributes
+                    .get("targetname".into())
+                    .is_some_and(|targetname_curr| targetname_curr == targetname)
+        })
+    }
+}
+
+impl Entity {
+    pub fn origin(&self) -> Option<DVec3> {
+        self.attributes.get("origin").and_then(|x| parse_triplet(x))
+    }
+
+    pub fn angles(&self) -> Option<DVec3> {
+        self.attributes.get("angles").and_then(|x| parse_triplet(x))
+    }
+}
+
+fn parse_triplet(i: &str) -> Option<DVec3> {
+    let res = i
+        .split_ascii_whitespace()
+        .filter_map(|i| i.parse::<f64>().ok())
+        .collect::<Vec<f64>>();
+
+    if res.len() < 3 {
+        return None;
+    }
+
+    Some([res[0], res[1], res[2]].into())
+}

@@ -2,6 +2,7 @@
 //!
 //! https://github.com/malortie/assimp/wiki/MDL:-Half-Life-1-file-format
 //!
+mod constants;
 pub mod error;
 mod nom_helpers;
 mod parser;
@@ -9,8 +10,10 @@ mod types;
 mod utils;
 mod writer;
 
+pub use constants::*;
 pub use types::Mdl;
 pub use types::*;
+pub use utils::TrivertAffineTransformation;
 
 #[cfg(test)]
 mod test {
@@ -66,7 +69,7 @@ mod test {
         println!("{} {:?}", size_of_val(&mdl), mdl.header);
 
         // need to build agnostic data to export
-        mdl.maybe_build_agnostic_data();
+        mdl.rebuild_data_for_export();
 
         println!(
             "agnostic triangle count {}",
@@ -159,7 +162,7 @@ mod test {
         assert_eq!(mdl.hitboxes, mdl2.hitboxes);
 
         // write the file
-        mdl2.maybe_build_agnostic_data();
+        mdl2.rebuild_data_for_export();
 
         println!(
             "agnostic 2 triangle count {}",
@@ -182,9 +185,38 @@ mod test {
 
         let mut mdl = Mdl::open_from_bytes(bytes).unwrap();
 
-        mdl.maybe_build_agnostic_data();
+        println!("{:?}", mdl.sequences);
+        println!("{:?}", mdl.bones);
+        println!("{:?}", mdl.bone_controllers);
+        println!("{:?}", mdl.skin_families);
+        println!("{:?}", mdl.header);
+        println!("{:?}", mdl.sequence_groups);
+        println!("{:?}", mdl.triangle_count());
+        println!(
+            "{:?}",
+            mdl.bodyparts
+                .iter()
+                .map(|x| x.header.base)
+                .collect::<Vec<i32>>()
+        );
+
+        mdl.rebuild_data_for_export();
 
         mdl.write_to_file("/home/khang/gchimp/mdl/src/tests/arte_farte_bhop_parse_write.mdl")
             .unwrap();
+    }
+
+    #[test]
+    fn parse_write_parse_arte_farte2() {
+        let bytes = include_bytes!("/home/khang/map/arte_dela/bake/final_1p1b/final_1p1b_blbh.mdl");
+
+        let mut mdl = Mdl::open_from_bytes(bytes).unwrap();
+
+        println!("{:?}", mdl.sequences);
+        println!("{:?}", mdl.bones);
+        println!("{:?}", mdl.bone_controllers);
+        println!("{:?}", mdl.skin_families);
+        println!("{:?}", mdl.transitions);
+        println!("{:?}", mdl.header);
     }
 }

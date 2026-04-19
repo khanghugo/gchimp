@@ -6,7 +6,7 @@
 
 use std::ffi::CStr;
 
-use crate::{Mdl, MeshTriangles, Model, Texture, Trivert};
+use crate::{MeshTriangles, Model, Texture, Trivert};
 
 fn trivert_to_smd_vertex(trivert: &Trivert, parent: i32, texture: &Texture) -> smd::Vertex {
     smd::Vertex {
@@ -95,24 +95,5 @@ impl Model {
         }
 
         self.agnostic_mesh = Some(smd_mesh);
-    }
-}
-
-impl Mdl {
-    /// In order to export the model file, must invoke this function before exporting.
-    pub fn maybe_build_agnostic_data(&mut self) {
-        if self.bodyparts.iter().all(|bodypart| {
-            bodypart
-                .models
-                .iter()
-                .all(|model| model.agnostic_mesh.is_none())
-        }) {
-            self.bodyparts.iter_mut().for_each(|bodypart| {
-                bodypart
-                    .models
-                    .iter_mut()
-                    .for_each(|model| model.build_agnostic_data(&self.textures))
-            });
-        }
     }
 }
