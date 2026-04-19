@@ -140,6 +140,7 @@ pub struct Sequence {
 
 bitflags! {
     #[derive(Debug, PartialEq)]
+    #[repr(C)]
     pub struct TextureFlag: i32 {
         const FLATSHADE = 1;
         const CHROME = 1 << 1;
@@ -152,6 +153,7 @@ bitflags! {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct TextureHeader {
     pub name: [u8; 64],
     pub flags: TextureFlag,
@@ -191,6 +193,7 @@ impl Texture {
     }
 }
 
+#[repr(C)]
 pub struct BodypartHeader {
     pub name: [u8; 64],
     pub num_models: i32,
@@ -203,6 +206,7 @@ pub struct Bodypart {
     pub models: Vec<Model>,
 }
 
+#[derive(Debug)]
 pub struct ModelHeader {
     pub name: [u8; 64],
     pub type_: i32,
@@ -231,6 +235,11 @@ pub struct Model {
     /// But it is actually u8 type, not i32
     pub vertex_info: Vec<u8>,
     pub normal_info: Vec<u8>,
+
+    /// Calculated agnostic mesh for easier processing.
+    ///
+    /// This is the data used for any sort of manipulation.
+    pub agnostic_mesh: Option<Vec<smd::Triangle>>,
 }
 
 #[derive(Debug)]
@@ -278,24 +287,6 @@ impl MeshTriangles {
         }
     }
 }
-
-// impl Mesh {
-//     pub fn store_order(&self) -> TrivertStoreOrder {
-//         if self.header.num_tris.is_positive() {
-//             TrivertStoreOrder::Strip
-//         } else {
-//             TrivertStoreOrder::Fan
-//         }
-//     }
-
-//     pub fn is_fan(&self) -> bool {
-//         matches!(self.store_order(), TrivertStoreOrder::Fan)
-//     }
-
-//     pub fn is_strip(&self) -> bool {
-//         matches!(self.store_order(), TrivertStoreOrder::Strip)
-//     }
-// }
 
 #[derive(Debug, Clone, Copy)]
 pub struct TrivertHeader {

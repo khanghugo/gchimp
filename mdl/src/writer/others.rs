@@ -1,6 +1,6 @@
 use byte_writer::ByteWriter;
 
-use crate::{writer::WriteToWriter, SkinFamilies, Transitions};
+use crate::{SkinFamilies, Transitions, writer::WriteToWriter};
 
 impl WriteToWriter for SkinFamilies {
     fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
@@ -9,6 +9,8 @@ impl WriteToWriter for SkinFamilies {
         self.iter().flatten().for_each(|x| {
             writer.append_i16(*x);
         });
+
+        writer.align_size(4);
 
         offset
     }
@@ -19,6 +21,8 @@ impl WriteToWriter for Transitions {
         let offset = writer.get_offset();
 
         writer.append_u8_slice(self);
+
+        writer.align_size(4);
 
         offset
     }

@@ -8,9 +8,9 @@ use byte_writer::ByteWriter;
 use glam::Vec3;
 
 use crate::{
-    error::MdlError,
-    writer::impl_trait::{WriteToWriter, WriteToWriterTexture},
     Header, Mdl,
+    error::MdlError,
+    writer::impl_trait::{WriteToWriter, WriteToWriterBodyparts, WriteToWriterTexture},
 };
 
 mod attachment;
@@ -26,6 +26,7 @@ const MAGIC: &str = "IDST";
 const PADDING_MAGIC: i32 = 0x69696969;
 
 impl Mdl {
+    /// Mesh must be rebuilt with [`Mdl.maybe_build_agnostic_data()`] before exporting .mdl
     pub fn write_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> Result<(), MdlError> {
         let bytes = self.write_to_bytes();
 
@@ -42,6 +43,7 @@ impl Mdl {
         Ok(())
     }
 
+    /// Mesh must be rebuilt with [`Mdl.maybe_build_agnostic_data()`] before exporting .mdl
     pub fn write_to_bytes(&self) -> Vec<u8> {
         let mut writer = ByteWriter::new();
 
@@ -131,57 +133,43 @@ impl Mdl {
         let bone_offset = self.bones.as_slice().write_to_writer(&mut writer);
         writer.replace_with_i32(bone_index, bone_offset as i32);
 
-        println!("bone file length {}", writer.get_offset());
-
         let bone_controller_offset = self
             .bone_controllers
             .as_slice()
             .write_to_writer(&mut writer);
         writer.replace_with_i32(bone_controller_index, bone_controller_offset as i32);
 
-        println!("bone controller file length {}", writer.get_offset());
-
         let hitbox_offset = self.hitboxes.as_slice().write_to_writer(&mut writer);
         writer.replace_with_i32(hitbox_index, hitbox_offset as i32);
-
-        println!("hitbox file length {}", writer.get_offset());
 
         let sequence_offset = self.sequences.as_slice().write_to_writer(&mut writer);
         writer.replace_with_i32(sequence_index, sequence_offset as i32);
 
-        println!("sequence file length {}", writer.get_offset());
-
         let sequence_group_offset = self.sequence_groups.as_slice().write_to_writer(&mut writer);
         writer.replace_with_i32(sequence_group_index, sequence_group_offset as i32);
-
-        println!("sequence group file length {}", writer.get_offset());
-
-        let (texture_offset, texture_image_offset) =
-            self.textures.as_slice().write_to_writer(&mut writer);
-        writer.replace_with_i32(texture_index, texture_offset as i32);
-        writer.replace_with_i32(texture_data_index, texture_image_offset as i32);
-
-        println!("texture file length {}", writer.get_offset());
 
         let skin_offset = self.skin_families.write_to_writer(&mut writer);
         writer.replace_with_i32(skin_index, skin_offset as i32);
 
-        println!("skin length {}", writer.get_offset());
-
-        let bodypart_offset = self.bodyparts.as_slice().write_to_writer(&mut writer);
-        writer.replace_with_i32(bodypart_index, bodypart_offset as i32);
-
-        println!("bodypart length {}", writer.get_offset());
-
         let attachment_offset = self.attachments.as_slice().write_to_writer(&mut writer);
         writer.replace_with_i32(attachment_index, attachment_offset as i32);
-
-        println!("attachment length {}", writer.get_offset());
 
         let transition_offset = self.transitions.write_to_writer(&mut writer);
         writer.replace_with_i32(transitions_index, transition_offset as i32);
 
-        println!("transitions length {}", writer.get_offset());
+        // write bodypart second to last
+
+        let bodypart_offset = self
+            .bodyparts
+            .as_slice()
+            .write_to_writer(&mut writer, &self.textures);
+        writer.replace_with_i32(bodypart_index, bodypart_offset as i32);
+
+        // write texture last so it is easier to check
+        let (texture_offset, texture_image_offset) =
+            self.textures.as_slice().write_to_writer(&mut writer);
+        writer.replace_with_i32(texture_index, texture_offset as i32);
+        writer.replace_with_i32(texture_data_index, texture_image_offset as i32);
 
         writer.replace_with_i32(file_length_pos, writer.get_offset() as i32);
 

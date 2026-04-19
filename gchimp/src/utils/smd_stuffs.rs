@@ -35,14 +35,6 @@ pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
         .collect()
 }
 
-// poorman's hash function
-#[inline]
-fn vertex_hash(vertex: &smd::Vertex) -> String {
-    let pos = vertex.pos;
-    let norm = vertex.norm;
-    format!("{}{}{}{}{}{}", pos.x, pos.y, pos.z, norm.x, norm.y, norm.z)
-}
-
 /// Splits one SMD to multiple SMD if number of vertices exceeds the limit.
 pub fn maybe_split_smd(smd: &Smd) -> Vec<Smd> {
     let mut res: Vec<Smd> = vec![];
@@ -58,7 +50,7 @@ pub fn maybe_split_smd(smd: &Smd) -> Vec<Smd> {
 
     for triangle in &smd.triangles {
         for vertex in &triangle.vertices {
-            vertex_list.insert(vertex_hash(vertex), vertex.to_owned());
+            vertex_list.insert(vertex.bad_hash(), vertex.to_owned());
         }
     }
 
@@ -81,9 +73,9 @@ pub fn maybe_split_smd(smd: &Smd) -> Vec<Smd> {
         let mut curr_smd_vertices: HashSet<String> = HashSet::new();
 
         while let Some(curr_triangle) = triangle_list.pop() {
-            let vert0_hash = vertex_hash(&curr_triangle.vertices[0]);
-            let vert1_hash = vertex_hash(&curr_triangle.vertices[1]);
-            let vert2_hash = vertex_hash(&curr_triangle.vertices[2]);
+            let vert0_hash = curr_triangle.vertices[0].bad_hash();
+            let vert1_hash = curr_triangle.vertices[1].bad_hash();
+            let vert2_hash = curr_triangle.vertices[2].bad_hash();
 
             curr_smd_vertices.insert(vert0_hash);
             curr_smd_vertices.insert(vert1_hash);

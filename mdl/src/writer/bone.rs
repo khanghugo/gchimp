@@ -1,6 +1,6 @@
 use byte_writer::ByteWriter;
 
-use crate::{writer::WriteToWriter, Bone, BoneController};
+use crate::{Bone, BoneController, writer::WriteToWriter};
 
 impl WriteToWriter for &[Bone] {
     fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
@@ -9,6 +9,8 @@ impl WriteToWriter for &[Bone] {
         self.iter().for_each(|bone| {
             bone.write_to_writer(writer);
         });
+
+        writer.align_size(4);
 
         offset
     }
@@ -21,6 +23,8 @@ impl WriteToWriter for &[BoneController] {
         self.iter().for_each(|bone_controller| {
             bone_controller.write_to_writer(writer);
         });
+
+        writer.align_size(4);
 
         offset
     }

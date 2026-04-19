@@ -1,6 +1,6 @@
 use byte_writer::ByteWriter;
 
-use crate::{writer::WriteToWriter, AnimValues, Blend};
+use crate::{AnimValues, Blend, writer::WriteToWriter};
 
 impl WriteToWriter for &[Blend] {
     fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
@@ -48,6 +48,8 @@ impl WriteToWriter for &[Blend] {
 
         // then add the motion data to the writer
         writer.append_u8_slice(&motion_data_writer.data);
+
+        writer.align_size(4);
 
         offset
     }

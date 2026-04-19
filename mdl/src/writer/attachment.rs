@@ -1,6 +1,6 @@
 use byte_writer::ByteWriter;
 
-use crate::{writer::WriteToWriter, Attachment};
+use crate::{Attachment, writer::WriteToWriter};
 
 impl WriteToWriter for Attachment {
     fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
@@ -33,6 +33,8 @@ impl WriteToWriter for &[Attachment] {
         self.iter().for_each(|attachment| {
             attachment.write_to_writer(writer);
         });
+
+        writer.align_size(4);
 
         offset
     }

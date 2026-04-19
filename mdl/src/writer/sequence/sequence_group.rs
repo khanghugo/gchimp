@@ -1,6 +1,6 @@
 use byte_writer::ByteWriter;
 
-use crate::{writer::WriteToWriter, SequenceGroup};
+use crate::{SequenceGroup, writer::WriteToWriter};
 
 impl WriteToWriter for SequenceGroup {
     fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
@@ -24,11 +24,16 @@ impl WriteToWriter for SequenceGroup {
 
 impl WriteToWriter for &[SequenceGroup] {
     fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
-        self.iter()
+        let res = self
+            .iter()
             .map(|sequence_group| sequence_group.write_to_writer(writer))
             .collect::<Vec<usize>>()
             .first()
             .cloned()
-            .unwrap_or(0)
+            .unwrap_or(0);
+
+        writer.align_size(4);
+
+        res
     }
 }

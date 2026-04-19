@@ -1,20 +1,20 @@
 use std::{array::from_fn, ffi::OsStr, fs::OpenOptions, io::Read, path::Path};
 
 use nom::{
+    Parser,
     bytes::complete::take,
     combinator::map,
     multi::count,
-    number::complete::{le_f32, le_i16, le_i32, le_u16, le_u8},
-    Parser,
+    number::complete::{le_f32, le_i16, le_i32, le_u8, le_u16},
 };
 
 use crate::{
-    error::MdlError,
-    nom_helpers::{vec3, IResult},
-    types::{Header, Mdl, SequenceHeader, Texture, TextureFlag, TextureHeader},
     AnimValues, Attachment, Blend, Bodypart, BodypartHeader, Bone, BoneController, Hitbox, Mesh,
-    MeshHeader, MeshTriangles, Model, ModelHeader, Sequence, SequenceFlag, SequenceGroup,
-    SkinFamilies, Transitions, Trivert, TrivertHeader, PALETTE_COUNT, VEC3_T_SIZE,
+    MeshHeader, MeshTriangles, Model, ModelHeader, PALETTE_COUNT, Sequence, SequenceFlag,
+    SequenceGroup, SkinFamilies, Transitions, Trivert, TrivertHeader, VEC3_T_SIZE,
+    error::MdlError,
+    nom_helpers::{IResult, vec3},
+    types::{Header, Mdl, SequenceHeader, Texture, TextureFlag, TextureHeader},
 };
 
 impl Mdl {
@@ -826,6 +826,7 @@ fn parse_model<'a>(i: &'a [u8], start: &'a [u8]) -> IResult<'a, Model> {
             meshes,
             vertex_info,
             normal_info,
+            agnostic_mesh: None,
         },
     ))
 }

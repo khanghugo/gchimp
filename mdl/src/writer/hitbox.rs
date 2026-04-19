@@ -1,6 +1,6 @@
 use byte_writer::ByteWriter;
 
-use crate::{writer::WriteToWriter, Hitbox};
+use crate::{Hitbox, writer::WriteToWriter};
 
 impl WriteToWriter for Hitbox {
     fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
@@ -29,6 +29,8 @@ impl WriteToWriter for &[Hitbox] {
         self.iter().for_each(|hitbox| {
             hitbox.write_to_writer(writer);
         });
+
+        writer.align_size(4);
 
         offset
     }

@@ -1,6 +1,6 @@
 use byte_writer::ByteWriter;
 
-use crate::{writer::WriteToWriter, Sequence, SequenceHeader};
+use crate::{Sequence, SequenceHeader, writer::WriteToWriter};
 
 mod blend;
 mod sequence_group;
@@ -85,6 +85,8 @@ impl WriteToWriter for &[Sequence] {
 
                 assert_eq!(end - start, std::mem::size_of::<SequenceHeader>());
             });
+
+        writer.align_size(4);
 
         offsets
     }
