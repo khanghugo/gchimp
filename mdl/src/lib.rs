@@ -94,7 +94,7 @@ mod test {
         assert_eq!(mdl.sequences[0].anim_blends, mdl2.sequences[0].anim_blends);
 
         // check triangles
-        let contains = |y: &Vec<Trivert>| {
+        let _contains = |y: &Vec<Trivert>| {
             mdl2.bodyparts[0].models[0].meshes[0]
                 .triangles
                 .iter()
