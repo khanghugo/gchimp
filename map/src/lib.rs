@@ -316,7 +316,7 @@ fn parse_attribute(i: &'_ str) -> IResult<'_, (&str, &'_ str)> {
     tuple((quoted_text, preceded(space0, quoted_text)))(i)
 }
 
-fn parse_attributes(i: &'_ str) -> IResult<'_, Attributes> {
+pub fn parse_attributes(i: &'_ str) -> IResult<'_, Attributes> {
     fold_many1(
         terminated(parse_attribute, multispace0),
         Attributes::new,
