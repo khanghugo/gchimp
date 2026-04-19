@@ -5,12 +5,14 @@ use std::path::{Path, PathBuf};
 use eyre::eyre;
 
 use crate::parser::parse_smd;
-use crate::types::{BonePos, Node, Skeleton, Smd, Triangle};
 
 pub mod parser;
-pub mod types;
-pub mod utils;
-pub mod writer;
+mod types;
+mod utils;
+mod writer;
+
+pub use types::*;
+pub use utils::SmdAffineTransformation;
 
 impl Default for Smd {
     fn default() -> Self {
