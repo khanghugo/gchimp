@@ -40,7 +40,7 @@ pub fn make_func_door_every_xth_block(map: &Map) -> eyre::Result<Map> {
 "style" "0"
 "spawnflags" "256"g"#;
     let (_parse_remain, func_door_attribute) =
-        map::parse_attributes(func_door_attributes_str).unwrap();
+        map::parser::parse_attributes(func_door_attributes_str).unwrap();
 
     assert!(_parse_remain.is_empty());
 
