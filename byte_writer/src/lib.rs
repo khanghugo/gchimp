@@ -110,4 +110,12 @@ impl ByteWriter {
         self.data.extend(i.to_le_bytes());
         self.offset(2);
     }
+
+    pub fn align_size(&mut self, align: usize) {
+        let needed = (align - (self.data.len() % align)) % align;
+
+        for _ in 0..needed {
+            self.append_u8(0);
+        }
+    }
 }
