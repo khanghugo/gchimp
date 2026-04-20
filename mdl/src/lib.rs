@@ -212,11 +212,11 @@ mod test {
 
         let mut mdl = Mdl::open_from_bytes(bytes).unwrap();
 
-        println!("{:?}", mdl.sequences);
-        println!("{:?}", mdl.bones);
-        println!("{:?}", mdl.bone_controllers);
-        println!("{:?}", mdl.skin_families);
-        println!("{:?}", mdl.transitions);
+        // println!("{:?}", mdl.sequences);
+        // println!("{:?}", mdl.bones);
+        // println!("{:?}", mdl.bone_controllers);
+        // println!("{:?}", mdl.skin_families);
+        // println!("{:?}", mdl.transitions);
         println!("{:?}", mdl.header);
     }
 }

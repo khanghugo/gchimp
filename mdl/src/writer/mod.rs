@@ -100,7 +100,7 @@ impl Mdl {
         let texture_data_index = writer.get_offset();
         writer.append_i32(PADDING_MAGIC);
 
-        writer.append_i32(self.header.num_skin_ref);
+        writer.append_i32(self.textures.len() as i32); // num_skin_ref, matches texture count
         writer.append_i32(self.skin_families.len() as i32);
         let skin_index = writer.get_offset();
         writer.append_i32(PADDING_MAGIC);

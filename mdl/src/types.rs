@@ -60,49 +60,6 @@ pub struct Header {
     pub transition_index: i32,
 }
 
-impl Default for Header {
-    fn default() -> Self {
-        Self {
-            id: 1414743113, // TSDI
-            version: 10,
-            name: [0; 64],
-            length: 0,
-            eye_position: Default::default(),
-            min: Default::default(),
-            max: Default::default(),
-            bbmin: Default::default(),
-            bbmax: Default::default(),
-            flags: Default::default(),
-            num_bones: Default::default(),
-            bone_index: Default::default(),
-            num_bone_controllers: Default::default(),
-            bone_controller_index: Default::default(),
-            num_hitboxes: Default::default(),
-            hitbox_index: Default::default(),
-            num_seq: Default::default(),
-            seq_index: Default::default(),
-            num_seq_group: Default::default(),
-            seq_group_index: Default::default(),
-            num_textures: Default::default(),
-            texture_index: Default::default(),
-            texture_data_index: Default::default(),
-            num_skin_ref: Default::default(),
-            num_skin_families: Default::default(),
-            skin_index: Default::default(),
-            num_bodyparts: Default::default(),
-            bodypart_index: Default::default(),
-            num_attachments: Default::default(),
-            attachment_index: Default::default(),
-            sound_table: Default::default(),
-            sound_index: Default::default(),
-            sound_groups: Default::default(),
-            sound_group_index: Default::default(),
-            num_transitions: Default::default(),
-            transition_index: Default::default(),
-        }
-    }
-}
-
 bitflags! {
     #[derive(Debug, Default, Clone, Copy, PartialEq)]
     pub struct SequenceFlag: i32 {
