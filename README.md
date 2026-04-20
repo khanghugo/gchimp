@@ -2,6 +2,8 @@
 
 A collection of various GoldSrc mapping tools with both graphical and command line interface
 
+![collage](./docs/gchimp_collage.png)
+
 **You can check gchimp-web, a mini version of native application at your convenience, here [https://gchimp.rs/](https://gchimp.rs/)**
 
 ![default](./docs/gchimp.gif)
@@ -13,6 +15,10 @@ Head to [Release](https://github.com/khanghugo/gchimp/releases) page to download
 Usually it would just work out of the box. If there is any problem, try starting the binary through terminal and you will see the program output to better diagnose the issue.
 
 ## Features
+
+- [BLBH: Makes baked light models accessible](https://github.com/khanghugo/gchimp/wiki/BLBH)
+
+- [JoinMDL: Combines multiple models inside Hammer into ONE model](https://github.com/khanghugo/gchimp/wiki/JoinMDL)
 
 - [S2G: Source to GoldSrc model converter](https://github.com/khanghugo/gchimp/wiki/S2G)
 
