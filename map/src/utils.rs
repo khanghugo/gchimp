@@ -3,7 +3,10 @@ use glam::DVec3;
 use crate::{Attributes, Entity, Map};
 
 impl Map {
-    pub fn get_entities<'a>(&'a self, classname: &'a str) -> impl Iterator<Item = &'a Entity> + 'a {
+    pub fn get_entities_by_classname<'a>(
+        &'a self,
+        classname: &'a str,
+    ) -> impl Iterator<Item = &'a Entity> + 'a {
         self.entities.iter().filter(move |x| {
             x.attributes
                 .get("classname".into())
@@ -11,7 +14,7 @@ impl Map {
         })
     }
 
-    pub fn get_entities_mut<'a>(
+    pub fn get_entities_by_classname_mut<'a>(
         &'a mut self,
         classname: &'a str,
     ) -> impl Iterator<Item = &'a mut Entity> + 'a {
@@ -22,7 +25,7 @@ impl Map {
         })
     }
 
-    pub fn get_entity_first(&self, classname: &str) -> Option<usize> {
+    pub fn get_entity_by_class_name_first(&self, classname: &str) -> Option<usize> {
         self.entities.iter().position(|x| {
             x.attributes
                 .get("classname".into())
@@ -30,7 +33,7 @@ impl Map {
         })
     }
 
-    pub fn get_entities_all(&self, classname: &str) -> Vec<usize> {
+    pub fn get_entities_by_classname_all(&self, classname: &str) -> Vec<usize> {
         self.entities
             .iter()
             .enumerate()

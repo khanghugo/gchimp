@@ -5,9 +5,11 @@
     options(Flags) =
 	[
 		// Converts brushes into models
-		1: "map2mdl Conversion" : 0
+		1: "map2mdl Conversion" : 1
 		// Exports model entity into the map. Can be used without "conversion" option to avoid redoing conversion.
-		2: "map2mdl Export" : 0
+		2: "map2mdl Export" : 1
+		// Enables JoinMDL functionality
+		4: "jmdl Enable": 1
 	]
 ] 
 
@@ -40,7 +42,7 @@
 
 @PointClass base(Targetname, Angles, RenderFields, ZHLT, TexLightType) = gchimp_jmdl : "Joins selected model entities as one model"
 [
+	targetname(target_source) : "Other model entities point to this" : "jmdl1"
     output(string) : "Relative output path for combined model"
     model_entity(string) : "Classname of model displaying entity" : "cycler_sprite"
-	model_targets(string) : "Comma separated targetname model entities"
 ]

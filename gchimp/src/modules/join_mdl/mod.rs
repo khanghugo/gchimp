@@ -9,11 +9,9 @@ use map::Map;
 use mdl::{Bodypart, Mdl, Texture, TrivertAffineTransformation};
 
 use crate::{
-    entity::GchimpInfo,
+    entity::{GchimpInfo, GchimpInfoOption},
     modules::join_mdl::{
-        entity::{
-            JMDL_ATTR_MODEL_ENTITY, JMDL_ATTR_MODEL_TARGETS, JMDL_ATTR_OUTPUT, JMDL_ENTITY_NAME,
-        },
+        entity::{JMDL_ATTR_MODEL_ENTITY, JMDL_ATTR_OUTPUT, JMDL_ENTITY_NAME},
         error::JMdlError,
     },
 };
@@ -27,6 +25,12 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
     // will only search inside `basegame` and `basegame_downloads`
     let gchimp_info =
         GchimpInfo::from_map(&map).map_err(|op| JMdlError::GchimpInfo { source: op })?;
+
+    // is enabled beause i want this to be standard
+    if !gchimp_info.options().contains(GchimpInfoOption::JoinMDL) {
+        println!("JoinMDL is not enabled.");
+        return Ok(0);
+    }
 
     let game_dirs = if let Some(stripped) = gchimp_info.gamedir().strip_suffix("_downloads") {
         vec![
@@ -53,7 +57,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
     let output_prefix = Path::new(gchimp_info.hl_path()).join(gchimp_info.gamedir());
 
     // does this over all gchimp_jmdl
-    let entities = map.get_entities_all(JMDL_ENTITY_NAME);
+    let entities = map.get_entities_by_classname_all(JMDL_ENTITY_NAME);
 
     let mut work_count = 0;
 
@@ -79,27 +83,32 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
             }
         }
 
-        // all other models with the same targetname
-        let Some(target_model_entities) = map.entities[jmdl_entity_idx]
+        // list of model entities that point to our gchimp_jmdl
+        // this just has better ergonomics
+        // if gchimp_jmdl contains the model targetname instead, you have to
+        // name the model and then insert it to the gchimp_mdl
+        let jmdl_targetname = map.entities[jmdl_entity_idx]
             .attributes
-            .get(JMDL_ATTR_MODEL_TARGETS)
-            .map(|s| {
-                s.split_terminator(',')
-                    .map(|entry| entry.trim())
-                    .collect::<Vec<&str>>()
-            })
-        else {
-            continue;
-        };
+            .get("targetname")
+            .cloned()
+            .ok_or(JMdlError::NoTargetName)?;
 
-        // list of entities with that targetname
-
-        // TODO right now there is no check that the targetname must exists
-        // so it is doing best effort to select models that exists
-        let mut model_entities_indices = target_model_entities
+        let mut model_entities_indices = map
+            .entities
             .iter()
-            .filter_map(|x| map.get_entity_by_targetname(x))
+            .enumerate()
+            .filter(|(_, ent)| {
+                ent.attributes
+                    .get("target")
+                    .map_or(false, |t| t == &jmdl_targetname)
+            })
+            .map(|(idx, _)| idx)
             .collect::<Vec<usize>>();
+
+        // skip if nothing, easy
+        if model_entities_indices.is_empty() {
+            continue;
+        }
 
         // model paths
         let model_paths = model_entities_indices

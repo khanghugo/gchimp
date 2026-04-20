@@ -59,7 +59,7 @@ fn check_gchimp_entity(entity: &Entity) -> Result<(), GchimpInfoError> {
 
     // check options
     if let Some(options) = entity.attributes.get("options") {
-        if let Err(err) = options.parse::<usize>() {
+        if let Err(_) = options.parse::<usize>() {
             return Err(GchimpInfoError::OptionsKeyNaN);
         }
     } else {
@@ -122,6 +122,8 @@ bitflags! {
         /// Keep this option ticked if the model is already converted and model is not updated.
         /// By doing that, model will not be re-converted on every compile.
         const Map2MdlExport = 1 << 1;
+        /// Enables JoinMDL
+        const JoinMDL = 1 << 2;
     }
 }
 

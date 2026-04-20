@@ -10,6 +10,8 @@ pub enum JMdlError {
     NoOutput,
     #[error("Value of `output` is not a .mdl file: `{name}`")]
     OutputNotMdl { name: String },
+    #[error("gchimp_jmdl MUST have targetname")]
+    NoTargetName,
 
     #[error("gchimp_info error: {source}")]
     GchimpInfo { source: GchimpInfoError },
