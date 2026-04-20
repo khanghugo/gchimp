@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use common::setup_studio_model_transformations::setup_studio_model_transformations;
 use glam::DVec3;
 use map::Map;
 use mdl::{Bodypart, Mdl, Texture, TrivertAffineTransformation};
@@ -269,6 +270,20 @@ fn actually_join_models(
 
             let mut owned_bodyparts = mdl.bodyparts.clone();
 
+            // need to apply the model idle sequence to get the "idle" geometry
+
+            // TODO this mean it is possible to bake a model with multiple bones
+            let (bone_pos, bone_rot) = setup_studio_model_transformations(mdl)
+            [0] // sequence
+            [0] // blend
+            [0] // frame
+            [0].clone() // bone 0 always
+            ;
+
+            let angles: cgmath::Euler<cgmath::Rad<f32>> = bone_rot.into();
+            let bone_rot_glam = glam::vec3(angles.x.0, angles.y.0, angles.z.0);
+            let bone_pos_glam = glam::vec3(bone_pos.x, bone_pos.y, bone_pos.z);
+
             owned_bodyparts.iter_mut().for_each(|bodypart| {
                 // reduce the model count to just 1
                 bodypart.models = vec![bodypart.models[0].clone()];
@@ -286,6 +301,11 @@ fn actually_join_models(
                 // but everything is fine
                 bodypart.models[0].meshes.iter_mut().for_each(|mesh| {
                     mesh.triangles.iter_mut().for_each(|triangles| {
+                        // local/bone transformation
+                        triangles.rotate(bone_rot_glam);
+                        triangles.translate(bone_pos_glam);
+
+                        // world transformation
                         triangles.rotate(rotations[idx].as_vec3());
                         triangles.translate(translations[idx].as_vec3());
                     });

@@ -13,8 +13,9 @@ qc = { path = "../qc" }
 wad = { path = "../wad" }
 bsp = { path = "../bsp" }
 dem = "0.2.0"
-vtf = { version = "0.1.0", path = "../vtf" }
-mdl = { version = "0.3.0", path = "../mdl" }
+vtf = { path = "../vtf" }
+mdl = { path = "../mdl" }
+common = { path = "../common" }
 
 # dependencies
 glam = "0.32.1"
@@ -47,3 +48,4 @@ walkdir = "2.5.0"
 # enable js support for this random shit so that wasm32 can compile
 getrandom = { version = "0.2.15", features = ["js"] }
 thiserror = "2.0.18"
+cgmath = "0.18.0"

@@ -1817,8 +1817,10 @@ version = "0.3.5"
 dependencies = [
  "bitflags 2.9.4",
  "bsp",
+ "cgmath",
  "chrono",
  "clap",
+ "common",
  "cuet",
  "dem 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "eyre",
