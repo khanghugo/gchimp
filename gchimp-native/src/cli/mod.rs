@@ -3,6 +3,7 @@ use map::Map;
 mod check_illegal_brush;
 mod check_missing_texture;
 mod custom_script;
+mod join_mdl;
 mod light_scale;
 mod loop_wave;
 mod map2mdl;
@@ -75,6 +76,7 @@ pub fn cli() -> CliRes {
         &resmake::ResMake,
         &smd_compile::SmdCompile,
         &rename_texture::RenameTexture,
+        &join_mdl::JoinMdl,
     ];
 
     let help = || {

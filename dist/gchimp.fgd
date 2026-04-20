@@ -36,4 +36,11 @@
 [
     example(string) : "Texture with name `example` will be replaced with corresponding value field"
 	example2(string) : "Add more fields to swap more textures"
-] 
+]
+
+@PointClass base(Targetname, Angles, RenderFields, ZHLT, TexLightType) = gchimp_jmdl : "Joins selected model entities as one model"
+[
+    output(string) : "Relative output path for combined model"
+    model_entity(string) : "Classname of model displaying entity" : "cycler_sprite"
+	model_targets(string) : "Comma separated targetname model entities"
+]

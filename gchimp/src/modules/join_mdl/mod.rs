@@ -10,7 +10,9 @@ use mdl::{Bodypart, Mdl, Texture, TrivertAffineTransformation};
 use crate::{
     entity::GchimpInfo,
     modules::join_mdl::{
-        entity::{JMDL_ATTR_MODEL_TARGETS, JMDL_ENTITY_NAME},
+        entity::{
+            JMDL_ATTR_MODEL_ENTITY, JMDL_ATTR_MODEL_TARGETS, JMDL_ATTR_OUTPUT, JMDL_ENTITY_NAME,
+        },
         error::JMdlError,
     },
 };
@@ -18,9 +20,7 @@ use crate::{
 mod entity;
 mod error;
 
-pub fn join_model(map: &Map) -> Result<Map, JMdlError> {
-    let mut map = map.clone();
-
+pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
     // verifies that there is gchimp_info
     // jmdl uses gchimp_info to find where the model is
     // will only search inside `basegame` and `basegame_downloads`
@@ -28,11 +28,19 @@ pub fn join_model(map: &Map) -> Result<Map, JMdlError> {
         GchimpInfo::from_map(&map).map_err(|op| JMdlError::GchimpInfo { source: op })?;
 
     let game_dirs = if let Some(stripped) = gchimp_info.gamedir().strip_suffix("_downloads") {
-        vec![stripped.to_owned(), format!("{}_downloads", stripped)]
+        vec![
+            "valve".into(),
+            stripped.to_owned(),
+            format!("{}_downloads", stripped),
+        ]
     } else {
         let gamedir = gchimp_info.gamedir();
 
-        vec![gamedir.to_owned(), format!("{}_downloads", gamedir)]
+        vec![
+            "valve".into(),
+            gamedir.to_owned(),
+            format!("{}_downloads", gamedir),
+        ]
     };
 
     // verify that the gamedir exists oor just not
@@ -41,20 +49,45 @@ pub fn join_model(map: &Map) -> Result<Map, JMdlError> {
         .map(|x| Path::new(gchimp_info.hl_path()).join(x))
         .filter(|x| x.exists())
         .collect::<Vec<PathBuf>>();
+    let output_prefix = Path::new(gchimp_info.hl_path()).join(gchimp_info.gamedir());
 
     // does this over all gchimp_jmdl
     let entities = map.get_entities_all(JMDL_ENTITY_NAME);
 
-    for entity_idx in entities {
-        // current gchimp_jmdl
-        let entity = &map.entities[entity_idx];
+    let mut work_count = 0;
+
+    for jmdl_entity_idx in entities {
+        // verify output valu8e
+        let output_relative_path = map.entities[jmdl_entity_idx]
+            .attributes
+            .get(JMDL_ATTR_OUTPUT)
+            .cloned()
+            .ok_or(JMdlError::NoOutput)?;
+        let output_absolute_path = output_prefix.join(&output_relative_path);
+
+        {
+            if output_absolute_path.extension().is_some_and(|x| x != "mdl") {
+                return Err(JMdlError::OutputNotMdl {
+                    name: output_relative_path,
+                });
+            }
+
+            // create directory to be sure
+            if let Some(path) = output_absolute_path.parent() {
+                std::fs::create_dir_all(path).map_err(|e| JMdlError::IOError { source: e })?;
+            }
+        }
 
         // all other models with the same targetname
-        let Some(target_model_entities) = entity.attributes.get(JMDL_ATTR_MODEL_TARGETS).map(|s| {
-            s.split_terminator(',')
-                .map(|entry| entry.trim())
-                .collect::<Vec<&str>>()
-        }) else {
+        let Some(target_model_entities) = map.entities[jmdl_entity_idx]
+            .attributes
+            .get(JMDL_ATTR_MODEL_TARGETS)
+            .map(|s| {
+                s.split_terminator(',')
+                    .map(|entry| entry.trim())
+                    .collect::<Vec<&str>>()
+            })
+        else {
             continue;
         };
 
@@ -62,13 +95,13 @@ pub fn join_model(map: &Map) -> Result<Map, JMdlError> {
 
         // TODO right now there is no check that the targetname must exists
         // so it is doing best effort to select models that exists
-        let model_entities = target_model_entities
+        let mut model_entities_indices = target_model_entities
             .iter()
             .filter_map(|x| map.get_entity_by_targetname(x))
             .collect::<Vec<usize>>();
 
         // model paths
-        let model_paths = model_entities
+        let model_paths = model_entities_indices
             .iter()
             .filter_map(|&idx| map.entities[idx].attributes.get("model"))
             .collect::<Vec<&String>>();
@@ -90,7 +123,7 @@ pub fn join_model(map: &Map) -> Result<Map, JMdlError> {
             .collect::<Vec<PathBuf>>();
 
         // open all models
-        let mut mdls = model_full_paths
+        let mdls = model_full_paths
             .iter()
             .filter_map(|path| match Mdl::open_from_file(path) {
                 Ok(x) => Some(x),
@@ -101,12 +134,80 @@ pub fn join_model(map: &Map) -> Result<Map, JMdlError> {
             })
             .collect::<Vec<Mdl>>();
 
-        // build data for all models
-        mdls.iter_mut()
-            .for_each(|mdl| mdl.rebuild_data_for_export());
+        // gather affine transformations
+        let jmdl_entity_origin = map.entities[jmdl_entity_idx]
+            .origin()
+            .unwrap_or(DVec3::ZERO);
+        let translations = model_entities_indices
+            .iter()
+            .map(|index| map.entities[*index].origin().unwrap_or(DVec3::ZERO))
+            .map(|origin| origin - jmdl_entity_origin)
+            .collect::<Vec<DVec3>>();
+        let rotations = model_entities_indices
+            .iter()
+            // PITCH YAW ROLL // -Y Z X
+            .map(|&index| map.entities[index].angles().unwrap_or(DVec3::ZERO))
+            .map(|rotation| DVec3 {
+                x: rotation.z.to_radians(),
+                y: -rotation.x.to_radians(),
+                z: rotation.y.to_radians(),
+            })
+            .collect::<Vec<DVec3>>();
+
+        // the model
+        let mut combined_model = actually_join_models(&mdls, &translations, &rotations)?;
+
+        // now, replace gchimp_jmdl with model entity
+        let model_entity_name = map.entities[jmdl_entity_idx]
+            .attributes
+            .get(JMDL_ATTR_MODEL_ENTITY)
+            .cloned()
+            .unwrap_or("cycler_sprite".into());
+
+        map.entities[jmdl_entity_idx]
+            .attributes
+            .entry("classname".into())
+            .and_modify(|x| *x = model_entity_name);
+
+        map.entities[jmdl_entity_idx]
+            .attributes
+            .insert("model".into(), output_relative_path);
+
+        // at this point, new model entity should inherit all key and values
+
+        // removes gchimp_jmdl owned key and values
+        map.entities[jmdl_entity_idx]
+            .attributes
+            .remove(JMDL_ATTR_MODEL_ENTITY);
+        map.entities[jmdl_entity_idx]
+            .attributes
+            .remove(JMDL_ATTR_OUTPUT);
+
+        // delete all other models
+        model_entities_indices.sort();
+        model_entities_indices.iter().rev().for_each(|idx| {
+            map.entities.remove(*idx);
+        });
+
+        // write the model
+        // must have model name so it can be precached
+        combined_model.set_name(
+            &output_absolute_path
+                .file_name()
+                .unwrap()
+                .display()
+                .to_string(),
+        );
+        combined_model.rebuild_data_for_export();
+
+        combined_model
+            .write_to_file(output_absolute_path)
+            .map_err(|op| JMdlError::MdlError { source: op })?;
+
+        work_count += 1;
     }
 
-    Ok(map)
+    Ok(work_count)
 }
 
 fn actually_join_models(
@@ -156,6 +257,7 @@ fn actually_join_models(
         }
 
         combined_mdl.textures = texture_combined;
+        // combined_mdl.textures = mdls[0].textures.clone(); // debug
     }
 
     // next, join all the bodies
@@ -188,15 +290,21 @@ fn actually_join_models(
                         triangles.translate(translations[idx].as_vec3());
                     });
                 });
+
+                // force the vertex and normal bone to 0 cuz we have 1 bone
+                bodypart.models[0].normal_info.fill(0);
+                bodypart.models[0].vertex_info.fill(0);
             });
 
             bodypart_combined.append(&mut owned_bodyparts);
         }
 
         combined_mdl.bodyparts = bodypart_combined;
+        // combined_mdl.bodyparts = mdls[0].bodyparts.clone(); // debug
     }
 
     // should be good???
+    // so far i guess
 
     Ok(combined_mdl)
 }
@@ -208,6 +316,7 @@ mod test {
     use crate::modules::join_mdl::actually_join_models;
 
     #[test]
+    #[allow(unused)]
     fn run() {
         let bytes = include_bytes!("/home/khang/gchimp/mdl/src/tests/static_tree.mdl");
 
@@ -217,30 +326,30 @@ mod test {
 
         let transformations = vec![
             [0., 0., 0.].into(),
-            [128., 0., 0.].into(),
-            [-128., 0., 0.].into(),
+            [64., 0., 0.].into(),
+            [-64., 0., 0.].into(),
         ];
 
         let rotations = vec![[0., 0., 0.].into(); 3];
 
-        let mut res = actually_join_models(
+        let mut combined_mdl = actually_join_models(
             vec![mdl1, mdl2, mdl3].as_ref(),
             &transformations,
             &rotations,
         )
         .unwrap();
 
-        res.rebuild_data_for_export();
+        combined_mdl.rebuild_data_for_export();
 
         // must set name, otherwise HLAM rejects
-        res.set_name("hello_world.mdl");
+        combined_mdl.set_name("hello_world.mdl");
 
-        let out_bytes = res.write_to_bytes();
+        println!("{:?}", combined_mdl.header.name);
 
-        let mdl_out = Mdl::open_from_bytes(&out_bytes).unwrap();
-        println!("{:?}", mdl_out.header);
+        let out_bytes = combined_mdl.write_to_bytes();
 
-        res.write_to_file("/home/khang/gchimp/mdl/src/tests/static_tree_combined.mdl")
+        combined_mdl
+            .write_to_file("/home/khang/gchimp/mdl/src/tests/static_tree_combined.mdl")
             .unwrap();
     }
 }
