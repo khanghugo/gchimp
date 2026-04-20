@@ -1,6 +1,6 @@
 use glam::DVec3;
 
-use crate::{Entity, Map};
+use crate::{Attributes, Entity, Map};
 
 impl Map {
     pub fn get_entities<'a>(&'a self, classname: &'a str) -> impl Iterator<Item = &'a Entity> + 'a {
@@ -68,6 +68,15 @@ impl Map {
                     .get("targetname".into())
                     .is_some_and(|targetname_curr| targetname_curr == targetname)
         })
+    }
+
+    pub fn insert_new_point_entity(&mut self, attributes: Attributes) {
+        let new_entity = Entity {
+            attributes,
+            brushes: None,
+        };
+
+        self.entities.push(new_entity);
     }
 }
 
