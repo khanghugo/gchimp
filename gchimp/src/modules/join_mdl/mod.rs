@@ -4,7 +4,7 @@ use std::{
 };
 
 use common::setup_studio_model_transformations::setup_studio_model_transformations;
-use glam::DVec3;
+use glam::{DVec3, Mat3};
 use map::Map;
 use mdl::{Bodypart, Mdl, Texture, TrivertAffineTransformation};
 
@@ -277,11 +277,12 @@ fn actually_join_models(
             [0] // sequence
             [0] // blend
             [0] // frame
-            [0].clone() // bone 0 always
+            [0].clone() // bone 0
             ;
 
-            let angles: cgmath::Euler<cgmath::Rad<f32>> = bone_rot.into();
-            let bone_rot_glam = glam::vec3(angles.x.0, angles.y.0, angles.z.0);
+            // must use matrix to avoid implicit rotation order
+            let cg_mat: cgmath::Matrix3<f32> = bone_rot.into();
+            let mat_array: [[f32; 3]; 3] = cg_mat.into();
             let bone_pos_glam = glam::vec3(bone_pos.x, bone_pos.y, bone_pos.z);
 
             owned_bodyparts.iter_mut().for_each(|bodypart| {
@@ -302,7 +303,7 @@ fn actually_join_models(
                 bodypart.models[0].meshes.iter_mut().for_each(|mesh| {
                     mesh.triangles.iter_mut().for_each(|triangles| {
                         // local/bone transformation
-                        triangles.rotate(bone_rot_glam);
+                        triangles.transform_mat3(Mat3::from_cols_array_2d(&mat_array));
                         triangles.translate(bone_pos_glam);
 
                         // world transformation

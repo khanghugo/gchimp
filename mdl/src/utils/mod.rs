@@ -1,4 +1,4 @@
-use glam::Vec3;
+use glam::{Mat3, Vec3};
 
 use crate::{AnimValues, Bone, Header, MeshTriangles, SequenceGroup, Trivert};
 use crate::{Mdl, Sequence, SequenceHeader};
@@ -180,6 +180,7 @@ pub trait TrivertAffineTransformation {
     fn translate(&mut self, value: Vec3);
     fn rotate(&mut self, value: Vec3);
     fn scale(&mut self, value: f32);
+    fn transform_mat3(&mut self, value: Mat3);
 }
 
 impl TrivertAffineTransformation for MeshTriangles {
@@ -206,6 +207,14 @@ impl TrivertAffineTransformation for MeshTriangles {
             }
         }
     }
+
+    fn transform_mat3(&mut self, value: Mat3) {
+        match self {
+            MeshTriangles::Strip(triverts) | MeshTriangles::Fan(triverts) => {
+                triverts.transform_mat3(value);
+            }
+        }
+    }
 }
 
 impl TrivertAffineTransformation for Vec<Trivert> {
@@ -220,6 +229,10 @@ impl TrivertAffineTransformation for Vec<Trivert> {
     fn scale(&mut self, value: f32) {
         self.as_mut_slice().scale(value);
     }
+
+    fn transform_mat3(&mut self, value: Mat3) {
+        self.as_mut_slice().transform_mat3(value);
+    }
 }
 
 impl TrivertAffineTransformation for &mut [Trivert] {
@@ -230,7 +243,7 @@ impl TrivertAffineTransformation for &mut [Trivert] {
     }
 
     fn rotate(&mut self, value: Vec3) {
-        let rot_mat = glam::Mat3::from_euler(glam::EulerRot::XYZ, value.x, value.y, value.z);
+        let rot_mat = glam::Mat3::from_euler(glam::EulerRot::ZYX, value.z, value.y, value.x);
 
         for tri in self.iter_mut() {
             tri.vertex = rot_mat * tri.vertex;
@@ -241,6 +254,13 @@ impl TrivertAffineTransformation for &mut [Trivert] {
     fn scale(&mut self, value: f32) {
         for tri in self.iter_mut() {
             tri.vertex *= value;
+        }
+    }
+
+    fn transform_mat3(&mut self, value: glam::Mat3) {
+        for tri in self.iter_mut() {
+            tri.vertex = value * tri.vertex;
+            tri.normal = (value * tri.normal).normalize();
         }
     }
 }
