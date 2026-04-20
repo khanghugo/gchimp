@@ -154,9 +154,14 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
                 z: rotation.y.to_radians(),
             })
             .collect::<Vec<DVec3>>();
+        let scales = model_entities_indices
+            .iter()
+            // PITCH YAW ROLL // -Y Z X
+            .map(|&index| map.entities[index].scale().unwrap_or(1.))
+            .collect::<Vec<f64>>();
 
         // the model
-        let mut combined_model = actually_join_models(&mdls, &translations, &rotations)?;
+        let mut combined_model = actually_join_models(&mdls, &translations, &rotations, &scales)?;
 
         // now, replace gchimp_jmdl with model entity
         let model_entity_name = map.entities[jmdl_entity_idx]
@@ -215,6 +220,7 @@ fn actually_join_models(
     mdls: &[Mdl],
     translations: &[DVec3],
     rotations: &[DVec3],
+    scales: &[f64],
 ) -> Result<Mdl, JMdlError> {
     let mut combined_mdl = Mdl::new_empty();
 
@@ -307,6 +313,7 @@ fn actually_join_models(
                         triangles.translate(bone_pos_glam);
 
                         // world transformation
+                        triangles.scale(scales[idx] as f32);
                         triangles.rotate(rotations[idx].as_vec3());
                         triangles.translate(translations[idx].as_vec3());
                     });
@@ -352,11 +359,13 @@ mod test {
         ];
 
         let rotations = vec![[0., 0., 0.].into(); 3];
+        let scales = vec![1.; 3];
 
         let mut combined_mdl = actually_join_models(
             vec![mdl1, mdl2, mdl3].as_ref(),
             &transformations,
             &rotations,
+            &scales,
         )
         .unwrap();
 

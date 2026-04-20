@@ -133,15 +133,46 @@ impl Mdl {
         self.skin_families = vec![(0..(self.textures.len() as i16)).collect()];
     }
 
-    /// In order to export the model file, must invoke this function before exporting.
-    pub fn rebuild_data_for_export(&mut self) {
-        // only rebuild mesh if agnostic mesh is all empty
-        if self.bodyparts.iter().all(|bodypart| {
+    fn build_bbox(&mut self) {
+        // initialize min/max to zero so that
+        // origin is always part fo the bbox
+        // it makes the model bigger than it is
+        let mut min = glam::DVec3::ZERO;
+        let mut max = glam::DVec3::ZERO;
+
+        // this function should only calculate from smd mesh, not the original model
+        for bodypart in &self.bodyparts {
+            if let Some(model) = bodypart.models.first() {
+                if let Some(mesh) = &model.agnostic_mesh {
+                    for tri in mesh {
+                        for v in &tri.vertices {
+                            min = min.min(v.pos);
+                            max = max.max(v.pos);
+                        }
+                    }
+                }
+            }
+        }
+
+        self.header.min = min.as_vec3();
+        self.header.max = max.as_vec3();
+        self.header.bbmin = min.as_vec3();
+        self.header.bbmax = max.as_vec3();
+    }
+
+    fn has_agnostic_mesh_data(&self) -> bool {
+        self.bodyparts.iter().all(|bodypart| {
             bodypart
                 .models
                 .iter()
-                .all(|model| model.agnostic_mesh.is_none())
-        }) {
+                .all(|model| model.agnostic_mesh.is_some())
+        })
+    }
+
+    /// In order to export the model file, must invoke this function before exporting.
+    pub fn rebuild_data_for_export(&mut self) {
+        // only rebuild mesh if agnostic mesh is all empty
+        if !self.has_agnostic_mesh_data() {
             self.bodyparts.iter_mut().for_each(|bodypart| {
                 bodypart
                     .models
@@ -152,22 +183,35 @@ impl Mdl {
 
         // skinfamilies must match textures count
         self.build_skin_families();
+
+        self.build_bbox();
     }
 
     /// Returns model triangle count at any typical given moment
     pub fn triangle_count(&self) -> usize {
-        self.bodyparts.iter().fold(0, |acc, e| {
-            acc + e
-                .models
-                .iter()
-                .next() // count the first model cuz not all of them are in-used
-                .map(|x| {
-                    x.meshes
-                        .iter()
-                        .fold(0, |acc2, e2| acc2 + e2.header.num_tris.abs() as usize)
-                })
-                .unwrap_or(0)
-        })
+        if !self.has_agnostic_mesh_data() {
+            self.bodyparts.iter().fold(0, |acc, e| {
+                acc + e
+                    .models
+                    .iter()
+                    .next() // count the first model cuz not all of them are in-used
+                    .map(|x| {
+                        x.meshes
+                            .iter()
+                            .fold(0, |acc2, e2| acc2 + e2.header.num_tris.abs() as usize)
+                    })
+                    .unwrap_or(0)
+            })
+        } else {
+            self.bodyparts.iter().fold(0, |acc, bp| {
+                acc + bp
+                    .models
+                    .first()
+                    .and_then(|m| m.agnostic_mesh.as_ref())
+                    .map(|mesh| mesh.len())
+                    .unwrap_or(0)
+            })
+        }
     }
 
     pub fn set_name(&mut self, name: &str) {

@@ -88,6 +88,12 @@ impl Entity {
     pub fn angles(&self) -> Option<DVec3> {
         self.attributes.get("angles").and_then(|x| parse_triplet(x))
     }
+
+    pub fn scale(&self) -> Option<f64> {
+        self.attributes
+            .get("scale")
+            .and_then(|x| x.parse::<f64>().ok())
+    }
 }
 
 fn parse_triplet(i: &str) -> Option<DVec3> {
