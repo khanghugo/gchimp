@@ -1,6 +1,6 @@
 use glam::{Mat3, Vec3};
 
-use crate::{AnimValues, Bone, Header, MeshTriangles, SequenceGroup, Trivert};
+use crate::{AnimValues, Bone, Header, Hitbox, MeshTriangles, SequenceGroup, Trivert};
 use crate::{Mdl, Sequence, SequenceHeader};
 
 mod model_to_smd;
@@ -153,6 +153,16 @@ impl Mdl {
                 }
             }
         }
+
+        // need to have hitbox as well
+        let hitbox = Hitbox {
+            bone: 0,
+            group: 0,
+            bbmin: min.as_vec3(),
+            bbmax: max.as_vec3(),
+        };
+
+        self.hitboxes = vec![hitbox];
 
         self.header.min = min.as_vec3();
         self.header.max = max.as_vec3();
