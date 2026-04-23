@@ -10,10 +10,8 @@ pub const MAP2MDL_ATTR_MODEL_ENTITY: &str = "model_entity";
 pub const MAP2MDL_ATTR_CLIPTYPE: &str = "cliptype";
 
 pub const MAP2MDL_ATTR_TARGET_ORIGIN: &str = "target_origin";
-pub const MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY: &str = "info_target";
 
 pub const MAP2MDL_ATTR_LIGHT_ORIGIN: &str = "light_origin";
-pub const MAP2MDL_ATTR_LIGHT_ORIGIN_ENTITY: &str = "info_target";
 
 pub const MAP2MDL_ATTR_OPTIONS: &str = "options";
 

@@ -9,9 +9,9 @@ use std::{
 };
 
 use entity::{
-    Map2MdlEntityOptions, MAP2MDL_ATTR_CELSHADE_COLOR, MAP2MDL_ATTR_CELSHADE_DISTANCE,
-    MAP2MDL_ATTR_CLIPTYPE, MAP2MDL_ATTR_MODEL_ENTITY, MAP2MDL_ATTR_OPTIONS, MAP2MDL_ATTR_OUTPUT,
-    MAP2MDL_ATTR_TARGET_ORIGIN, MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY, MAP2MDL_ENTITY_NAME,
+    MAP2MDL_ATTR_CELSHADE_COLOR, MAP2MDL_ATTR_CELSHADE_DISTANCE, MAP2MDL_ATTR_CLIPTYPE,
+    MAP2MDL_ATTR_MODEL_ENTITY, MAP2MDL_ATTR_OPTIONS, MAP2MDL_ATTR_OUTPUT,
+    MAP2MDL_ATTR_TARGET_ORIGIN, MAP2MDL_ENTITY_NAME, Map2MdlEntityOptions,
 };
 use map::{Attributes, Entity, Map};
 use qc::Qc;
@@ -21,12 +21,12 @@ use wad::{error::WadError, types::Wad};
 use rayon::{iter::Either, prelude::*};
 
 use crate::{
-    entity::{GchimpInfo, GchimpInfoOption, GCHIMP_INFO_ENTITY},
+    entity::{GCHIMP_INFO_ENTITY, GchimpInfo, GchimpInfoOption},
     err,
     utils::{
         constants::{
-            NoRenderTexture, CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT,
-            NO_RENDER_TEXTURE, ORIGIN_TEXTURE,
+            CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE,
+            NoRenderTexture, ORIGIN_TEXTURE,
         },
         img_stuffs::write_8bpp_to_file,
         map_stuffs::{
@@ -41,7 +41,7 @@ use crate::{
             find_mins_maxs, maybe_split_smd, move_by, textures_used_in_triangles,
             with_selected_textures,
         },
-        wad_stuffs::{export_texture, SimpleWad},
+        wad_stuffs::{SimpleWad, export_texture},
     },
 };
 
@@ -620,7 +620,9 @@ impl Map2Mdl {
 
         if let Some(entity) = &entity_entity {
             if !entity.attributes.contains_key("wad") {
-                return err!("Provided entity does not contain \"wad\" key. Make sure entity is a worldbrush.");
+                return err!(
+                    "Provided entity does not contain \"wad\" key. Make sure entity is a worldbrush."
+                );
             }
         }
 
@@ -1153,11 +1155,9 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     if !target_origin.is_empty() {
                         if let Some(entity_attributes) =
                             map_entities_attributes_clone.iter().find(|attributes| {
-                                attributes.get("classname").is_some_and(|classname| {
-                                    classname == MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY
-                                }) && attributes
-                                    .get("targetname")
-                                    .is_some_and(|targetname| targetname == target_origin)
+                                attributes
+                                    .get("targetname".into())
+                                    .is_some_and(|targetname_curr| targetname_curr == target_origin)
                             })
                         {
                             if let Ok(triplet) =
@@ -1166,8 +1166,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                                 maybe_target_origin = triplet.into();
                             } else {
                                 return err!(
-                                    "Cannot parse origin for {} with targetname {}",
-                                    MAP2MDL_ATTR_TARGET_ORIGIN_ENTITY,
+                                    "Cannot parse origin from entity with targetname `{}`",
                                     target_origin
                                 );
                             }
