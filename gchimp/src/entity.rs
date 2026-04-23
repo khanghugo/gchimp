@@ -17,6 +17,8 @@ pub struct GchimpInfo {
 pub enum GchimpInfoError {
     #[error("gchimp_info does not exist in the map")]
     NoGchimpInfo,
+    #[error("Too many gchimp_info is created in the map. There should be only 1 gchimp_info.")]
+    TooManyGchimpInfo,
     #[error("Path to Half-Life does not exist: {path}")]
     PathToHL { path: String },
     #[error("Path to Half-Life is empty")]
@@ -59,7 +61,7 @@ fn check_gchimp_entity(entity: &Entity) -> Result<(), GchimpInfoError> {
 
     // check options
     if let Some(options) = entity.attributes.get("options") {
-        if let Err(_) = options.parse::<usize>() {
+        if let Err(_) = options.parse::<u32>() {
             return Err(GchimpInfoError::OptionsKeyNaN);
         }
     } else {
@@ -71,19 +73,26 @@ fn check_gchimp_entity(entity: &Entity) -> Result<(), GchimpInfoError> {
 
 impl GchimpInfo {
     pub fn from_map(map: &Map) -> Result<Self, GchimpInfoError> {
-        let entity_index = map.entities.iter().position(|entity| {
-            entity
-                .attributes
-                .get("classname")
-                .is_some_and(|classname| classname == GCHIMP_INFO_ENTITY)
-        });
+        let entity_index = map
+            .entities
+            .iter()
+            .filter(|entity| {
+                entity
+                    .attributes
+                    .get("classname")
+                    .is_some_and(|classname| classname == GCHIMP_INFO_ENTITY)
+            })
+            .collect::<Vec<&Entity>>();
 
-        if entity_index.is_none() {
+        if entity_index.is_empty() {
             return Err(GchimpInfoError::NoGchimpInfo);
         }
 
-        let entity_index = entity_index.unwrap();
-        let entity = &map.entities[entity_index];
+        if entity_index.len() != 1 {
+            return Err(GchimpInfoError::TooManyGchimpInfo);
+        }
+
+        let entity = entity_index[0];
 
         check_gchimp_entity(entity)?;
 
@@ -104,8 +113,7 @@ impl GchimpInfo {
         self.entity
             .attributes
             .get(GCHIMP_INFO_OPTIONS)
-            .unwrap()
-            .parse::<u32>()
+            .and_then(|x| x.parse::<u32>().ok())
             .unwrap()
             .into()
     }
@@ -119,7 +127,7 @@ bitflags! {
         const Map2MdlConversion = 1 << 0;
         /// Exports map2mdl entity into normal map entity
         ///
-        /// Keep this option ticked if the model is already converted and model is not updated.
+        /// Keep this option enabled if the model is already converted and does not need updating.
         /// By doing that, model will not be re-converted on every compile.
         const Map2MdlExport = 1 << 1;
         /// Enables JoinMDL
