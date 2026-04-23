@@ -61,6 +61,10 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
 
     let mut work_count = 0;
 
+    // delete entities later when all the entities are processed
+    // otherwise, the entity index no longer works
+    let mut entities_to_delete = vec![];
+
     for jmdl_entity_idx in entities {
         // verify output valu8e
         let output_relative_path = map.entities[jmdl_entity_idx]
@@ -199,10 +203,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
             .remove(JMDL_ATTR_OUTPUT);
 
         // delete all other models
-        model_entities_indices.sort();
-        model_entities_indices.iter().rev().for_each(|idx| {
-            map.entities.remove(*idx);
-        });
+        entities_to_delete.append(&mut model_entities_indices);
 
         // write the model
         // must have model name so it can be precached
@@ -221,6 +222,13 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
 
         work_count += 1;
     }
+
+    // no, actually delete at the end
+    // otherwise, the entity index is shuffled.
+    entities_to_delete.sort();
+    entities_to_delete.iter().rev().for_each(|idx| {
+        map.entities.remove(*idx);
+    });
 
     Ok(work_count)
 }
