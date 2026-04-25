@@ -7,7 +7,7 @@ use std::{
 
 use eyre::eyre;
 use image::{
-    codecs::bmp::BmpDecoder, imageops, GenericImageView, ImageDecoder, RgbImage, RgbaImage,
+    GenericImageView, ImageDecoder, RgbImage, RgbaImage, codecs::bmp::BmpDecoder, imageops,
 };
 use quantette::{ColorSpace, ImagePipeline, QuantizeMethod};
 use rayon::prelude::*;

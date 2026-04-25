@@ -8,7 +8,7 @@ use egui_extras::{Column, TableBuilder};
 
 use gchimp::modules::textile::{TexTileBuilder, TexTileOptions, TexTileSync};
 
-use crate::gui::{utils::preview_file_being_dropped, TabProgram};
+use crate::gui::{TabProgram, utils::preview_file_being_dropped};
 
 pub struct TexTileGui {
     items: Vec<PathBuf>,

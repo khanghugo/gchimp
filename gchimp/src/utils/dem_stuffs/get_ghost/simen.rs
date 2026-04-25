@@ -1,10 +1,10 @@
+use nom::IResult;
 use nom::bytes::complete::{tag, take, take_till};
 use nom::character::complete::{multispace0, newline, space0, u32};
 use nom::combinator::{all_consuming, map, opt, recognize};
 use nom::multi::separated_list0;
 use nom::number::complete::float as _float;
 use nom::sequence::{delimited, preceded, tuple};
-use nom::IResult;
 
 use super::*;
 

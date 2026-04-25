@@ -11,13 +11,7 @@ const DEFAULT_ANGLES_KEY: &str = "angles";
 pub fn rename_texture(map: &mut Map) -> usize {
     // get mapping
     let mapping: HashMap<String, String> = map
-        .entities
-        .iter()
-        .filter(|x| {
-            x.attributes
-                .get("classname".into())
-                .is_some_and(|classname| classname == RENAMETEX_ENTITY_NAME)
-        })
+        .get_entities_by_classname(RENAMETEX_ENTITY_NAME)
         .flat_map(|entity| {
             entity
                 .attributes

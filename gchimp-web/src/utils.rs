@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use zip::{write::SimpleFileOptions, ZipWriter};
+use zip::{ZipWriter, write::SimpleFileOptions};
 
 pub struct WasmFile {
     pub name: String,

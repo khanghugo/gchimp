@@ -11,9 +11,9 @@ use gchimp::modules::skymod::{SkyModBuilder, SkyModOptions};
 use crate::{
     config::Config,
     gui::{
+        TabProgram,
         constants::{IMAGE_FORMATS, PROGRAM_HEIGHT, PROGRAM_WIDTH},
         utils::{load_egui_image_to_texture, preview_file_being_dropped},
-        TabProgram,
     },
 };
 

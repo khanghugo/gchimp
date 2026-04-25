@@ -14,8 +14,8 @@ use eyre::eyre;
 use wad::types::{Entry, FileEntry, Wad};
 
 use crate::utils::img_stuffs::{
-    eight_bpp_bitmap_to_png_bytes, generate_mipmaps_from_path, generate_mipmaps_from_rgba_image,
-    write_8bpp_to_file, GenerateMipmapsResult,
+    GenerateMipmapsResult, eight_bpp_bitmap_to_png_bytes, generate_mipmaps_from_path,
+    generate_mipmaps_from_rgba_image, write_8bpp_to_file,
 };
 
 pub struct Waddy {

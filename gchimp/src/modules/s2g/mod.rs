@@ -331,7 +331,9 @@ impl S2G {
                 self.log_err(format!("Cannot open VTF file {}: {}", path.display(), err).as_str());
             }
 
-            return Err(eyre!("Fail to process all VTF files. For this, the problem is usually that the VTF image format is not supported. Leave a note in gchimp's issue tracker please."));
+            return Err(eyre!(
+                "Fail to process all VTF files. For this, the problem is usually that the VTF image format is not supported. Leave a note in gchimp's issue tracker please."
+            ));
         }
 
         // no vtf so it can return so we don't do something dumb

@@ -113,9 +113,7 @@ macro_rules! err {
 
 #[macro_export]
 macro_rules! rand_int_range {
-    ($x1:expr,$x2:expr) => {{
-        (rand::random::<f32>() * ($x2 - $x1) as f32 + $x1 as f32).round() as u32
-    }};
+    ($x1:expr,$x2:expr) => {{ (rand::random::<f32>() * ($x2 - $x1) as f32 + $x1 as f32).round() as u32 }};
 }
 
 // all copied from kdr

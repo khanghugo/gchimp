@@ -5,14 +5,14 @@ use std::{
 
 use eframe::egui::{self, ScrollArea};
 
-use gchimp::modules::s2g::{S2GOptions, S2GSteps, S2GSync, S2G};
+use gchimp::modules::s2g::{S2G, S2GOptions, S2GSteps, S2GSync};
 
 use crate::{
     config::Config,
     gui::{
+        TabProgram,
         constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
         utils::preview_file_being_dropped,
-        TabProgram,
     },
 };
 

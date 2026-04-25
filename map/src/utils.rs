@@ -121,6 +121,10 @@ impl Entity {
     pub fn model(&self) -> Option<&String> {
         self.attributes.get("model")
     }
+
+    pub fn classname(&self) -> Option<&String> {
+        self.attributes.get("classname")
+    }
 }
 
 fn parse_triplet(i: &str) -> Option<DVec3> {

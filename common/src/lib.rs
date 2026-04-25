@@ -1,4 +1,4 @@
-use nom::{combinator::fail, IResult as _IResult};
+use nom::{IResult as _IResult, combinator::fail};
 
 pub mod setup_studio_model_transformations;
 

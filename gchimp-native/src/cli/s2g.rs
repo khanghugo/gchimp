@@ -1,4 +1,4 @@
-use crate::config::{parse_config, Config};
+use crate::config::{Config, parse_config};
 
 use super::*;
 

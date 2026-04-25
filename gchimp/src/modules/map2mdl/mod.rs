@@ -1154,9 +1154,9 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     // is_empty just to be nice i guess?
                     if !target_origin.is_empty() {
                         if let Some(entity_attributes) =
-                            map_entities_attributes_clone.iter().find(|attributes| {
+                            map_entities_attributes_clone.iter().find(|&attributes| {
                                 attributes
-                                    .get("targetname".into())
+                                    .get("targetname")
                                     .is_some_and(|targetname_curr| targetname_curr == target_origin)
                             })
                         {

@@ -11,7 +11,7 @@ use rayon::prelude::*;
 use vtf::Vtf;
 
 use crate::utils::img_stuffs::{
-    eight_bpp_transparent_img, rgba8_to_8bpp, tile_and_resize, write_8bpp_to_file, GoldSrcBmp,
+    GoldSrcBmp, eight_bpp_transparent_img, rgba8_to_8bpp, tile_and_resize, write_8bpp_to_file,
 };
 
 pub struct TexTileBuilder {

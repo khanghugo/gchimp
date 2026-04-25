@@ -7,12 +7,12 @@ use std::{
 use eframe::egui;
 
 use gchimp::modules::blender_lightmap_baker_helper::{
-    blender_lightmap_baker_helper, BLBHOptions, BLBH, BLBH_DEFAULT_UV_CLAMP_FACTOR,
+    BLBH, BLBH_DEFAULT_UV_CLAMP_FACTOR, BLBHOptions, blender_lightmap_baker_helper,
 };
 
 use crate::{
     config::Config,
-    gui::{constants::IMAGE_FORMATS, utils::preview_file_being_dropped, TabProgram},
+    gui::{TabProgram, constants::IMAGE_FORMATS, utils::preview_file_being_dropped},
 };
 
 #[derive(Debug)]

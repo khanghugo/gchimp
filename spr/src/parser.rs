@@ -1,9 +1,9 @@
 use nom::{
+    IResult as _IResult, Parser,
     bytes::complete::take,
     combinator::map,
     multi::count,
     number::complete::{le_f32, le_i16, le_i32, le_u8},
-    IResult as _IResult, Parser,
 };
 
 use crate::{Spr, SprFrame, SprFrameHeader, SprFrameImage, SprFrames, SprHeader, SprPalette};

@@ -1,6 +1,6 @@
 use eyre::eyre;
 use glam::{DVec2, DVec3};
-use image::{imageops, RgbaImage};
+use image::{RgbaImage, imageops};
 use qc::Qc;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use smd::{Smd, Triangle, Vertex};
@@ -17,7 +17,7 @@ use crate::{
     utils::{
         constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
         img_stuffs::{
-            generate_rgba8_from_image_path, rgba8_to_8bpp, write_8bpp_to_file, GoldSrcBmp,
+            GoldSrcBmp, generate_rgba8_from_image_path, rgba8_to_8bpp, write_8bpp_to_file,
         },
     },
 };

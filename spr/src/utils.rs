@@ -3,7 +3,7 @@ use std::{ffi::OsStr, fs::OpenOptions, io::Write, path::Path};
 use image::RgbImage;
 use nom::Parser;
 
-use crate::{error::SprError, parser::parse_spr, Spr};
+use crate::{Spr, error::SprError, parser::parse_spr};
 
 impl Spr {
     pub fn open_from_bytes(i: &[u8]) -> Result<Spr, SprError> {

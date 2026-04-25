@@ -189,7 +189,7 @@ pub fn dem2cam(
 mod test {
     use std::path::PathBuf;
 
-    use super::{dem2cam, Dem2CamOptions};
+    use super::{Dem2CamOptions, dem2cam};
 
     #[test]
     fn run() {
