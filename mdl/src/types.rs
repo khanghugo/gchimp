@@ -290,6 +290,13 @@ impl MeshTriangles {
             MeshTriangles::Fan(triverts) => triverts,
         }
     }
+
+    pub fn get_triverts_mut(&mut self) -> &mut Vec<Trivert> {
+        match self {
+            MeshTriangles::Strip(triverts) => triverts,
+            MeshTriangles::Fan(triverts) => triverts,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

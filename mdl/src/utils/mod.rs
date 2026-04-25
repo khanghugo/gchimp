@@ -292,29 +292,47 @@ impl TrivertAffineTransformation for Vec<Trivert> {
 impl TrivertAffineTransformation for &mut [Trivert] {
     fn translate(&mut self, value: Vec3) {
         for tri in self.iter_mut() {
-            tri.vertex += value;
+            tri.translate(value);
         }
     }
 
     fn rotate(&mut self, value: Vec3) {
-        let rot_mat = glam::Mat3::from_euler(glam::EulerRot::ZYX, value.z, value.y, value.x);
-
         for tri in self.iter_mut() {
-            tri.vertex = rot_mat * tri.vertex;
-            tri.normal = (rot_mat * tri.normal).normalize();
+            tri.rotate(value);
         }
     }
 
     fn scale(&mut self, value: f32) {
         for tri in self.iter_mut() {
-            tri.vertex *= value;
+            tri.scale(value);
         }
     }
 
     fn transform_mat3(&mut self, value: glam::Mat3) {
         for tri in self.iter_mut() {
-            tri.vertex = value * tri.vertex;
-            tri.normal = (value * tri.normal).normalize();
+            tri.transform_mat3(value);
         }
+    }
+}
+
+impl TrivertAffineTransformation for Trivert {
+    fn translate(&mut self, value: Vec3) {
+        self.vertex += value;
+    }
+
+    fn rotate(&mut self, value: Vec3) {
+        let rot_mat = glam::Mat3::from_euler(glam::EulerRot::ZYX, value.z, value.y, value.x);
+
+        self.vertex = rot_mat * self.vertex;
+        self.normal = (rot_mat * self.normal).normalize();
+    }
+
+    fn scale(&mut self, value: f32) {
+        self.vertex *= value;
+    }
+
+    fn transform_mat3(&mut self, value: Mat3) {
+        self.vertex = value * self.vertex;
+        self.normal = (value * self.normal).normalize();
     }
 }

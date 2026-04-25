@@ -23,6 +23,9 @@ pub enum MdlError {
     #[error("Failed to parse transitions")]
     ParseTransitions,
 
+    #[error("Too many textures in model: {len}")]
+    TooManyTextures { len: usize },
+
     #[error("Intermediate mesh is not built. Try invoking [`Mdl.maybe_build_agnostic_data()`]")]
     AgnosticMeshNotBuilt,
     #[error("IOError: {source}")]
