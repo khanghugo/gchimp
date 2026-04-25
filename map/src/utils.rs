@@ -97,6 +97,26 @@ impl Entity {
             .get("scale")
             .and_then(|x| x.parse::<f64>().ok())
     }
+
+    pub fn sequence(&self) -> Option<u32> {
+        self.attributes
+            .get("sequence")
+            .and_then(|x| x.parse::<u32>().ok())
+    }
+
+    pub fn targetname(&self) -> Option<&String> {
+        self.attributes.get("targetname")
+    }
+
+    pub fn target(&self) -> Option<&String> {
+        self.attributes.get("target")
+    }
+
+    pub fn spawnflags(&self) -> Option<u32> {
+        self.attributes
+            .get("spawnflags")
+            .and_then(|x| x.parse::<u32>().ok())
+    }
 }
 
 fn parse_triplet(i: &str) -> Option<DVec3> {
