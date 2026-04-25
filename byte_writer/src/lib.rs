@@ -3,6 +3,7 @@
 pub struct ByteWriter {
     pub data: Vec<u8>,
     offset: usize,
+    absolute_start: usize,
 }
 
 impl Default for ByteWriter {
@@ -16,7 +17,16 @@ impl ByteWriter {
         Self {
             data: Vec::new(),
             offset: 0,
+            absolute_start: 0,
         }
+    }
+
+    pub fn new_with_absolute_offset(offset: usize) -> Self {
+        let mut res = Self::new();
+
+        res.absolute_start = offset;
+
+        res
     }
 
     fn offset(&mut self, offset: usize) {
@@ -24,6 +34,10 @@ impl ByteWriter {
     }
 
     pub fn get_offset(&self) -> usize {
+        self.offset + self.absolute_start
+    }
+
+    pub fn get_offset_relative(&self) -> usize {
         self.offset
     }
 
