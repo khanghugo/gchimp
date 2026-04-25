@@ -76,21 +76,6 @@ impl MdlScrub {
             + 18. // 1 labels
             + image_tile_size;
 
-        // let is_search_enabled = self.instances[instance_index].search.enable;
-        // let search_text = self.instances[instance_index].search.text.to_lowercase();
-        // let filtered_tiles = (0..tile_count)
-        //     .filter(|&texture_tile| {
-        //         if is_search_enabled {
-        //             self.instances[instance_index].texture_tiles[texture_tile]
-        //                 .name()
-        //                 .to_lowercase()
-        //                 .contains(search_text.as_str())
-        //         } else {
-        //             true
-        //         }
-        //     })
-        //     .collect::<Vec<usize>>();
-
         let total_rows = tile_count.div_ceil(tile_per_row);
 
         ScrollArea::vertical()

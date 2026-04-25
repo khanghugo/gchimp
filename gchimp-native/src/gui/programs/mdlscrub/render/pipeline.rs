@@ -1,11 +1,11 @@
 use egui_wgpu::wgpu;
 
 use crate::gui::{
+    WgpuContext,
     programs::mdlscrub::render::{
         camera::CameraPushConstant, mdl_buffer::MdlVertex, mipmap_array::MipmapArrayBuffer,
         mvp::MvpBuffer,
     },
-    WgpuContext,
 };
 
 #[derive(Debug)]

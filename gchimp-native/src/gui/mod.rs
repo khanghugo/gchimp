@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use egui_wgpu::{wgpu, WgpuSetupCreateNew};
+use egui_wgpu::wgpu;
 
 use eframe::egui::{self, ThemePreference};
 use egui_tiles::Tree;
@@ -12,14 +12,14 @@ use utils::preview_file_being_dropped;
 use gchimp::err;
 
 use crate::{
-    config::{parse_config, parse_config_from_file, Config},
-    gui::programs::mdlscrub::render::pipeline::MdlScrubRenderer,
+    config::{Config, parse_config, parse_config_from_file},
+    // gui::programs::mdlscrub::render::pipeline::MdlScrubRenderer,
     persistent_storage::PersistentStorage,
 };
 
 use self::{
     constants::{PROGRAM_HEIGHT, PROGRAM_WIDTH},
-    pane::{create_tree, Pane, TreeBehavior},
+    pane::{Pane, TreeBehavior, create_tree},
 };
 
 mod constants;
@@ -57,32 +57,32 @@ pub fn gui() -> eyre::Result<()> {
             .with_maximize_button(true)
             .with_minimize_button(true),
         // from default egui_wgpu but with push constant enabled
-        wgpu_options: egui_wgpu::WgpuConfiguration {
-            wgpu_setup: egui_wgpu::WgpuSetup::CreateNew(WgpuSetupCreateNew {
-                device_descriptor: Arc::new(|adapter| {
-                    let base_limits = if adapter.get_info().backend == wgpu::Backend::Gl {
-                        wgpu::Limits::downlevel_webgl2_defaults()
-                    } else {
-                        wgpu::Limits::default()
-                    };
+        // wgpu_options: egui_wgpu::WgpuConfiguration {
+        //     wgpu_setup: egui_wgpu::WgpuSetup::CreateNew(WgpuSetupCreateNew {
+        //         device_descriptor: Arc::new(|adapter| {
+        //             let base_limits = if adapter.get_info().backend == wgpu::Backend::Gl {
+        //                 wgpu::Limits::downlevel_webgl2_defaults()
+        //             } else {
+        //                 wgpu::Limits::default()
+        //             };
 
-                    wgpu::DeviceDescriptor {
-                        label: Some("egui wgpu device"),
-                        required_limits: wgpu::Limits {
-                            // When using a depth buffer, we have to be able to create a texture
-                            // large enough for the entire surface, and we want to support 4k+ displays.
-                            max_texture_dimension_2d: 8192,
-                            max_push_constant_size: 128,
-                            ..base_limits
-                        },
-                        required_features: wgpu::Features::PUSH_CONSTANTS,
-                        ..Default::default()
-                    }
-                }),
-                ..Default::default()
-            }),
-            ..Default::default()
-        },
+        //             wgpu::DeviceDescriptor {
+        //                 label: Some("egui wgpu device"),
+        //                 required_limits: wgpu::Limits {
+        //                     // When using a depth buffer, we have to be able to create a texture
+        //                     // large enough for the entire surface, and we want to support 4k+ displays.
+        //                     max_texture_dimension_2d: 8192,
+        //                     // max_push_constant_size: 128,
+        //                     ..base_limits
+        //                 },
+        //                 // required_features: wgpu::Features::PUSH_CONSTANTS,
+        //                 ..Default::default()
+        //             }
+        //         }),
+        //         ..Default::default()
+        //     }),
+        //     ..Default::default()
+        // },
         ..Default::default()
     };
 
@@ -137,7 +137,7 @@ pub fn gui() -> eyre::Result<()> {
 }
 
 pub struct CustomRenderer {
-    pub mdlscrub_renderer: MdlScrubRenderer,
+    // pub mdlscrub_renderer: MdlScrubRenderer,
 }
 
 #[derive(Debug, Clone)]
@@ -158,10 +158,12 @@ pub struct MyApp {
 }
 
 impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx();
+
         ctx.options_mut(|option| option.theme_preference = self.theme);
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             if let Some(tree) = &mut self.tree {
                 let mut behavior = TreeBehavior {};
                 tree.ui(&mut behavior, ui);
@@ -204,7 +206,7 @@ impl MyApp {
         wgpu_context: WgpuContext,
     ) -> Self {
         let custom_renderer = CustomRenderer {
-            mdlscrub_renderer: MdlScrubRenderer::new(wgpu_context.clone()),
+            // mdlscrub_renderer: MdlScrubRenderer::new(wgpu_context.clone()),
         };
 
         if let Err(err) = config_res {
