@@ -7,7 +7,6 @@ pub static GCHIMP_INFO_ENTITY: &str = "gchimp_info";
 
 pub static GCHIMP_INFO_HL_PATH: &str = "hl_path";
 pub static GCHIMP_INFO_GAMEDIR: &str = "gamedir";
-pub static GCHIMP_INFO_OPTIONS: &str = "options";
 
 pub struct GchimpInfo {
     entity: Entity,
@@ -73,31 +72,24 @@ fn check_gchimp_entity(entity: &Entity) -> Result<(), GchimpInfoError> {
 
 impl GchimpInfo {
     pub fn from_map(map: &Map) -> Result<Self, GchimpInfoError> {
-        let entity_index = map
-            .entities
-            .iter()
-            .filter(|entity| {
-                entity
-                    .attributes
-                    .get("classname")
-                    .is_some_and(|classname| classname == GCHIMP_INFO_ENTITY)
-            })
-            .collect::<Vec<&Entity>>();
+        let gchimp_info_entities = map
+            .get_entities_by_classname(GCHIMP_INFO_ENTITY)
+            .collect::<Vec<_>>();
 
-        if entity_index.is_empty() {
+        if gchimp_info_entities.is_empty() {
             return Err(GchimpInfoError::NoGchimpInfo);
         }
 
-        if entity_index.len() != 1 {
+        if gchimp_info_entities.len() != 1 {
             return Err(GchimpInfoError::TooManyGchimpInfo);
         }
 
-        let entity = entity_index[0];
+        let gchimp_info = gchimp_info_entities[0];
 
-        check_gchimp_entity(entity)?;
+        check_gchimp_entity(gchimp_info)?;
 
         Ok(Self {
-            entity: entity.clone(),
+            entity: gchimp_info.clone(),
         })
     }
 
@@ -109,13 +101,8 @@ impl GchimpInfo {
         self.entity.attributes.get(GCHIMP_INFO_GAMEDIR).unwrap()
     }
 
-    pub fn options(&self) -> GchimpInfoOption {
-        self.entity
-            .attributes
-            .get(GCHIMP_INFO_OPTIONS)
-            .and_then(|x| x.parse::<u32>().ok())
-            .unwrap()
-            .into()
+    pub fn spawnflags(&self) -> GchimpInfoOption {
+        self.entity.spawnflags().unwrap().into()
     }
 }
 
@@ -137,6 +124,6 @@ bitflags! {
 
 impl From<u32> for GchimpInfoOption {
     fn from(value: u32) -> Self {
-        Self::from_bits(value).unwrap_or_default()
+        Self::from_bits_retain(value)
     }
 }

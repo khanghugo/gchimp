@@ -5,7 +5,7 @@ use map::Map;
 use mdl::Mdl;
 
 use crate::{
-    entity::{GchimpInfo, GchimpInfoOption},
+    gchimp_info::{GchimpInfo, GchimpInfoOption},
     modules::join_mdl::{
         entity::{JMDL_ATTR_MODEL_ENTITY, JMDL_ATTR_OUTPUT, JMDL_ENTITY_NAME},
         error::JMdlError,
@@ -23,7 +23,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
     let gchimp_info = GchimpInfo::from_map(&map)?;
 
     // is enabled beause i want this to be standard
-    if !gchimp_info.options().contains(GchimpInfoOption::JoinMDL) {
+    if !gchimp_info.spawnflags().contains(GchimpInfoOption::JoinMDL) {
         println!("JoinMDL is not enabled.");
         return Ok(0);
     }
@@ -88,8 +88,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
         // if gchimp_jmdl contains the model targetname instead, you have to
         // name the model and then insert it to the gchimp_mdl
         let jmdl_targetname = map.entities[jmdl_entity_idx]
-            .attributes
-            .get("targetname")
+            .targetname()
             .cloned()
             .ok_or(JMdlError::NoTargetName)?;
 
@@ -97,11 +96,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
             .entities
             .iter()
             .enumerate()
-            .filter(|(_, ent)| {
-                ent.attributes
-                    .get("target")
-                    .map_or(false, |t| t == &jmdl_targetname)
-            })
+            .filter(|(_, ent)| ent.target().map_or(false, |t| t == &jmdl_targetname))
             .map(|(idx, _)| idx)
             .collect::<Vec<usize>>();
 
@@ -113,7 +108,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
         // model paths
         let model_paths = model_entities_indices
             .iter()
-            .filter_map(|&idx| map.entities[idx].attributes.get("model"))
+            .filter_map(|&idx| map.entities[idx].model())
             .collect::<Vec<&String>>();
 
         // verify that all models exists

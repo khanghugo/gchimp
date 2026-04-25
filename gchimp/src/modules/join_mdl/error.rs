@@ -1,6 +1,6 @@
 use mdl::error::MdlError;
 
-use crate::entity::GchimpInfoError;
+use crate::gchimp_info::GchimpInfoError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum JMdlError {

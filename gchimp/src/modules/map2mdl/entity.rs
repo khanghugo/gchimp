@@ -13,8 +13,6 @@ pub const MAP2MDL_ATTR_TARGET_ORIGIN: &str = "target_origin";
 
 pub const MAP2MDL_ATTR_LIGHT_ORIGIN: &str = "light_origin";
 
-pub const MAP2MDL_ATTR_OPTIONS: &str = "options";
-
 bitflags! {
     #[derive(Debug, Clone, Copy)]
     pub struct Map2MdlEntityOptions: u32 {
@@ -25,6 +23,12 @@ bitflags! {
         const AsCelShade = 1 << 2;
         /// Reverses all normals in the model. This is mainly for reflection scenes.
         const ReverseNormals = 1 << 3;
+    }
+}
+
+impl From<u32> for Map2MdlEntityOptions {
+    fn from(value: u32) -> Self {
+        Map2MdlEntityOptions::from_bits_retain(value)
     }
 }
 

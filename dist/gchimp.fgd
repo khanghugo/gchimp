@@ -2,7 +2,7 @@
 [
     hl_path(string) : "Path to folder containing hl.exe"
     gamedir(string) : "Game mod directory name" : "cstrike"
-    options(Flags) =
+    spawnflags(Flags) =
 	[
 		// Converts brushes into models
 		1: "map2mdl Conversion" : 1
@@ -15,16 +15,16 @@
 
 @SolidClass base(Targetname, Angles, RenderFields, ZHLT, TexLightType) = gchimp_map2mdl : "Converts brush to model"
 [
-    output(string) : "Path to the model name (eg: models/folder_that_exists/model.mdl)"
-    model_entity(string) : "Classname of model displaying entity" : "cycler_sprite"
+    output(string) : "Output file path" : "models/map2mdl.mdl"
+    model_entity(string) : "Class name of model displaying entity" : "cycler_sprite"
 	cliptype(choices) : "Generates CLIP brush overlaying model" : 0 =
 	[
 		0 : "No Clip"
 		1 : "Same as Brush"
 		2 : "Biggest Box"
 	]
-	target_origin(target_source) : "Sets the model origin based on origin of info_target"
-	options(Flags) =
+	target_origin(target_destination) : "Origin of the model is based on this targetname"
+	spawnflags(Flags) =
 	[
 		1: "Flat Shade" : 1
 		2: "With CelShade" : 0
@@ -43,6 +43,6 @@
 @PointClass base(Targetname, Angles, RenderFields, ZHLT, TexLightType) = gchimp_jmdl : "Joins selected model entities as one model"
 [
 	targetname(target_source) : "Other model entities point to this" : "jmdl1"
-    output(string) : "Relative output path for combined model"
-    model_entity(string) : "Classname of model displaying entity" : "cycler_sprite"
+    output(string) : "Output file path" : "models/jmdl.mdl"
+    model_entity(string) : "Class name of model displaying entity" : "cycler_sprite"
 ]

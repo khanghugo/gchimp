@@ -10,8 +10,8 @@ use std::{
 
 use entity::{
     MAP2MDL_ATTR_CELSHADE_COLOR, MAP2MDL_ATTR_CELSHADE_DISTANCE, MAP2MDL_ATTR_CLIPTYPE,
-    MAP2MDL_ATTR_MODEL_ENTITY, MAP2MDL_ATTR_OPTIONS, MAP2MDL_ATTR_OUTPUT,
-    MAP2MDL_ATTR_TARGET_ORIGIN, MAP2MDL_ENTITY_NAME, Map2MdlEntityOptions,
+    MAP2MDL_ATTR_MODEL_ENTITY, MAP2MDL_ATTR_OUTPUT, MAP2MDL_ATTR_TARGET_ORIGIN,
+    MAP2MDL_ENTITY_NAME, Map2MdlEntityOptions,
 };
 use map::{Attributes, Entity, Map};
 use qc::Qc;
@@ -21,8 +21,8 @@ use wad::{error::WadError, types::Wad};
 use rayon::{iter::Either, prelude::*};
 
 use crate::{
-    entity::{GCHIMP_INFO_ENTITY, GchimpInfo, GchimpInfoOption},
     err,
+    gchimp_info::{GCHIMP_INFO_ENTITY, GchimpInfo, GchimpInfoOption},
     utils::{
         constants::{
             CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE,
@@ -987,7 +987,7 @@ All missing textures have uppercase letters. If you use jack, make sure to have 
         let gchimp_info = GchimpInfo::from_map(map)?;
 
         if !gchimp_info
-            .options()
+            .spawnflags()
             .contains(GchimpInfoOption::Map2MdlConversion)
         {
             println!(
@@ -998,7 +998,7 @@ All missing textures have uppercase letters. If you use jack, make sure to have 
         }
 
         let map2mdl_export_resource = gchimp_info
-            .options()
+            .spawnflags()
             .contains(GchimpInfoOption::Map2MdlExport);
 
         if !map2mdl_export_resource {
@@ -1181,12 +1181,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     }
                 }
 
-                let entity_options = entity
-                    .attributes
-                    .get(MAP2MDL_ATTR_OPTIONS)
-                    .and_then(|v| v.parse::<u32>().ok())
-                    .and_then(|v| Map2MdlEntityOptions::from_bits(v))
-                    .unwrap_or(Map2MdlEntityOptions::empty());
+                let entity_options = entity.spawnflags().unwrap_or(0).into();
 
                 let celshade_color = entity
                     .attributes

@@ -117,6 +117,10 @@ impl Entity {
             .get("spawnflags")
             .and_then(|x| x.parse::<u32>().ok())
     }
+
+    pub fn model(&self) -> Option<&String> {
+        self.attributes.get("model")
+    }
 }
 
 fn parse_triplet(i: &str) -> Option<DVec3> {
