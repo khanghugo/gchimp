@@ -4,15 +4,24 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-bsp = { version = "0.1.0", path = "../bsp" }
-console_error_panic_hook = "0.1.7"
 gchimp = { path = "../gchimp" }
-dem = "0.2.0"
-zip = { version = "2.2.2", features = ["deflate"], default-features = false }
+smd = { path = "../smd" }
+bsp = { path = "../bsp" }
 
-wasm-bindgen = "0.2.100"
-web-sys = "0.3.72"
-smd = { version = "0.1.0", path = "../smd" }
+dem = "0.2.3"
+
+console_error_panic_hook = "0.1.7"
+zip = { version = "8.5.1", features = ["deflate"], default-features = false }
+
+wasm-bindgen = "0.2.118"
+web-sys = "0.3.95"
+
+# fuck fuck fuck
+getrandom = { version = "0.3.4", features = ["wasm_js"] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+# need this
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int"]

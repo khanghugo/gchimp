@@ -59,7 +59,7 @@ export const SmdSplit = () => {
             return;
 
         // tried and true method
-        const blob = new Blob([output], { type: 'application/zip' });
+        const blob = new Blob([output as BlobPart], { type: 'application/zip' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
 

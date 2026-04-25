@@ -64,7 +64,7 @@ export const WaveLoop = () => {
             return;
 
         // tried and true method
-        const blob = new Blob([output], { type: 'audio/wave' });
+        const blob = new Blob([output as BlobPart], { type: 'audio/wave' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
 

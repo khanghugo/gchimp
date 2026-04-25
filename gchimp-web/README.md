@@ -9,7 +9,10 @@ You need `wasm-pack` to nicely package `gchimp-web`. Refer to your OS package ma
 Then,
 
 ```sh
-wasm-pack build
+cd www
+npm run build-wasm
 ```
+
+This shit is convoluted so just run the script inside the NodeJS project.
 
 You then will have a `pkg` folder inside `gchimp-web`. It will be a NodeJS module that you can use it for a NodeJS project.

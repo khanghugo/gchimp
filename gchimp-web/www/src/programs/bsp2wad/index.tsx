@@ -2,10 +2,13 @@ import { ChangeEvent, createRef, FormEvent, useEffect, useState } from "react";
 import { GchimpProgram } from "..";
 
 import "./styles.css";
-import { bsp2wad } from "gchimp-web";
 import { UploadButton } from "@/components/upload-button";
+import { useGChimp } from "@/hooks/useGChimp";
+import { bsp2wad } from "gchimp-web";
 
 export const Bsp2Wad = () => {
+    const { isLoading, fileToBytes } = useGChimp();
+
     const [name, setName] = useState<string | undefined>(undefined);
     const [file, setFile] = useState<File | null>(null);
     const [output, setOutput] = useState<Uint8Array | null>(null);
@@ -13,27 +16,18 @@ export const Bsp2Wad = () => {
     const submitButton = createRef<HTMLInputElement>();
 
     const runProgram = async (e: FormEvent<HTMLFormElement>) => {
-        // dont refresh
         e.preventDefault();
 
-        // reading the file to byte
-        const reader = new FileReader();
+        if (!file || !name) return;
 
-        reader.onload = (e) => {
-            if (name) {
-                const res = bsp2wad(new Uint8Array(e.target?.result as ArrayBuffer));
-                setOutput(res);
-            } else {
-                console.error("no file name set for input demo file");
-            }
-        };
+        try {
+            const bytes = await fileToBytes(file);
 
-        if (!file) {
-            // setStatus("No file selected")
-            return;
+            const res = bsp2wad(bytes);
+            setOutput(res);
+        } catch (err) {
+            console.error("WASM execution failed:", err);
         }
-
-        reader.readAsArrayBuffer(file as Blob);
     };
 
     const changeFile = (e: ChangeEvent<HTMLInputElement>) => {
@@ -58,7 +52,7 @@ export const Bsp2Wad = () => {
             return;
 
         // tried and true method
-        const blob = new Blob([output], { type: 'application/octet-stream' });
+        const blob = new Blob([output as BlobPart], { type: 'application/octet-stream' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
 
