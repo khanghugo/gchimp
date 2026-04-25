@@ -1,12 +1,8 @@
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
-use common::setup_studio_model_transformations::setup_studio_model_transformations;
-use glam::{DVec3, Mat3};
+use glam::DVec3;
 use map::Map;
-use mdl::{Bodypart, Mdl, Texture, TrivertAffineTransformation};
+use mdl::Mdl;
 
 use crate::{
     entity::{GchimpInfo, GchimpInfoOption},
@@ -14,6 +10,7 @@ use crate::{
         entity::{JMDL_ATTR_MODEL_ENTITY, JMDL_ATTR_OUTPUT, JMDL_ENTITY_NAME},
         error::JMdlError,
     },
+    utils::mdl_stuffs::{JoinMdlsParameters, join_mdls_with_affine_transformation},
 };
 
 mod entity;
@@ -23,8 +20,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
     // verifies that there is gchimp_info
     // jmdl uses gchimp_info to find where the model is
     // will only search inside `basegame` and `basegame_downloads`
-    let gchimp_info =
-        GchimpInfo::from_map(&map).map_err(|op| JMdlError::GchimpInfo { source: op })?;
+    let gchimp_info = GchimpInfo::from_map(&map)?;
 
     // is enabled beause i want this to be standard
     if !gchimp_info.options().contains(GchimpInfoOption::JoinMDL) {
@@ -172,9 +168,21 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
             // PITCH YAW ROLL // -Y Z X
             .map(|&index| map.entities[index].scale().unwrap_or(1.))
             .collect::<Vec<f64>>();
+        let sequences = model_entities_indices
+            .iter()
+            .map(|&index| map.entities[index].sequence().unwrap_or(0))
+            .collect::<Vec<u32>>();
 
         // the model
-        let mut combined_model = actually_join_models(&mdls, &translations, &rotations, &scales)?;
+        let mut combined_model = join_mdls_with_affine_transformation(
+            &mdls,
+            JoinMdlsParameters {
+                translations,
+                rotations,
+                scales,
+                sequences,
+            },
+        )?;
 
         // now, replace gchimp_jmdl with model entity
         let model_entity_name = map.entities[jmdl_entity_idx]
@@ -216,9 +224,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
         );
         combined_model.rebuild_data_for_export();
 
-        combined_model
-            .write_to_file(output_absolute_path)
-            .map_err(|op| JMdlError::MdlError { source: op })?;
+        combined_model.write_to_file(output_absolute_path)?;
 
         work_count += 1;
     }
@@ -231,172 +237,4 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
     });
 
     Ok(work_count)
-}
-
-fn actually_join_models(
-    mdls: &[Mdl],
-    translations: &[DVec3],
-    rotations: &[DVec3],
-    scales: &[f64],
-) -> Result<Mdl, JMdlError> {
-    let mut combined_mdl = Mdl::new_empty();
-
-    // first, join all the textures
-    // the same structure but uses number to index to avoid extra calculation
-    // this is used for mesh to have the correct index
-    let mut texture_processed_models_what: Vec<usize> = vec![];
-    {
-        let mut texture_combined: Vec<Texture> = vec![];
-
-        // unique models that have had texture added
-        // use a hashmap instead of hashset due to ergonomics
-        let mut texture_processed_models: HashMap<String, usize> = HashMap::new();
-
-        for mdl in mdls {
-            let mdl_name = format!(
-                "{}{}",
-                String::from_utf8_lossy(mdl.header.name.as_slice()),
-                mdl.triangle_count() // this is to make sure the name is totally good
-            );
-
-            let start_index = texture_processed_models.entry(mdl_name).or_insert_with(|| {
-                // this is new model, must insert its texture to our list
-                let start_index = texture_combined.len();
-
-                for tex in &mdl.textures {
-                    texture_combined.push(tex.clone());
-                }
-
-                start_index
-            });
-
-            // the difference betweenn this and the hashmap is that the hashmap length is always less than or equal to this vector
-            texture_processed_models_what.push(*start_index);
-        }
-
-        if texture_combined.len() > mdl::MAX_TEXTURE {
-            return Err(JMdlError::TooManyTextures {
-                len: texture_combined.len(),
-            });
-        }
-
-        combined_mdl.textures = texture_combined;
-        // combined_mdl.textures = mdls[0].textures.clone(); // debug
-    }
-
-    // next, join all the bodies
-    {
-        let mut bodypart_combined: Vec<Bodypart> = vec![];
-
-        for (idx, mdl) in mdls.iter().enumerate() {
-            let texture_start_index = texture_processed_models_what[idx];
-
-            let mut owned_bodyparts = mdl.bodyparts.clone();
-
-            // need to apply the model idle sequence to get the "idle" geometry
-
-            // TODO this mean it is possible to bake a model with multiple bones
-            let (bone_pos, bone_rot) = setup_studio_model_transformations(mdl)
-            [0] // sequence
-            [0] // blend
-            [0] // frame
-            [0].clone() // bone 0
-            ;
-
-            // must use matrix to avoid implicit rotation order
-            let cg_mat: cgmath::Matrix3<f32> = bone_rot.into();
-            let mat_array: [[f32; 3]; 3] = cg_mat.into();
-            let bone_pos_glam = glam::vec3(bone_pos.x, bone_pos.y, bone_pos.z);
-
-            owned_bodyparts.iter_mut().for_each(|bodypart| {
-                // reduce the model count to just 1
-                bodypart.models = vec![bodypart.models[0].clone()];
-
-                // point to the new texture bunch
-                bodypart.models[0].meshes.iter_mut().for_each(|mesh| {
-                    mesh.header.skin_ref += texture_start_index as i32;
-                });
-
-                // affine transformation
-
-                // TODO
-                // again, this assumes static model with ONE bone
-                // if the model has more than 1 bone, this would easily bork the mesh
-                // but everything is fine
-                bodypart.models[0].meshes.iter_mut().for_each(|mesh| {
-                    mesh.triangles.iter_mut().for_each(|triangles| {
-                        // local/bone transformation
-                        triangles.transform_mat3(Mat3::from_cols_array_2d(&mat_array));
-                        triangles.translate(bone_pos_glam);
-
-                        // world transformation
-                        triangles.scale(scales[idx] as f32);
-                        triangles.rotate(rotations[idx].as_vec3());
-                        triangles.translate(translations[idx].as_vec3());
-                    });
-                });
-
-                // force the vertex and normal bone to 0 cuz we have 1 bone
-                bodypart.models[0].normal_info.fill(0);
-                bodypart.models[0].vertex_info.fill(0);
-            });
-
-            bodypart_combined.append(&mut owned_bodyparts);
-        }
-
-        combined_mdl.bodyparts = bodypart_combined;
-        // combined_mdl.bodyparts = mdls[0].bodyparts.clone(); // debug
-    }
-
-    // should be good???
-    // so far i guess
-
-    Ok(combined_mdl)
-}
-
-#[cfg(test)]
-mod test {
-    use mdl::Mdl;
-
-    use crate::modules::join_mdl::actually_join_models;
-
-    #[test]
-    #[allow(unused)]
-    fn run() {
-        let bytes = include_bytes!("/home/khang/gchimp/mdl/src/tests/static_tree.mdl");
-
-        let mdl1 = Mdl::open_from_bytes(bytes).unwrap();
-        let mdl2 = mdl1.clone();
-        let mdl3 = mdl1.clone();
-
-        let transformations = vec![
-            [0., 0., 0.].into(),
-            [64., 0., 0.].into(),
-            [-64., 0., 0.].into(),
-        ];
-
-        let rotations = vec![[0., 0., 0.].into(); 3];
-        let scales = vec![1.; 3];
-
-        let mut combined_mdl = actually_join_models(
-            vec![mdl1, mdl2, mdl3].as_ref(),
-            &transformations,
-            &rotations,
-            &scales,
-        )
-        .unwrap();
-
-        combined_mdl.rebuild_data_for_export();
-
-        // must set name, otherwise HLAM rejects
-        combined_mdl.set_name("hello_world.mdl");
-
-        println!("{:?}", combined_mdl.header.name);
-
-        let out_bytes = combined_mdl.write_to_bytes();
-
-        combined_mdl
-            .write_to_file("/home/khang/gchimp/mdl/src/tests/static_tree_combined.mdl")
-            .unwrap();
-    }
 }
