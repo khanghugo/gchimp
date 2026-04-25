@@ -20,3 +20,15 @@ pub enum JMdlError {
     #[error("IOError: {source}")]
     IOError { source: std::io::Error },
 }
+
+impl From<MdlError> for JMdlError {
+    fn from(value: MdlError) -> Self {
+        Self::MdlError { source: value }
+    }
+}
+
+impl From<GchimpInfoError> for JMdlError {
+    fn from(value: GchimpInfoError) -> Self {
+        Self::GchimpInfo { source: value }
+    }
+}
