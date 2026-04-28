@@ -1348,6 +1348,24 @@ impl ConvexHull {
             self.0.push(new_face.with_sorted_vertices().unwrap());
         }
     }
+
+    pub fn get_bounds(&self) -> Option<[Point3D; 2]> {
+        if self.0.is_empty() {
+            return None;
+        }
+
+        let mut overall_mins = DVec3::MAX;
+        let mut overall_maxs = DVec3::MIN;
+
+        for polygon in &self.0 {
+            let [p_min, p_max] = polygon.get_bounds();
+
+            overall_mins = overall_mins.min(p_min.into());
+            overall_maxs = overall_maxs.max(p_max.into());
+        }
+
+        Some([overall_mins.into(), overall_maxs.into()])
+    }
 }
 
 #[derive(Debug)]
