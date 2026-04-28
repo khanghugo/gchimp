@@ -108,18 +108,7 @@ pub fn brush_to_solid3d(brush: &Brush) -> Solid3D {
         .into()
 }
 
-pub fn solid_3d_to_convex_hull() {}
-
-// technical debt
-pub fn solid3d_to_triangulated_smd(
-    // brush is still needed here so we can get correct triangle data
-    // TODO: refactor this so that this function doesnt do too much
-    // right now, it does not only turn brush into triangles, but also makes them SMD triangles
-    brush: &Brush,
-    solid: &Solid3D,
-    wads: &SimpleWad,
-    three_planes: bool,
-) -> eyre::Result<Vec<Triangle>> {
+pub fn solid_3d_to_convex_hull(solid: &Solid3D, three_planes: bool) -> ConvexHull {
     // TODO maybe phase out three_planes
     let convex_hull = if three_planes {
         // https://3707026871-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2F-LtVT8pJjInrrHVCovzy%2Fuploads%2FEukkFYJLwfafFXUMpsI2%2FMAPFiles_2001_StefanHajnoczi.pdf?alt=media&token=51471685-bf69-42ae-a015-a474c0b95165
@@ -161,6 +150,20 @@ pub fn solid3d_to_triangulated_smd(
         polytope
     };
 
+    convex_hull
+}
+
+// technical debt
+pub fn solid3d_to_triangulated_smd(
+    // brush is still needed here so we can get correct triangle data
+    // TODO: refactor this so that this function doesnt do too much
+    // right now, it does not only turn brush into triangles, but also makes them SMD triangles
+    brush: &Brush,
+    solid: &Solid3D,
+    wads: &SimpleWad,
+    three_planes: bool,
+) -> eyre::Result<Vec<Triangle>> {
+    let convex_hull = solid_3d_to_convex_hull(solid, three_planes);
     // it is convex so no worry that the center is outside the brush
     let polytope_centroid = convex_hull.centroid()?;
 
