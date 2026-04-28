@@ -3,10 +3,12 @@ use std::path::PathBuf;
 use bitflags::bitflags;
 use map::{Entity, Map};
 
-pub static GCHIMP_INFO_ENTITY: &str = "gchimp_info";
+pub const GCHIMP_INFO_ENTITY: &str = "gchimp_info";
 
-pub static GCHIMP_INFO_HL_PATH: &str = "hl_path";
-pub static GCHIMP_INFO_GAMEDIR: &str = "gamedir";
+pub const GCHIMP_INFO_HL_PATH: &str = "hl_path";
+pub const GCHIMP_INFO_GAMEDIR: &str = "gamedir";
+
+pub const GCHIMP_SPAWNFLAGS_KEY: &str = "spawnflags";
 
 pub struct GchimpInfo {
     entity: Entity,
@@ -26,10 +28,10 @@ pub enum GchimpInfoError {
     GameMod { gamemod: String },
     #[error("Game mod is empty")]
     GameModEmpty,
-    #[error("\"options\" key is not a number")]
-    OptionsKeyNaN,
-    #[error("\"options\" key is not in gchimp_info")]
-    OptionsKeyNone,
+    #[error("\"spawnflags\" key is not a number")]
+    SpawnflagsKeyNaN,
+    #[error("\"spawnflags\" key is not in gchimp_info")]
+    SpawnflagsKeyNone,
 }
 
 fn check_gchimp_entity(entity: &Entity) -> Result<(), GchimpInfoError> {
@@ -59,12 +61,12 @@ fn check_gchimp_entity(entity: &Entity) -> Result<(), GchimpInfoError> {
     }
 
     // check options
-    if let Some(options) = entity.attributes.get("options") {
+    if let Some(options) = entity.attributes.get(GCHIMP_SPAWNFLAGS_KEY) {
         if let Err(_) = options.parse::<u32>() {
-            return Err(GchimpInfoError::OptionsKeyNaN);
+            return Err(GchimpInfoError::SpawnflagsKeyNaN);
         }
     } else {
-        return Err(GchimpInfoError::OptionsKeyNone);
+        return Err(GchimpInfoError::SpawnflagsKeyNone);
     };
 
     Ok(())
