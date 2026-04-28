@@ -40,9 +40,16 @@
 	example2(string) : "Add more fields to swap more textures"
 ]
 
-@PointClass base(Targetname, Angles, RenderFields, ZHLT, TexLightType) = gchimp_jmdl : "Joins selected model entities as one model"
+@PointClass base(Targetname, Angles, RenderFields, ZHLT, TexLightType) = gchimp_jmdl : "Joins linked model entities as one model"
 [
 	targetname(target_source) : "Other model entities point to this" : "jmdl1"
     output(string) : "Output file path" : "models/jmdl.mdl"
     model_entity(string) : "Class name of model displaying entity" : "cycler_sprite"
+]
+
+@SolidClass base(RenderFields, ZHLT, TexLightType) = trigger_gchimp_jmdl : "Joins covered model entities as one model"
+[
+    output(string) : "Output file path" : "models/jmdl.mdl"
+    model_entity(string) : "Class name of model displaying entity" : "cycler_sprite"
+	target(target_destination) : "Optional entity origin" : ""
 ]

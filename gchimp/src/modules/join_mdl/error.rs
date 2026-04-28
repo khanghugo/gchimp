@@ -12,6 +12,14 @@ pub enum JMdlError {
     OutputNotMdl { name: String },
     #[error("gchimp_jmdl MUST have targetname")]
     NoTargetName,
+    #[error("trigger_gchimp_jmdl origin points to non-existent target: {name}")]
+    BrushNoTarget { name: String },
+    #[error("trigger_gchimp_jmdl origin points to a brush entity: {name}")]
+    BrushTargetNotPointEntity { name: String },
+    #[error(
+        "trigger_gchimp_jmdl brush fails to produce a convex hull. Entity index: {entity_idx}. This is likely a gchimp internal error. Try using simpler brush to cover entities."
+    )]
+    BrushInvalid { entity_idx: usize },
 
     #[error("gchimp_info error: {source}")]
     GchimpInfo { source: GchimpInfoError },
