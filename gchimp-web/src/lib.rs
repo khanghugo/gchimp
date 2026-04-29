@@ -106,7 +106,7 @@ pub fn split_smd(_smd_string: Vec<u8>, smd_name: String) -> Result<Vec<u8>, JsVa
 
     let smd_string = from_utf8(&_smd_string).unwrap();
 
-    let Ok(smd) = Smd::from(&smd_string) else {
+    let Ok(smd) = Smd::from(smd_string) else {
         return Err(JsValue::from_str("cannot parse smd"));
     };
 

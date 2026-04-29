@@ -44,15 +44,13 @@ pub fn rename_texture(map: &mut Map) -> usize {
         .for_each(|brushes| {
             brushes.iter_mut().for_each(|brush| {
                 brush.planes.iter_mut().for_each(|plane| {
-                    mapping
-                        .get(&plane.texture_name.get_string_standard())
-                        .map(|value| {
-                            count += 1;
-                            plane.texture_name = TextureName::new(value.to_owned())
-                        });
+                    if let Some(value) = mapping.get(&plane.texture_name.get_string_standard()) {
+                        count += 1;
+                        plane.texture_name = TextureName::new(value.to_owned())
+                    };
                 })
             })
         });
 
-    return count;
+    count
 }

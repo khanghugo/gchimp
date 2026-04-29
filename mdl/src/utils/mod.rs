@@ -142,13 +142,13 @@ impl Mdl {
 
         // this function should only calculate from smd mesh, not the original model
         for bodypart in &self.bodyparts {
-            if let Some(model) = bodypart.models.first() {
-                if let Some(mesh) = &model.agnostic_mesh {
-                    for tri in mesh {
-                        for v in &tri.vertices {
-                            min = min.min(v.pos);
-                            max = max.max(v.pos);
-                        }
+            if let Some(model) = bodypart.models.first()
+                && let Some(mesh) = &model.agnostic_mesh
+            {
+                for tri in mesh {
+                    for v in &tri.vertices {
+                        min = min.min(v.pos);
+                        max = max.max(v.pos);
                     }
                 }
             }
@@ -203,12 +203,11 @@ impl Mdl {
             self.bodyparts.iter().fold(0, |acc, e| {
                 acc + e
                     .models
-                    .iter()
-                    .next() // count the first model cuz not all of them are in-used
+                    .first() // count the first model cuz not all of them are in-used
                     .map(|x| {
-                        x.meshes
-                            .iter()
-                            .fold(0, |acc2, e2| acc2 + e2.header.num_tris.abs() as usize)
+                        x.meshes.iter().fold(0, |acc2, e2| {
+                            acc2 + e2.header.num_tris.unsigned_abs() as usize
+                        })
                     })
                     .unwrap_or(0)
             })

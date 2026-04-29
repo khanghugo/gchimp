@@ -140,6 +140,7 @@ pub struct CustomRenderer {
     // pub mdlscrub_renderer: MdlScrubRenderer,
 }
 
+#[allow(unused)]
 #[derive(Debug, Clone)]
 pub struct WgpuContext {
     device: Arc<wgpu::Device>,
@@ -168,13 +169,12 @@ impl eframe::App for MyApp {
                 let mut behavior = TreeBehavior {};
                 tree.ui(&mut behavior, ui);
             } else {
-                if ui.button("Add config.toml").highlight().clicked() {
-                    if let Some(path) = rfd::FileDialog::new()
+                if ui.button("Add config.toml").highlight().clicked()
+                    && let Some(path) = rfd::FileDialog::new()
                         .add_filter("TOML", &["toml"])
                         .pick_file()
-                    {
-                        self.update_from_config(path.as_path());
-                    }
+                {
+                    self.update_from_config(path.as_path());
                 }
 
                 let mut readonly_buffer = self._no_config_status.as_str();
@@ -186,10 +186,10 @@ impl eframe::App for MyApp {
 
                 ctx.input(|i| {
                     for dropped_file in i.raw.dropped_files.iter() {
-                        if let Some(path) = &dropped_file.path {
-                            if path.extension().unwrap() == "toml" {
-                                self.update_from_config(path);
-                            }
+                        if let Some(path) = &dropped_file.path
+                            && path.extension().unwrap() == "toml"
+                        {
+                            self.update_from_config(path);
                         }
                     }
                 });

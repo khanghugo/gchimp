@@ -204,7 +204,15 @@ impl Waddy {
                 FileEntry::Font(_) => unimplemented!(),
             });
 
-        if res.is_none() {
+        if let Some(err_str) = res {
+            if let Some(err_str) = err_str {
+                self.log(&err_str);
+
+                Err(eyre!(err_str))
+            } else {
+                Ok(())
+            }
+        } else {
             let err_str = format!(
                 "Index {} out of bound {}",
                 texture_index,
@@ -213,14 +221,8 @@ impl Waddy {
 
             self.log(&err_str);
 
-            return Err(eyre!(err_str));
-        } else if let Some(err_str) = res.unwrap() {
-            self.log(&err_str);
-
-            return Err(eyre!(err_str));
+            Err(eyre!(err_str))
         }
-
-        Ok(())
     }
 
     /// Dumps all textures into .bmp format to a specified folder

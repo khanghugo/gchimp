@@ -283,10 +283,10 @@ fn parse_models(i: &'_ [u8]) -> IResult<'_, Vec<Model>> {
     all_consuming(many0(parse_model))(i)
 }
 
-type FUCKOFF<'a> = nom::Err<nom::error::Error<&'a [u8]>>;
+type FuckOff<'a> = nom::Err<nom::error::Error<&'a [u8]>>;
 
 pub fn parse_bsp(i: &'_ [u8]) -> Result<Bsp, BspError> {
-    let (beginning, version) = le_i32(i).map_err(|_: FUCKOFF| BspError::NomParsingError)?;
+    let (beginning, version) = le_i32(i).map_err(|_: FuckOff| BspError::NomParsingError)?;
 
     if version != BSP_VERSION {
         return BspError::BspVersion { version }.to_result();

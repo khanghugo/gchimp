@@ -8,7 +8,7 @@ pub fn normal_rename_tex(map: &Map) -> eyre::Result<Map> {
     let mut res = map.clone();
 
     res.entities.iter_mut().for_each(|entity| {
-        entity.brushes.as_mut().map(|brushes| {
+        if let Some(brushes) = entity.brushes.as_mut() {
             brushes.iter_mut().for_each(|brush| {
                 brush.planes.iter_mut().for_each(|plane| {
                     let plane3d = Plane3D::from_three_points(
@@ -24,7 +24,7 @@ pub fn normal_rename_tex(map: &Map) -> eyre::Result<Map> {
                     }
                 });
             })
-        });
+        }
     });
 
     Ok(res)

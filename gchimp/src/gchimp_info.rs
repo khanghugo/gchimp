@@ -62,7 +62,7 @@ fn check_gchimp_entity(entity: &Entity) -> Result<(), GchimpInfoError> {
 
     // check options
     if let Some(options) = entity.attributes.get(GCHIMP_SPAWNFLAGS_KEY) {
-        if let Err(_) = options.parse::<u32>() {
+        if options.parse::<u32>().is_err() {
             return Err(GchimpInfoError::SpawnflagsKeyNaN);
         }
     } else {

@@ -6,11 +6,11 @@ mod blend;
 mod sequence_group;
 
 impl WriteToWriter for &[Sequence] {
-    fn write_to_writer(&self, mut writer: &mut ByteWriter) -> usize {
+    fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
         // write sequence data and then sequence headers next
         let anim_indices = self
             .iter()
-            .map(|sequence| sequence.anim_blends.as_slice().write_to_writer(&mut writer))
+            .map(|sequence| sequence.anim_blends.as_slice().write_to_writer(writer))
             .collect::<Vec<usize>>();
 
         // write header

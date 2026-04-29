@@ -157,7 +157,7 @@ impl SkyModBuilder {
         let textures = self
             .textures
             .iter()
-            .map(|path| generate_rgba8_from_image_path(path))
+            .map(generate_rgba8_from_image_path)
             .collect::<Result<Vec<RgbaImage>, _>>()?;
 
         if textures.len() != 6 {

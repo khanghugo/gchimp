@@ -1373,9 +1373,9 @@ pub struct Solid3D(pub Vec<Plane3D>);
 
 impl Solid3D {
     pub fn contains_point(&self, point: Point3D) -> bool {
-        self.0.iter().fold(true, |acc, e| {
-            matches!(e.side_of_point(point), SideOfPoint::In | SideOfPoint::On) && acc
-        })
+        self.0
+            .iter()
+            .all(|e| matches!(e.side_of_point(point), SideOfPoint::In | SideOfPoint::On))
     }
 
     pub fn face_count(&self) -> usize {

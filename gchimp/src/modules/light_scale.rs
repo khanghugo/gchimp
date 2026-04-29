@@ -11,27 +11,27 @@ pub fn light_scale(map: &mut Map, scalar: (f64, f64, f64, f64)) {
             .attributes
             .get("classname")
             .map(|value| value == "light" || value == "light_spot");
-        if let Some(exist) = exist {
-            if exist {
-                let light = entity.attributes.get("_light").map(|light| {
-                    light
-                        .split_ascii_whitespace()
-                        .map(|v| v.parse::<f64>().unwrap())
-                });
+        if let Some(exist) = exist
+            && exist
+        {
+            let light = entity.attributes.get("_light").map(|light| {
+                light
+                    .split_ascii_whitespace()
+                    .map(|v| v.parse::<f64>().unwrap())
+            });
 
-                if let Some(values) = light {
-                    let values: Vec<f64> = values.collect();
-                    entity.attributes.insert(
-                        "_light".to_string(),
-                        format!(
-                            "{} {} {} {}",
-                            (values[0] * scalar.0).clamp(0., 255.) as i32,
-                            (values[1] * scalar.1).clamp(0., 255.) as i32,
-                            (values[2] * scalar.2).clamp(0., 255.) as i32,
-                            (values[3] * scalar.3).max(0.) as i32
-                        ),
-                    );
-                }
+            if let Some(values) = light {
+                let values: Vec<f64> = values.collect();
+                entity.attributes.insert(
+                    "_light".to_string(),
+                    format!(
+                        "{} {} {} {}",
+                        (values[0] * scalar.0).clamp(0., 255.) as i32,
+                        (values[1] * scalar.1).clamp(0., 255.) as i32,
+                        (values[2] * scalar.2).clamp(0., 255.) as i32,
+                        (values[3] * scalar.3).max(0.) as i32
+                    ),
+                );
             }
         }
     });

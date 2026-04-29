@@ -291,8 +291,8 @@ pub fn parse_animation_frame_rle(rle_start: &'_ [u8], num_frame: usize) -> IResu
     while curr_frame < num_frame {
         let (mut _next, run) = take(2usize)(next)?;
 
-        let mut valid = run[0];
-        let mut total = run[1];
+        let valid = run[0];
+        let total = run[1];
 
         // // invalid case
         // let mut invalid_advance = curr_frame;
@@ -349,7 +349,7 @@ fn _parse_blend_studiomdl_impl<'a>(
     mdl_header: &Header,
     sequence_header: &SequenceHeader,
 ) -> IResult<'a, Blend> {
-    let offset_parser = map(count(le_u16, 6 as usize), |res| {
+    let offset_parser = map(count(le_u16, 6_usize), |res| {
         [res[0], res[1], res[2], res[3], res[4], res[5]]
     });
 
@@ -378,7 +378,12 @@ fn _parse_blend_studiomdl_impl<'a>(
             // 	short		value;
             // } mstudioanimvalue_t;
 
-            for frame_index in 0..num_frames {
+            for (frame_index, frame_motion) in bone_values[motion_idx]
+                .0
+                .iter_mut()
+                .enumerate()
+                .take(num_frames)
+            {
                 let mut panimvalue = &panim[offset as usize..];
 
                 // "find span of values that includes the frame we want"
@@ -391,22 +396,20 @@ fn _parse_blend_studiomdl_impl<'a>(
                     panimvalue = &panimvalue[(num_valid as usize + 1) * 2..];
                 }
 
-                let mut anim_value = 0;
-
                 // "if we're inside the span"
-                if panimvalue[0] > k {
+                let anim_value = if panimvalue[0] > k {
                     // "and there's more data in the span"
                     let idx = (k as usize + 1) * 2;
 
-                    anim_value = i16::from_le_bytes([panimvalue[idx], panimvalue[idx + 1]]);
+                    i16::from_le_bytes([panimvalue[idx], panimvalue[idx + 1]])
                 } else {
                     // "are we at the end of the repeating values section and there's another section with data?"
                     let idx = panimvalue[0] as usize * 2;
 
-                    anim_value = i16::from_le_bytes([panimvalue[idx], panimvalue[idx + 1]]);
-                }
+                    i16::from_le_bytes([panimvalue[idx], panimvalue[idx + 1]])
+                };
 
-                bone_values[motion_idx][frame_index] = anim_value;
+                *frame_motion = anim_value;
             }
         }
 
@@ -438,7 +441,7 @@ fn parse_blend<'a>(
     mdl_header: &Header,
     sequence_header: &SequenceHeader,
 ) -> IResult<'a, Blend> {
-    let offset_parser = map(count(le_u16, 6 as usize), |res| {
+    let offset_parser = map(count(le_u16, 6_usize), |res| {
         [res[0], res[1], res[2], res[3], res[4], res[5]]
     });
 

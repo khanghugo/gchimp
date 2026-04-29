@@ -59,14 +59,13 @@ impl Misc {
             .show(ui, |ui| {
                 ui.label("QC:");
                 ui.add(egui::TextEdit::singleline(&mut self.qc).hint_text("Choose .qc file"));
-                if ui.button("Add").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().add_filter("QC", &["qc"]).pick_file()
-                    {
-                        if path.extension().is_some_and(|ext| ext == "qc") {
-                            self.qc = path.display().to_string();
-                        }
-                    }
+                if ui.button("Add").clicked()
+                    && let Some(path) = rfd::FileDialog::new().add_filter("QC", &["qc"]).pick_file()
+                    && path.extension().is_some_and(|ext| ext == "qc")
+                {
+                    self.qc = path.display().to_string();
                 }
+
                 ui.end_row();
 
                 if ui.button("Run").clicked() {
@@ -85,16 +84,15 @@ impl Misc {
         egui::Grid::new("loop_wav").num_columns(2).show(ui, |ui| {
             ui.label("WAV:");
             ui.add(egui::TextEdit::singleline(&mut self.wav).hint_text("Choose .wav file"));
-            if ui.button("Add").clicked() {
-                if let Some(path) = rfd::FileDialog::new()
+            if ui.button("Add").clicked()
+                && let Some(path) = rfd::FileDialog::new()
                     .add_filter("WAV", &["wav"])
                     .pick_file()
-                {
-                    if path.extension().is_some_and(|ext| ext == "wav") {
-                        self.wav = path.display().to_string();
-                    }
-                }
+                && path.extension().is_some_and(|ext| ext == "wav")
+            {
+                self.wav = path.display().to_string();
             }
+
             ui.end_row();
 
             ui.checkbox(&mut self.loop_wave_loop, "Loop")
@@ -121,16 +119,15 @@ impl Misc {
         egui::Grid::new("resmake").num_columns(2).show(ui, |ui| {
             ui.label("BSP:");
             ui.add(egui::TextEdit::singleline(&mut self.bsp).hint_text("Choose .bsp file"));
-            if ui.button("Add").clicked() {
-                if let Some(path) = rfd::FileDialog::new()
+            if ui.button("Add").clicked()
+                && let Some(path) = rfd::FileDialog::new()
                     .add_filter("BSP", &["bsp"])
                     .pick_file()
-                {
-                    if path.extension().is_some_and(|ext| ext == "bsp") {
-                        self.bsp = path.display().to_string();
-                    }
-                }
+                && path.extension().is_some_and(|ext| ext == "bsp")
+            {
+                self.bsp = path.display().to_string();
             }
+
             ui.end_row();
         });
 
@@ -195,16 +192,15 @@ If there are external WADs found, this option will create a new WAD file contain
             .show(ui, |ui| {
                 ui.label("SMD:");
                 ui.add(egui::TextEdit::singleline(&mut self.smd).hint_text("Choose .smd file"));
-                if ui.button("Add").clicked() {
-                    if let Some(path) = rfd::FileDialog::new()
+                if ui.button("Add").clicked()
+                    && let Some(path) = rfd::FileDialog::new()
                         .add_filter("SMD", &["smd"])
                         .pick_file()
-                    {
-                        if path.extension().is_some_and(|ext| ext == "smd") {
-                            self.smd = path.display().to_string();
-                        }
-                    }
+                    && path.extension().is_some_and(|ext| ext == "smd")
+                {
+                    self.smd = path.display().to_string();
                 }
+
                 ui.end_row();
 
                 if ui.button("Run").clicked() {
@@ -326,21 +322,20 @@ impl TabProgram for Misc {
         // Collect dropped files:
         ctx.input(|i| {
             for item in i.raw.dropped_files.clone() {
-                if let Some(item) = item.path {
-                    if item.is_file() {
-                        item.extension().map(|ext| {
-                            if ext == "qc" {
-                                self.qc = item.to_str().unwrap().to_string();
-                            } else if ext == "wav" {
-                                self.wav = item.to_str().unwrap().to_string();
-                            } else if ext == "bsp" {
-                                self.bsp = item.to_str().unwrap().to_string();
-                            } else if ext == "smd" {
-                                self.smd = item.to_str().unwrap().to_string();
-                            }
-                        });
+                if let Some(item) = item.path
+                    && item.is_file()
+                    && let Some(ext) = item.extension()
+                {
+                    if ext == "qc" {
+                        self.qc = item.to_str().unwrap().to_string();
+                    } else if ext == "wav" {
+                        self.wav = item.to_str().unwrap().to_string();
+                    } else if ext == "bsp" {
+                        self.bsp = item.to_str().unwrap().to_string();
+                    } else if ext == "smd" {
+                        self.smd = item.to_str().unwrap().to_string();
                     }
-                }
+                };
             }
         });
 

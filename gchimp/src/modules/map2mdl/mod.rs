@@ -618,12 +618,12 @@ impl Map2Mdl {
             }
         }
 
-        if let Some(entity) = &entity_entity {
-            if !entity.attributes.contains_key("wad") {
-                return err!(
-                    "Provided entity does not contain \"wad\" key. Make sure entity is a worldbrush."
-                );
-            }
+        if let Some(entity) = &entity_entity
+            && !entity.attributes.contains_key("wad")
+        {
+            return err!(
+                "Provided entity does not contain \"wad\" key. Make sure entity is a worldbrush."
+            );
         }
 
         // now we talking about something different
@@ -806,15 +806,15 @@ All missing textures have uppercase letters. If you use jack, make sure to have 
         // if we don't have a map, we might have an entity pasted in the GUI part
         if let Some(map) = &mut map_file {
             if self.options.marked_entity {
-                return self.convert_marked_entity(f_input, map);
+                self.convert_marked_entity(f_input, map)
             } else {
-                return self.convert_whole_map_indiscriminately(f_input, map);
+                self.convert_whole_map_indiscriminately(f_input, map)
             }
         } else if let Some(entity) = &entity_entity {
-            return self.convert_input_entity(f_input, entity);
+            self.convert_input_entity(f_input, entity)
         } else {
             unreachable!()
-        };
+        }
     }
 
     fn convert_whole_map_indiscriminately(
@@ -925,15 +925,16 @@ All missing textures have uppercase letters. If you use jack, make sure to have 
 
         let mut textures_used_in_smd = textures_used_in_triangles(&smd_triangles);
 
-        self.maybe_process_celshade(
-            &self.options.entity_options,
-            entity,
-            celshade_options.color,
-            celshade_options.distance,
+        maybe_process_celshade(
+            CelShadeFuckAssRefactor {
+                entity_options: &self.options.entity_options,
+                entity,
+                simple_wads: &simple_wads,
+                output_path: self.map.as_ref().unwrap(),
+            },
+            celshade_options,
             &mut textures_used_in_smd,
-            &simple_wads,
             &mut smd_triangles,
-            &output_path,
         );
 
         let handles = self.convert_from_triangles(
@@ -1187,7 +1188,7 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     .attributes
                     .get(MAP2MDL_ATTR_CELSHADE_COLOR)
                     .and_then(|v| parse_triplet(v).ok())
-                    .map(|v| f64_3_to_u8_3(v))
+                    .map(f64_3_to_u8_3)
                     .unwrap_or([0, 0, 0]);
 
                 let celshade_distance = entity
@@ -1196,15 +1197,19 @@ However, it will still turn {} into model displaying entities such as cycler_spr
                     .and_then(|v| v.parse::<f32>().ok())
                     .unwrap_or(4.);
 
-                self.maybe_process_celshade(
-                    &entity_options,
-                    entity,
-                    celshade_color,
-                    celshade_distance,
+                maybe_process_celshade(
+                    CelShadeFuckAssRefactor {
+                        entity_options: &entity_options,
+                        entity,
+                        simple_wads: &simple_wads,
+                        output_path: self.map.as_ref().unwrap(),
+                    },
+                    CelShadeOptions {
+                        color: celshade_color,
+                        distance: celshade_distance,
+                    },
                     &mut textures_used_in_smd,
-                    &simple_wads,
                     &mut smd_triangles,
-                    self.map.as_ref().unwrap(),
                 );
 
                 let model_count = textures_used_in_smd.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT + 1;
@@ -1438,103 +1443,117 @@ However, it will still turn {} into model displaying entities such as cycler_spr
 
         Ok(())
     }
+}
 
-    fn maybe_process_celshade(
-        &self,
-        entity_options: &Map2MdlEntityOptions,
-        entity: &Entity,
-        celshade_color: [u8; 3],
-        celshade_distance: f32,
-        textures_used_in_smd: &mut HashSet<String>,
-        simple_wads: &SimpleWad,
-        smd_triangles: &mut Vec<Triangle>,
-        output_path: &Path,
-    ) {
-        if entity_options
-            .intersects(Map2MdlEntityOptions::WithCelShade | Map2MdlEntityOptions::AsCelShade)
-        {
-            let Some(mut brushes) = entity.brushes.clone() else {
-                panic!("cell shading a brush without brushes");
-            };
+struct CelShadeFuckAssRefactor<'a> {
+    entity_options: &'a Map2MdlEntityOptions,
+    entity: &'a Entity,
+    simple_wads: &'a SimpleWad,
+    output_path: &'a Path,
+}
 
-            let celshade_texture_name = format!(
-                // adding "_gfs" to force flatshade when we are in another step
-                // is this stupid?
-                "{}_{}_{}_gfs",
-                celshade_color[0], celshade_color[1], celshade_color[2]
-            );
-            textures_used_in_smd.insert(celshade_texture_name.clone());
+fn maybe_process_celshade(
+    fuck_ass_refactor: CelShadeFuckAssRefactor,
+    celshade_options: CelShadeOptions,
+    textures_used_in_smd: &mut HashSet<String>,
+    smd_triangles: &mut Vec<Triangle>,
+) {
+    let CelShadeOptions {
+        color: celshade_color,
+        distance: celshade_distance,
+    } = celshade_options;
 
-            // now write our own texture
-            let img = [0u8; 16 * 16];
-            // need to pad a few colors, otherwise, the mdl compiler will whine
-            let palette = [celshade_color; 16];
-            // hard code the dimensions
-            let dimensions = (16, 16);
+    let CelShadeFuckAssRefactor {
+        entity_options,
+        entity,
+        simple_wads,
+        output_path,
+    } = fuck_ass_refactor;
 
-            // write here is async for some reasons
-            // if everything is processed before file is written, the process fails
-            let texture_output_path = output_path
-                .with_file_name(celshade_texture_name.clone())
-                .with_extension("bmp");
+    if entity_options
+        .intersects(Map2MdlEntityOptions::WithCelShade | Map2MdlEntityOptions::AsCelShade)
+    {
+        let Some(mut brushes) = entity.brushes.clone() else {
+            // TODO: what the fuck? why?
+            panic!("cell shading a brush without brushes");
+        };
 
-            write_8bpp_to_file(&img, &palette, dimensions, texture_output_path.as_path()).unwrap();
+        let celshade_texture_name = format!(
+            // adding "_gfs" to force flatshade when we are in another step
+            // is this stupid?
+            "{}_{}_{}_gfs",
+            celshade_color[0], celshade_color[1], celshade_color[2]
+        );
+        textures_used_in_smd.insert(celshade_texture_name.clone());
 
-            // need to sleep, otherwise, file does not exist
-            // and then studiomdl has nothing to work with
-            // our program is too fast
-            loop {
-                if texture_output_path.exists() {
-                    break;
-                }
+        // now write our own texture
+        let img = [0u8; 16 * 16];
+        // need to pad a few colors, otherwise, the mdl compiler will whine
+        let palette = [celshade_color; 16];
+        // hard code the dimensions
+        let dimensions = (16, 16);
 
-                thread::sleep(Duration::from_millis(100));
+        // write here is async for some reasons
+        // if everything is processed before file is written, the process fails
+        let texture_output_path = output_path
+            .with_file_name(celshade_texture_name.clone())
+            .with_extension("bmp");
+
+        write_8bpp_to_file(&img, &palette, dimensions, texture_output_path.as_path()).unwrap();
+
+        // need to sleep, otherwise, file does not exist
+        // and then studiomdl has nothing to work with
+        // our program is too fast
+        loop {
+            if texture_output_path.exists() {
+                break;
             }
 
-            let triangles: Vec<Triangle> = brushes
-                .iter_mut()
-                .flat_map(|brush| {
-                    let solid = brush_to_solid3d(brush).expand(celshade_distance as f64);
+            thread::sleep(Duration::from_millis(100));
+        }
 
-                    let mut triangles = solid3d_to_triangulated_smd(
-                        brush,
-                        &solid,
-                        // this simple_wads contains all textures used in this map
-                        // so, we will convert this into smd triangles
-                        // then we will change the triangles here into our celshade color
-                        // and then add celshade texture into "textures_used_in_smd"
-                        &simple_wads,
-                        false,
-                    )
-                    .unwrap();
+        let triangles: Vec<Triangle> = brushes
+            .iter_mut()
+            .flat_map(|brush| {
+                let solid = brush_to_solid3d(brush).expand(celshade_distance as f64);
 
-                    // now flip the triangles
-                    triangles.iter_mut().for_each(|triangle| {
-                        triangle.vertices.swap(0, 1);
-                    });
+                let mut triangles = solid3d_to_triangulated_smd(
+                    brush,
+                    &solid,
+                    // this simple_wads contains all textures used in this map
+                    // so, we will convert this into smd triangles
+                    // then we will change the triangles here into our celshade color
+                    // and then add celshade texture into "textures_used_in_smd"
+                    simple_wads,
+                    false,
+                )
+                .unwrap();
 
-                    // remove nodraws
-                    triangles.retain(|triangle| {
-                        !NO_RENDER_TEXTURE.contains(&triangle.material.as_str())
-                    });
+                // now flip the triangles
+                triangles.iter_mut().for_each(|triangle| {
+                    triangle.vertices.swap(0, 1);
+                });
 
-                    // name it all to "black"
-                    triangles.iter_mut().for_each(|triangle| {
-                        // hardcode black texture
-                        triangle.material = celshade_texture_name.clone();
-                    });
+                // remove nodraws
+                triangles
+                    .retain(|triangle| !NO_RENDER_TEXTURE.contains(&triangle.material.as_str()));
 
-                    triangles
-                })
-                .collect();
+                // name it all to "black"
+                triangles.iter_mut().for_each(|triangle| {
+                    // hardcode black texture
+                    triangle.material = celshade_texture_name.clone();
+                });
 
-            if entity_options.contains(Map2MdlEntityOptions::AsCelShade) {
-                *smd_triangles = triangles;
-            } else if entity_options.contains(Map2MdlEntityOptions::WithCelShade) {
-                smd_triangles.extend(triangles);
-            } else {
-                unreachable!()
-            }
+                triangles
+            })
+            .collect();
+
+        if entity_options.contains(Map2MdlEntityOptions::AsCelShade) {
+            *smd_triangles = triangles;
+        } else if entity_options.contains(Map2MdlEntityOptions::WithCelShade) {
+            smd_triangles.extend(triangles);
+        } else {
+            unreachable!()
         }
     }
 }

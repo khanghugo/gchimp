@@ -22,7 +22,7 @@ impl WriteToWriterTexture for &[Texture] {
 
                 assert_eq!(image.len(), (header.width * header.height) as usize);
 
-                image_texture_writer.append_u8_slice(&image);
+                image_texture_writer.append_u8_slice(image);
                 image_texture_writer.append_u8_slice(
                     palette
                         .iter()

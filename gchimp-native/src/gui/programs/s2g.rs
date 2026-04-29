@@ -144,16 +144,16 @@ impl TabProgram for S2GGui {
                             .hint_text("Choose .mdl file"),
                     );
                 });
-                if ui.button("+").clicked() {
-                    if let Some(path) = rfd::FileDialog::new()
+                if ui.button("+").clicked()
+                    && let Some(path) = rfd::FileDialog::new()
                         .add_filter("Model files", &["mdl"])
                         .pick_file()
-                    {
-                        self.drag_and_drop.file_path = path.display().to_string();
-                        self.drag_and_drop.use_file = true;
-                        self.drag_and_drop.use_folder = false;
-                    }
+                {
+                    self.drag_and_drop.file_path = path.display().to_string();
+                    self.drag_and_drop.use_file = true;
+                    self.drag_and_drop.use_folder = false;
                 }
+
                 ui.end_row();
 
                 ui.label("Folder:");
@@ -163,12 +163,12 @@ impl TabProgram for S2GGui {
                             .hint_text("Choose folder containing .mdl"),
                     );
                 });
-                if ui.button("+").clicked() {
-                    if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                        self.drag_and_drop.folder_path = path.display().to_string();
-                        self.drag_and_drop.use_folder = true;
-                        self.drag_and_drop.use_file = false;
-                    }
+                if ui.button("+").clicked()
+                    && let Some(path) = rfd::FileDialog::new().pick_folder()
+                {
+                    self.drag_and_drop.folder_path = path.display().to_string();
+                    self.drag_and_drop.use_folder = true;
+                    self.drag_and_drop.use_file = false;
                 }
             })
         });

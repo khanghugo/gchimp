@@ -383,7 +383,7 @@ impl ResMake {
 
         let start_processing = |skip: bool, bsp_path: &Path| {
             let _ = counter.lock().map(|mut v| {
-                *v = *v + 1;
+                *v += 1;
                 println!(
                     "{} processing {}/{} : {}",
                     if skip { "Skip" } else { "Start" },
@@ -414,11 +414,11 @@ impl ResMake {
             };
 
             if skip_created_res {
-                start_processing(true, &bsp_path);
+                start_processing(true, bsp_path);
                 return Ok(());
             }
 
-            start_processing(false, &bsp_path);
+            start_processing(false, bsp_path);
 
             let bsp = Bsp::from_file(bsp_path)?;
 
@@ -463,12 +463,12 @@ impl ResMake {
         if multithread {
             bsp_paths
                 .par_iter()
-                .map(|bsp_path| good_fucking_god_rust_you_are_so_good_at_inference(bsp_path))
+                .map(good_fucking_god_rust_you_are_so_good_at_inference)
                 .collect::<eyre::Result<Vec<_>>>()?;
         } else {
             bsp_paths
                 .iter()
-                .map(|bsp_path| good_fucking_god_rust_you_are_so_good_at_inference(bsp_path))
+                .map(good_fucking_god_rust_you_are_so_good_at_inference)
                 .collect::<eyre::Result<Vec<_>>>()?;
         };
 
@@ -592,23 +592,21 @@ fn help_a_friend_out(s: &str) -> &str {
         }
     }
 
-    return s;
+    s
 }
 
 fn get_models(bsp: &Bsp) -> HashSet<String> {
     let mut used_models = HashSet::<String>::new();
 
     for entity in &bsp.entities {
-        if let Some(classname) = entity.get("classname") {
-            if MODEL_ENTITIES.contains(&classname.as_str()) {
-                if let Some(model) = entity.get("model") {
-                    if model.ends_with(".mdl") {
-                        let model = help_a_friend_out(model);
+        if let Some(classname) = entity.get("classname")
+            && MODEL_ENTITIES.contains(&classname.as_str())
+            && let Some(model) = entity.get("model")
+            && model.ends_with(".mdl")
+        {
+            let model = help_a_friend_out(model);
 
-                        used_models.insert(model.to_string());
-                    }
-                }
-            }
+            used_models.insert(model.to_string());
         }
     }
 
@@ -619,17 +617,15 @@ fn get_sound(bsp: &Bsp) -> HashSet<String> {
     let mut used_sounds = HashSet::<String>::new();
 
     for entity in &bsp.entities {
-        if let Some(classname) = entity.get("classname") {
-            if SOUND_ENTITIES.contains(&classname.as_str()) {
-                if let Some(message) = entity.get("message") {
-                    if message.ends_with(".wav") {
-                        // need to pad "sound" at the beginning
-                        let sound_path = format!("sound/{}", message);
+        if let Some(classname) = entity.get("classname")
+            && SOUND_ENTITIES.contains(&classname.as_str())
+            && let Some(message) = entity.get("message")
+            && message.ends_with(".wav")
+        {
+            // need to pad "sound" at the beginning
+            let sound_path = format!("sound/{}", message);
 
-                        used_sounds.insert(sound_path);
-                    }
-                }
-            }
+            used_sounds.insert(sound_path);
         }
     }
 
@@ -721,24 +717,24 @@ fn get_sprites(bsp: &Bsp) -> HashSet<String> {
     let mut used_sprites = HashSet::<String>::new();
 
     for entity in &bsp.entities {
-        if let Some(classname) = entity.get("classname") {
-            if SPRITE_ENTITIES.contains(&classname.as_str()) {
-                // env_sprite
-                // env_glow
-                if let Some(model) = entity.get("model") {
-                    // some of sprite entities are used for displaying model so this check is to make sure
-                    if model.ends_with(".spr") {
-                        let model = help_a_friend_out(model);
+        if let Some(classname) = entity.get("classname")
+            && SPRITE_ENTITIES.contains(&classname.as_str())
+        {
+            // env_sprite
+            // env_glow
+            if let Some(model) = entity.get("model") {
+                // some of sprite entities are used for displaying model so this check is to make sure
+                if model.ends_with(".spr") {
+                    let model = help_a_friend_out(model);
 
-                        used_sprites.insert(model.to_string());
-                    }
+                    used_sprites.insert(model.to_string());
                 }
-                // env_beam
-                else if let Some(texture) = entity.get("texture") {
-                    let texture = help_a_friend_out(texture);
+            }
+            // env_beam
+            else if let Some(texture) = entity.get("texture") {
+                let texture = help_a_friend_out(texture);
 
-                    used_sprites.insert(texture.to_string());
-                }
+                used_sprites.insert(texture.to_string());
             }
         }
     }
@@ -783,17 +779,13 @@ fn create_linked_wad(
             .entry(x)
             .or_insert(Wad::from_file(game_mod.join(x))?);
 
-        wad_entry
-            .entries
-            .iter()
-            .find(|texture_entry| {
-                texture_entry.texture_name().as_str() == used_texture
-                    || texture_entry.texture_name_standard().as_str() == used_texture
-            })
-            .map(|entry| {
-                wad.entries.push(entry.clone());
-                wad.header.num_dirs += 1;
-            });
+        if let Some(entry) = wad_entry.entries.iter().find(|texture_entry| {
+            texture_entry.texture_name().as_str() == used_texture
+                || texture_entry.texture_name_standard().as_str() == used_texture
+        }) {
+            wad.entries.push(entry.clone());
+            wad.header.num_dirs += 1;
+        };
     }
 
     let bsp_name = bsp_path.file_stem().unwrap().to_str().unwrap();
@@ -951,7 +943,7 @@ pub fn resmake_single_bsp(
             } else {
                 // the wad table is storing absolute path, so here we will convert to relative path
                 // wad is usually inside game mod, so we can just take the file name directly
-                let used_wads_paths: Vec<&Path> = wads.iter().map(|s| Path::new(s)).collect();
+                let used_wads_paths: Vec<&Path> = wads.iter().map(Path::new).collect();
                 let used_wads_relative_paths: Vec<&str> = used_wads_paths
                     .iter()
                     .map(|path| path.file_name().unwrap().to_str().unwrap())
@@ -1092,9 +1084,12 @@ fn find_resource(
     let (wads, external_textures) = {
         let external_textures = need_external_wad(bsp);
 
-        if wad_check && !external_textures.is_empty() && wad_table.is_some() {
+        if wad_check
+            && !external_textures.is_empty()
+            && let Some(wad_table) = wad_table
+        {
             (
-                to_vec(get_wads(&external_textures, wad_table.unwrap())?),
+                to_vec(get_wads(&external_textures, wad_table)?),
                 external_textures,
             )
         } else {
@@ -1202,7 +1197,7 @@ fn resmake_zip_res(
     for relative_path in &all_files {
         // normalize relative path for easier search
         let normalized_relative_path = relative_path.to_lowercase();
-        let absolute_path_not_normalized = gamedir_path.join(gamemod_name).join(&relative_path);
+        let absolute_path_not_normalized = gamedir_path.join(gamemod_name).join(relative_path);
 
         let absolute_path = file_lookup_table.iter().find_map(|(k, v)| {
             if k.ends_with(&normalized_relative_path) {

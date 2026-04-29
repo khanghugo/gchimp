@@ -430,7 +430,6 @@ impl Wad {
 
     pub fn from_file(path: impl AsRef<Path> + AsRef<OsStr>) -> Result<Self, WadError> {
         let bytes = std::fs::read(path)?;
-        let res = Self::from_bytes(&bytes);
-        res
+        Self::from_bytes(&bytes)
     }
 }

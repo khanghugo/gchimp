@@ -64,7 +64,7 @@ impl Pane {
 pub fn create_tree(
     app_config: Config,
     persistent_storage: Arc<Mutex<PersistentStorage>>,
-    custom_renderer: CustomRenderer,
+    #[allow(unused)] custom_renderer: CustomRenderer,
 ) -> egui_tiles::Tree<Pane> {
     let mut tiles = egui_tiles::Tiles::default();
 

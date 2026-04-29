@@ -161,19 +161,19 @@ Append \"_<scalar>\" if tiling",
             .max(ui.spacing().interact_size.y);
 
         ui.horizontal(|ui| {
-            if ui.button("Add file(s)").clicked() {
-                if let Some(paths) = rfd::FileDialog::new().pick_files() {
-                    for path in paths {
-                        self.add_item(path.as_path());
-                    }
+            if ui.button("Add file(s)").clicked()
+                && let Some(paths) = rfd::FileDialog::new().pick_files()
+            {
+                for path in paths {
+                    self.add_item(path.as_path());
                 }
             }
 
-            if ui.button("Add folder(s)").clicked() {
-                if let Some(paths) = rfd::FileDialog::new().pick_folders() {
-                    for path in paths {
-                        self.add_item(path.as_path());
-                    }
+            if ui.button("Add folder(s)").clicked()
+                && let Some(paths) = rfd::FileDialog::new().pick_folders()
+            {
+                for path in paths {
+                    self.add_item(path.as_path());
                 }
             }
 

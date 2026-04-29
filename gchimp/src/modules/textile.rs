@@ -223,17 +223,17 @@ impl TexTileBuilder {
                     _ => image::open(&work_item).map_err(|err| eyre!(err)),
                 };
 
-                if new_img.is_err() {
+                if let Ok(new_img) = new_img {
+                    Ok((work_item, new_img.into_rgba8()))
+                } else {
                     let log = format!(
                         "Cannot open image {}: {}",
                         work_item.display(),
                         new_img.unwrap_err()
                     );
 
-                    return Err(eyre!(log));
+                    Err(eyre!(log))
                 }
-
-                Ok((work_item, new_img.unwrap().into_rgba8()))
             })
             .collect();
 
@@ -260,17 +260,17 @@ impl TexTileBuilder {
             .map(|(path, img)| {
                 let new_img = rgba8_to_8bpp(img);
 
-                if new_img.is_err() {
+                if let Ok(img) = new_img {
+                    Ok((path, img))
+                } else {
                     let log = format!(
                         "Cannot convert {} to 8bpp: {}",
                         path.display(),
                         new_img.unwrap_err()
                     );
 
-                    return Err(eyre!(log));
+                    Err(eyre!(log))
                 }
-
-                Ok((path, new_img.unwrap()))
             })
             .collect::<Vec<eyre::Result<(PathBuf, GoldSrcBmp)>>>();
 

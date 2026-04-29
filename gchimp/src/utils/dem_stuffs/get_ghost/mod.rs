@@ -136,9 +136,9 @@ impl GhostInfo {
             // attention, lerp to `from + diff`
             .lerp(from_frame.viewangles + viewangles_diff, target as f32);
 
-        let new_fov = if from_frame.fov.is_some() && to_frame.fov.is_some() {
-            let from_fov = from_frame.fov.unwrap();
-            let to_fov = to_frame.fov.unwrap();
+        let new_fov = if let Some(from_fov) = from_frame.fov
+            && let Some(to_fov) = to_frame.fov
+        {
             Some(from_fov.lerp(to_fov, target as f32))
         } else {
             None

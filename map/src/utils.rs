@@ -9,7 +9,7 @@ impl Map {
     ) -> impl Iterator<Item = &'a Entity> + 'a {
         self.entities.iter().filter(move |x| {
             x.attributes
-                .get("classname".into())
+                .get("classname")
                 .is_some_and(|classname_curr| classname_curr == classname)
         })
     }
@@ -20,7 +20,7 @@ impl Map {
     ) -> impl Iterator<Item = &'a mut Entity> + 'a {
         self.entities.iter_mut().filter(move |x| {
             x.attributes
-                .get("classname".into())
+                .get("classname")
                 .is_some_and(|classname_curr| classname_curr == classname)
         })
     }
@@ -28,7 +28,7 @@ impl Map {
     pub fn get_entity_by_class_name_first(&self, classname: &str) -> Option<usize> {
         self.entities.iter().position(|x| {
             x.attributes
-                .get("classname".into())
+                .get("classname")
                 .is_some_and(|classname_curr| classname_curr == classname)
         })
     }
@@ -39,7 +39,7 @@ impl Map {
             .enumerate()
             .filter_map(|(idx, x)| {
                 if x.attributes
-                    .get("classname".into())
+                    .get("classname")
                     .is_some_and(|classname_curr| classname_curr == classname)
                 {
                     Some(idx)
@@ -53,7 +53,7 @@ impl Map {
     pub fn get_entity_by_targetname(&self, targetname: &str) -> Option<usize> {
         self.entities.iter().position(|x| {
             x.attributes
-                .get("targetname".into())
+                .get("targetname")
                 .is_some_and(|targetname_curr| targetname_curr == targetname)
         })
     }
@@ -65,10 +65,10 @@ impl Map {
     ) -> Option<usize> {
         self.entities.iter().position(|x| {
             x.attributes
-                .get("classname".into())
+                .get("classname")
                 .is_some_and(|classname_curr| classname_curr == classname)
                 && x.attributes
-                    .get("targetname".into())
+                    .get("targetname")
                     .is_some_and(|targetname_curr| targetname_curr == targetname)
         })
     }

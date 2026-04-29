@@ -124,6 +124,10 @@ impl AnimValues {
     pub fn len(&self) -> usize {
         self.0.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 impl IndexMut<usize> for AnimValues {
@@ -232,7 +236,7 @@ pub struct ModelHeader {
 pub struct Model {
     pub header: ModelHeader,
     pub meshes: Vec<Mesh>,
-    /// > """vertexinfoindex is the offset to an array of int.
+    /// """vertexinfoindex is the offset to an array of int.
     /// This array is the same size as numverts and maps each vertex position to a bone index.
     /// This bone index is used to tell which bone affects this vertex position."""
     ///

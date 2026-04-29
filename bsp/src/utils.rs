@@ -26,6 +26,6 @@ pub fn between_braces<'a, T>(
     )
 }
 
-pub fn quoted_text(i: &str) -> SResult<&str> {
+pub fn quoted_text<'a>(i: &'a str) -> SResult<'a, &'a str> {
     terminated(preceded(tag("\""), take_till(|c| c == '\"')), tag("\""))(i)
 }

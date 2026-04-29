@@ -46,8 +46,6 @@ pub fn map_to_triangulated_smd(
         .collect())
 }
 
-pub fn map_to_triangulated_smd2(map: &Map, wads: &SimpleWad, three_planes: bool) {}
-
 /// Remember to check if texture exists.
 pub fn entity_to_triangulated_smd(
     entity: &Entity,
@@ -87,7 +85,7 @@ fn brush_to_triangulated_smd(
     wads: &SimpleWad,
     three_planes: bool,
 ) -> eyre::Result<Vec<Triangle>> {
-    let solid = brush_to_solid3d(&brush);
+    let solid = brush_to_solid3d(brush);
 
     solid3d_to_triangulated_smd(brush, &solid, wads, three_planes)
 }
@@ -110,7 +108,7 @@ pub fn brush_to_solid3d(brush: &Brush) -> Solid3D {
 
 pub fn solid_3d_to_convex_hull(solid: &Solid3D, three_planes: bool) -> ConvexHull {
     // TODO maybe phase out three_planes
-    let convex_hull = if three_planes {
+    if three_planes {
         // https://3707026871-files.gitbook.io/~/files/v0/b/gitbook-x-prod.appspot.com/o/spaces%2F-LtVT8pJjInrrHVCovzy%2Fuploads%2FEukkFYJLwfafFXUMpsI2%2FMAPFiles_2001_StefanHajnoczi.pdf?alt=media&token=51471685-bf69-42ae-a015-a474c0b95165
         // https://github.com/pwitvoet/mess/blob/master/MESS/Mapping/Brush.cs#L38
         let plane_count = solid.face_count();
@@ -148,9 +146,7 @@ pub fn solid_3d_to_convex_hull(solid: &Solid3D, three_planes: bool) -> ConvexHul
         });
 
         polytope
-    };
-
-    convex_hull
+    }
 }
 
 // technical debt

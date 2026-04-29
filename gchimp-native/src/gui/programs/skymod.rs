@@ -150,19 +150,17 @@ impl SkyModGui {
             )
         };
 
-        if button.clicked() {
-            if let Some(path) = rfd::FileDialog::new()
+        if button.clicked()
+            && let Some(path) = rfd::FileDialog::new()
                 .add_filter("Image", IMAGE_FORMATS)
                 .pick_file()
-            {
-                self.texture_paths[index] = path.display().to_string();
+        {
+            self.texture_paths[index] = path.display().to_string();
 
-                // load new texture
-                let handle =
-                    load_egui_image_to_texture(ui, self.texture_paths[index].clone()).unwrap();
+            // load new texture
+            let handle = load_egui_image_to_texture(ui, self.texture_paths[index].clone()).unwrap();
 
-                self.texture_handles[index] = Some(handle);
-            }
+            self.texture_handles[index] = Some(handle);
         };
     }
 }

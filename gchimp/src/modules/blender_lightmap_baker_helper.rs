@@ -430,7 +430,7 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
 
                     let (w, h) = find_w_h_block(centroid);
 
-                    let uvs = vec![
+                    let uvs = [
                         wrap_uv(world_to_uv(polygon.vertices()[0].into()), (w, h)),
                         wrap_uv(world_to_uv(polygon.vertices()[1].into()), (w, h)),
                         wrap_uv(world_to_uv(polygon.vertices()[2].into()), (w, h)),

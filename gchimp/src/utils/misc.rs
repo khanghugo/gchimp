@@ -128,11 +128,8 @@ pub fn search_game_resource(
 ) -> Option<PathBuf> {
     let mut one_shot_path = game_dir.join(game_mod).join(relative_path);
 
-    if !case_sensitive {
-        case_insensitive_file_search(one_shot_path.as_path())
-            // need to assign like this
-            // do not exit early
-            .map(|res| one_shot_path = res);
+    if !case_sensitive && let Some(res) = case_insensitive_file_search(one_shot_path.as_path()) {
+        one_shot_path = res
     }
 
     if one_shot_path.exists() {
@@ -144,11 +141,8 @@ pub fn search_game_resource(
     for game_mod_to_check in game_mods_to_check {
         let mut new_path = game_dir.join(game_mod_to_check).join(relative_path);
 
-        if !case_sensitive {
-            case_insensitive_file_search(new_path.as_path())
-                // need to assign like this
-                // do not exit early
-                .map(|res| new_path = res);
+        if !case_sensitive && let Some(res) = case_insensitive_file_search(new_path.as_path()) {
+            new_path = res
         }
 
         if new_path.exists() {
@@ -262,7 +256,7 @@ pub fn build_file_lookup(dir: &Path) -> FileLookup {
         res.insert(entry_name_normalized, entry_path);
     }
 
-    return res;
+    res
 }
 
 pub fn f64_3_to_u8_3(i: [f64; 3]) -> [u8; 3] {

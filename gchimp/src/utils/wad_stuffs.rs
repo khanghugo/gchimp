@@ -170,11 +170,13 @@ pub fn export_texture(
             FileEntry::Font(_) => unimplemented!(),
         });
 
-    if res.is_none() {
-        return Err(eyre!("Cannot find texture: {}", texture_name));
-    } else if let Some(err_str) = res.unwrap() {
-        return Err(eyre!("{}", err_str));
+    if let Some(err_str) = res {
+        if let Some(err_str) = err_str {
+            Err(eyre!("{}", err_str))
+        } else {
+            Ok(())
+        }
+    } else {
+        Err(eyre!("Cannot find texture: {}", texture_name))
     }
-
-    Ok(())
 }

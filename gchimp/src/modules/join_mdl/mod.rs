@@ -32,7 +32,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
     // verifies that there is gchimp_info
     // jmdl uses gchimp_info to find where the model is
     // will only search inside `basegame` and `basegame_downloads`
-    let gchimp_info = GchimpInfo::from_map(&map)?;
+    let gchimp_info = GchimpInfo::from_map(map)?;
 
     // is enabled beause i want this to be standard
     if !gchimp_info.spawnflags().contains(GchimpInfoOption::JoinMDL) {
@@ -83,7 +83,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
                 .entities
                 .iter()
                 .enumerate()
-                .filter(|(_, ent)| ent.target().map_or(false, |t| t == &jmdl_targetname))
+                .filter(|(_, ent)| ent.target() == Some(&jmdl_targetname))
                 .map(|(idx, _)| idx)
                 .collect::<Vec<usize>>();
 
@@ -334,14 +334,14 @@ fn jmdl_entity_origin(
                 if let Some(origin) = map.entities[point_entity].origin() {
                     Ok(origin)
                 } else {
-                    return Err(JMdlError::BrushTargetNotPointEntity {
+                    Err(JMdlError::BrushTargetNotPointEntity {
                         name: target_origin_name.to_owned(),
-                    });
+                    })
                 }
             } else {
-                return Err(JMdlError::BrushNoTarget {
+                Err(JMdlError::BrushNoTarget {
                     name: target_origin_name.to_owned(),
-                });
+                })
             }
         } else {
             // hard path, find the extents and use the middle as origin
@@ -375,9 +375,9 @@ fn jmdl_entity_origin(
 
                 Ok(DVec3::new(mid_point.x, mid_point.y, mid_point.z))
             } else {
-                return Err(JMdlError::BrushInvalid {
+                Err(JMdlError::BrushInvalid {
                     entity_idx: jmdl_entity_idx,
-                });
+                })
             }
         }
     } else {

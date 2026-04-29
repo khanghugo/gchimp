@@ -3,9 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use eframe::egui::{
-    self, Context, Modifiers, RichText, ScrollArea, Sense, Ui, scroll_area::ScrollSource,
-};
+use eframe::egui::{self, Modifiers, RichText, ScrollArea, Sense, Ui, scroll_area::ScrollSource};
 use gchimp::{modules::waddy::Waddy, utils::misc::find_files_recursively};
 use image::{ImageBuffer, RgbaImage};
 use wad::types::FileEntry;
@@ -375,7 +373,7 @@ impl WaddyGui {
         instance_index: usize,
         texture_tile_index: usize,
         image_tile_size: f32,
-        filtered_tiles: &Vec<usize>,
+        filtered_tiles: &[usize],
     ) {
         // FIXME: reduce ram usage by at least 4 times
         let current_id = egui::Id::new(format!(
@@ -573,11 +571,11 @@ impl WaddyGui {
             });
     }
 
-    fn display_image_viewports(&mut self, ctx: &Context) {
+    fn display_image_viewports(&mut self, ui: &mut egui::Ui) {
         self.extra_image_viewports = self
             .extra_image_viewports
             .iter()
-            .filter(|wad_img| !display_image_viewport_from_texture(ctx, wad_img.texture()))
+            .filter(|wad_img| !display_image_viewport_from_texture(ui, wad_img.texture()))
             .cloned()
             .collect::<Vec<WadImage>>()
     }
@@ -686,26 +684,22 @@ impl WaddyGui {
 
         // search bar
         if self.instances[instance_index].search.enable {
-            egui::TopBottomPanel::bottom(format!("search_bar{}", instance_index)).show(
-                ui.ctx(),
-                |ui| {
-                    ui.horizontal(|ui| {
-                        let text_edit = egui::TextEdit::singleline(
-                            &mut self.instances[instance_index].search.text,
-                        )
-                        .hint_text("Search for texture");
+            egui::Panel::bottom(format!("search_bar{}", instance_index)).show_inside(ui, |ui| {
+                ui.horizontal(|ui| {
+                    let text_edit =
+                        egui::TextEdit::singleline(&mut self.instances[instance_index].search.text)
+                            .hint_text("Search for texture");
 
-                        let text_edit = ui.add(text_edit);
+                    let text_edit = ui.add(text_edit);
 
-                        if self.instances[instance_index].search.should_focus {
-                            text_edit.request_focus();
-                            self.instances[instance_index].search.should_focus = false;
-                        }
+                    if self.instances[instance_index].search.should_focus {
+                        text_edit.request_focus();
+                        self.instances[instance_index].search.should_focus = false;
+                    }
 
-                        self.instances[instance_index].search.has_focus = text_edit.has_focus();
-                    });
-                },
-            );
+                    self.instances[instance_index].search.has_focus = text_edit.has_focus();
+                });
+            });
         }
 
         // Save WAD file with Ctrl+S
@@ -736,18 +730,17 @@ impl WaddyGui {
                         .add_texture_from_rgba_image("pasted_texture", rgba_image)
                         .unwrap();
                     self.update_after_add_image(ui, instance_index);
-                } else if let Ok(uri) = clipboard.get_text() {
-                    if uri.starts_with("file://") {
-                        if let Ok(image) = image::open(uri.replace("file://", "")) {
-                            let rgba_image = image.into_rgba8();
+                } else if let Ok(uri) = clipboard.get_text()
+                    && uri.starts_with("file://")
+                    && let Ok(image) = image::open(uri.replace("file://", ""))
+                {
+                    let rgba_image = image.into_rgba8();
 
-                            self.instances[instance_index]
-                                .waddy
-                                .add_texture_from_rgba_image("pasted_texture", rgba_image)
-                                .unwrap();
-                            self.update_after_add_image(ui, instance_index);
-                        }
-                    }
+                    self.instances[instance_index]
+                        .waddy
+                        .add_texture_from_rgba_image("pasted_texture", rgba_image)
+                        .unwrap();
+                    self.update_after_add_image(ui, instance_index);
                 }
             }
         }
@@ -827,14 +820,14 @@ impl WaddyGui {
             self.instances[instance_index].is_changed = true;
         }
 
-        let ctx = ui.ctx();
+        {
+            self.display_image_viewports(ui);
+        }
 
-        self.display_image_viewports(ctx);
-
-        preview_file_being_dropped(ctx);
+        preview_file_being_dropped(ui.ctx());
 
         // Collect dropped files:
-        let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
+        let dropped_files = ui.input(|i| i.raw.dropped_files.clone());
 
         for item in &dropped_files {
             if let Some(path) = &item.path {
@@ -1237,13 +1230,12 @@ impl WaddyGui {
                     continue;
                 }
 
-                if let Some(ext) = path.extension() {
-                    if ext == "wad" || ext == "bsp" {
-                        if let Err(err) = self.start_waddy_instance(ui, Some(path)) {
-                            // TODO TOAST
-                            println!("{}", err);
-                        }
-                    }
+                if let Some(ext) = path.extension()
+                    && (ext == "wad" || ext == "bsp")
+                    && let Err(err) = self.start_waddy_instance(ui, Some(path))
+                {
+                    // TODO TOAST
+                    println!("{}", err);
                 }
             }
         }
@@ -1253,34 +1245,38 @@ impl WaddyGui {
         ui.menu_button("Open Recent", |ui| {
             let mutex = self.persistent_storage.clone();
             let persistent_storage = mutex.lock().unwrap();
-            let recent_wads = persistent_storage.get_waddy_recent_wads();
+            let recent_wads = persistent_storage.get_waddy_recent_wads().cloned();
 
-            let to_remove = if recent_wads.is_none() || recent_wads.unwrap().is_empty() {
+            let to_remove = if let Some(recent_wads) = recent_wads {
+                if recent_wads.is_empty() {
+                    ui.add_enabled(false, egui::Button::new("No recently opened"));
+
+                    None
+                } else {
+                    // start_waddy_instance will block until it has persistent_storage guard
+                    drop(persistent_storage);
+
+                    recent_wads.into_iter().find(|recent_wad| {
+                        if ui.button(recent_wad.as_str()).clicked() {
+                            let path = Path::new(recent_wad.as_str());
+
+                            if path.exists() {
+                                self.start_waddy_instance(ui, Some(Path::new(recent_wad.as_str())))
+                                    .expect("cannot start a Waddy instance");
+
+                                ui.close();
+                            } else {
+                                return true;
+                            }
+                        }
+
+                        false
+                    })
+                }
+            } else {
                 ui.add_enabled(false, egui::Button::new("No recently opened"));
 
                 None
-            } else {
-                let recent_wads = recent_wads.unwrap().to_owned();
-
-                // start_waddy_instance will block until it has persistent_storage guard
-                drop(persistent_storage);
-
-                recent_wads.into_iter().find(|recent_wad| {
-                    if ui.button(recent_wad.as_str()).clicked() {
-                        let path = Path::new(recent_wad.as_str());
-
-                        if path.exists() {
-                            self.start_waddy_instance(ui, Some(Path::new(recent_wad.as_str())))
-                                .expect("cannot start a Waddy instance");
-
-                            ui.close();
-                        } else {
-                            return true;
-                        }
-                    }
-
-                    false
-                })
             };
 
             if let Some(to_remove) = to_remove {
@@ -1324,11 +1320,11 @@ impl TabProgram for WaddyGui {
                             .with_inner_size(
                                 [PROGRAM_WIDTH, PROGRAM_HEIGHT], // border :()
                             ),
-                        |ctx, _class| {
-                            egui::CentralPanel::default().show(ctx, |ui| {
+                        |ui, _class| {
+                            egui::CentralPanel::default().show_inside(ui, |ui| {
                                 self.instance_ui(ui, *instance_index);
 
-                                if ctx.input(|i| {
+                                if ui.input(|i| {
                                     i.viewport().close_requested()
                                         || i.key_pressed(egui::Key::Escape)
                                 }) {

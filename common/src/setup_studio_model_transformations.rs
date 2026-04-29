@@ -66,7 +66,7 @@ impl WorldTransformationSkeletal {
             time,
         );
 
-        let gait_bones: HashSet<usize> = (40..54).into_iter().chain([1]).collect();
+        let gait_bones: HashSet<usize> = (40..54).chain([1]).collect();
 
         let bone_count = sequence.len();
 
@@ -99,7 +99,7 @@ pub fn build_mvp_from_pos_and_rot(
 ) -> cgmath::Matrix4<f32> {
     let rotation: cgmath::Matrix4<f32> = rotation.into();
 
-    cgmath::Matrix4::from_translation(position.into()) * rotation
+    cgmath::Matrix4::from_translation(position) * rotation
 }
 
 pub enum WorldTransformation {
@@ -190,8 +190,7 @@ pub fn setup_studio_model_transformations(mdl: &Mdl) -> MdlPosRot {
                                 };
 
                                 // compute hierarchy transformation
-                                let rotated_local_pos =
-                                    parent_rot.rotate_vector(cgmath::Vector3::from(local_pos));
+                                let rotated_local_pos = parent_rot.rotate_vector(local_pos);
 
                                 let accum_pos = parent_pos + rotated_local_pos;
                                 let accum_rot = parent_rot * local_rot;
@@ -228,7 +227,7 @@ fn get_traversal_order(mdl: &Mdl) -> Vec<usize> {
         }
 
         // add current bone to the order and then mark bone visited
-        order.push(bone_idx as usize);
+        order.push(bone_idx);
         visited[bone_idx] = true;
     }
 
@@ -284,13 +283,13 @@ pub fn origin_posrot() -> PosRot {
 // https://github.com/SamVanheer/HalfLifeAssetManager/blob/4df74a58a50438b8f4b974e04ab9f24fdfcbb811/src/hlam/formats/studiomodel/BoneTransformer.cpp#L15
 fn get_sequence_transformations(
     model_transformations: &MdlPosRot,
-    model_transformation_infos: &Vec<ModelTransformationInfo>,
+    model_transformation_infos: &[ModelTransformationInfo],
     world_transformation: PosRot,
     sequence_idx: usize,
     blending_factor: [u8; 2],
     time: f32,
 ) -> Vec<cgmath::Matrix4<f32>> {
-    if model_transformations.len() == 0 {
+    if model_transformations.is_empty() {
         return vec![];
     }
 
@@ -327,8 +326,8 @@ fn get_sequence_transformations(
 
     if blend_count == 9 {
         let mut blend_res = vec![];
-        let mut target_x = 0.;
-        let mut target_y = 0.;
+        let mut target_x;
+        let mut target_y;
 
         let mut shorter_code = |a, b, c, d| {
             // closure can't recursive so this functin can jus have the same name and it works just fine
@@ -368,11 +367,11 @@ fn get_sequence_transformations(
         let lerped1 = get_lerp_frame(&blend_res[0], &blend_res[1], target_x);
         let lerped2 = get_lerp_frame(&blend_res[2], &blend_res[3], target_x);
 
-        return get_lerp_frame_world_mvp(&lerped1, &lerped2, world_transformation, target_y);
+        get_lerp_frame_world_mvp(&lerped1, &lerped2, world_transformation, target_y)
     } else if blend_count > 0 {
         // use blend 0 and that's it
         // TODO, all the blends
-        return lerp_frame_world_mvp(0);
+        lerp_frame_world_mvp(0)
     } else {
         unreachable!("model does not have any blends");
     }
@@ -394,11 +393,7 @@ fn get_lerp_target(
     ((from_index, to_index), lerp_target)
 }
 
-fn get_lerp_frame(
-    from_frame: &Vec<PosRot>,
-    to_frame: &Vec<PosRot>,
-    lerp_target: f32,
-) -> Vec<PosRot> {
+fn get_lerp_frame(from_frame: &[PosRot], to_frame: &[PosRot], lerp_target: f32) -> Vec<PosRot> {
     from_frame
         .iter()
         .zip(to_frame)
@@ -412,8 +407,8 @@ fn get_lerp_frame(
 }
 
 fn get_lerp_frame_world_mvp(
-    from_frame: &Vec<PosRot>,
-    to_frame: &Vec<PosRot>,
+    from_frame: &[PosRot],
+    to_frame: &[PosRot],
     (world_pos, world_rot): PosRot,
     lerp_target: f32,
 ) -> Vec<cgmath::Matrix4<f32>> {

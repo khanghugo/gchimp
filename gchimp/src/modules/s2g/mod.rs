@@ -549,7 +549,7 @@ impl S2G {
                     let smd_path_for_writing = qc_path
                         .parent()
                         .unwrap()
-                        .join(format!("{}.smd", smd_path_for_qc.display().to_string()));
+                        .join(format!("{}.smd", smd_path_for_qc.display()));
 
                     match smd.write(smd_path_for_writing.display().to_string().as_str()) {
                         Ok(_) => {}
@@ -777,7 +777,7 @@ impl S2G {
             self.log_info("Folder conversion");
             let mdls_in_folder = find_files_with_ext_in_folder(&self.path, "mdl")?;
 
-            let res = if !self.options.ignore_converted {
+            if !self.options.ignore_converted {
                 mdls_in_folder
             } else {
                 mdls_in_folder
@@ -792,9 +792,7 @@ impl S2G {
                     })
                     .map(|path| path.to_owned())
                     .collect::<Vec<PathBuf>>()
-            };
-
-            res
+            }
         };
 
         let mut input_files_log_str = String::from("Detected MDL(s):");

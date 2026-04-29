@@ -109,16 +109,15 @@ impl TabProgram for BLBHGui {
                 ui.add(
                     egui::TextEdit::singleline(&mut self.smd_path).hint_text("Choose .smd file"),
                 );
-                if ui.button("Add").clicked() {
-                    if let Some(path) = rfd::FileDialog::new()
+                if ui.button("Add").clicked()
+                    && let Some(path) = rfd::FileDialog::new()
                         .add_filter("SMD", &["smd"])
                         .pick_file()
-                    {
-                        if path.extension().is_some_and(|ext| ext == "smd") {
-                            self.smd_path = path.display().to_string();
-                        }
-                    }
+                    && path.extension().is_some_and(|ext| ext == "smd")
+                {
+                    self.smd_path = path.display().to_string();
                 }
+
                 ui.end_row();
 
                 ui.label("Texture:");
@@ -126,14 +125,14 @@ impl TabProgram for BLBHGui {
                     egui::TextEdit::singleline(&mut self.texture_path)
                         .hint_text("Choose an image file"),
                 );
-                if ui.button("Add").clicked() {
-                    if let Some(path) = rfd::FileDialog::new()
+                if ui.button("Add").clicked()
+                    && let Some(path) = rfd::FileDialog::new()
                         .add_filter("Image", IMAGE_FORMATS)
                         .pick_file()
-                    {
-                        self.texture_path = path.display().to_string();
-                    }
+                {
+                    self.texture_path = path.display().to_string();
                 }
+
                 ui.end_row();
             });
 
@@ -227,13 +226,13 @@ All materials in the mesh file are replaced by bake texture.",
         // Collect dropped files:
         ctx.input(|i| {
             for item in i.raw.dropped_files.clone() {
-                if let Some(item) = item.path {
-                    if item.is_file() {
-                        if item.extension().is_some_and(|ext| ext == "smd") {
-                            self.smd_path = item.to_str().unwrap().to_string();
-                        } else {
-                            self.texture_path = item.to_str().unwrap().to_string();
-                        }
+                if let Some(item) = item.path
+                    && item.is_file()
+                {
+                    if item.extension().is_some_and(|ext| ext == "smd") {
+                        self.smd_path = item.to_str().unwrap().to_string();
+                    } else {
+                        self.texture_path = item.to_str().unwrap().to_string();
                     }
                 }
             }

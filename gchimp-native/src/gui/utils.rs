@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use eframe::egui::{
-    self, Align2, Color32, ColorImage, Context, Id, LayerId, Order, TextStyle, TextureHandle,
+    self, Align2, Color32, ColorImage, Id, LayerId, Order, TextStyle, TextureHandle,
 };
 
 use gchimp::utils::img_stuffs::generate_rgba8_from_image_path;
@@ -22,69 +22,35 @@ pub fn preview_files_being_dropped_min_max_file(ctx: &egui::Context, min: usize,
             content_rect.center(),
             Align2::CENTER_CENTER,
             "Drag-n-Drop",
-            TextStyle::Heading.resolve(&ctx.style()),
+            TextStyle::Heading.resolve(&ctx.global_style()),
             Color32::WHITE,
         );
     }
 }
 
-// fn is_in_rect(p: Pos2, rect: Rect) -> bool {
-//     let is_in = |v, min, max| min <= v && v <= max;
+pub fn display_image_viewport_from_texture(ui: &mut egui::Ui, texture: &TextureHandle) -> bool {
+    let mut should_close = false;
 
-//     is_in(p.x, rect.min.x, rect.max.x) && is_in(p.y, rect.min.y, rect.max.y)
-// }
-
-#[allow(dead_code)]
-pub fn display_image_viewport_from_uri(
-    ctx: &Context,
-    uri: &str,
-    name: impl AsRef<str> + Into<String> + std::hash::Hash,
-) -> bool {
-    let should_draw = ctx.show_viewport_immediate(
-        egui::ViewportId::from_hash_of(&name),
-        egui::ViewportBuilder::default()
-            .with_title(name)
-            .with_inner_size([512., 512.]),
-        |ctx, _class| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.add(egui::Image::from_uri(uri));
-
-                if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
-                {
-                    return true;
-                };
-
-                false
-            })
-        },
-    );
-
-    should_draw.inner
-}
-
-pub fn display_image_viewport_from_texture(ctx: &Context, texture: &TextureHandle) -> bool {
-    let should_draw = ctx.show_viewport_immediate(
+    ui.show_viewport_immediate(
         egui::ViewportId::from_hash_of(texture.name()),
         egui::ViewportBuilder::default()
             .with_title(texture.name())
             .with_inner_size(
                 texture.size_vec2() + egui::Vec2 { x: 16., y: 16. }, // border :()
             ),
-        |ctx, _class| {
-            egui::CentralPanel::default().show(ctx, |ui| {
-                ui.add(egui::Image::new(texture));
+        |ui, _class| {
+            ui.add(egui::Image::new(texture));
 
-                if ctx.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
-                {
-                    return true;
-                };
-
-                false
-            })
+            if ui.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape)) {
+                // return true;
+                should_close = true;
+            } else {
+                should_close = false;
+            }
         },
     );
 
-    should_draw.inner
+    should_close
 }
 
 #[derive(Clone)]

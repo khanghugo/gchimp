@@ -98,44 +98,43 @@ pub fn demo_ghost_parse(filename: &str, demo: &Demo) -> eyre::Result<GhostInfo> 
                     }
                 });
 
-                if let Some(delta_packet_entities) = delta_packet_entities {
-                    if !delta_packet_entities.entity_states.is_empty()
-                        && delta_packet_entities.entity_states[0].delta.is_some()
-                    {
-                        let delta = &delta_packet_entities.entity_states[0]
-                            .delta
-                            .as_ref()
-                            .unwrap();
+                if let Some(delta_packet_entities) = delta_packet_entities
+                    && !delta_packet_entities.entity_states.is_empty()
+                    && delta_packet_entities.entity_states[0].delta.is_some()
+                {
+                    let delta = &delta_packet_entities.entity_states[0]
+                        .delta
+                        .as_ref()
+                        .unwrap();
 
-                        if let Some(sequence_bytes) = delta.get("sequence\0") {
-                            let sequence_bytes: [u8; 4] = from_fn(|i| sequence_bytes[i]);
-                            sequence = Some(i32::from_le_bytes(sequence_bytes));
-                        }
+                    if let Some(sequence_bytes) = delta.get("sequence\0") {
+                        let sequence_bytes: [u8; 4] = from_fn(|i| sequence_bytes[i]);
+                        sequence = Some(i32::from_le_bytes(sequence_bytes));
+                    }
 
-                        if let Some(anim_frame_bytes) = delta.get("frame\0") {
-                            let anim_frame_bytes: [u8; 4] = from_fn(|i: usize| anim_frame_bytes[i]);
-                            anim_frame = Some(f32::from_le_bytes(anim_frame_bytes));
-                        }
+                    if let Some(anim_frame_bytes) = delta.get("frame\0") {
+                        let anim_frame_bytes: [u8; 4] = from_fn(|i: usize| anim_frame_bytes[i]);
+                        anim_frame = Some(f32::from_le_bytes(anim_frame_bytes));
+                    }
 
-                        if let Some(animtime_bytes) = delta.get("animtime\0") {
-                            let animtime_bytes: [u8; 4] = from_fn(|i| animtime_bytes[i]);
-                            animtime = Some(f32::from_le_bytes(animtime_bytes));
-                        }
+                    if let Some(animtime_bytes) = delta.get("animtime\0") {
+                        let animtime_bytes: [u8; 4] = from_fn(|i| animtime_bytes[i]);
+                        animtime = Some(f32::from_le_bytes(animtime_bytes));
+                    }
 
-                        if let Some(gaitsequence_bytes) = delta.get("gaitsequence\0") {
-                            let gaitsequence_bytes: [u8; 4] = from_fn(|i| gaitsequence_bytes[i]);
-                            gaitsequence = Some(i32::from_le_bytes(gaitsequence_bytes));
-                        }
+                    if let Some(gaitsequence_bytes) = delta.get("gaitsequence\0") {
+                        let gaitsequence_bytes: [u8; 4] = from_fn(|i| gaitsequence_bytes[i]);
+                        gaitsequence = Some(i32::from_le_bytes(gaitsequence_bytes));
+                    }
 
-                        if let Some(blending0) = delta.get("blending[0]\0") {
-                            // blending is just [u8; 1]
-                            blending[0] = blending0[0];
-                        }
+                    if let Some(blending0) = delta.get("blending[0]\0") {
+                        // blending is just [u8; 1]
+                        blending[0] = blending0[0];
+                    }
 
-                        if let Some(blending1) = delta.get("blending[1]\0") {
-                            // blending is just [u8; 1]
-                            blending[1] = blending1[0];
-                        }
+                    if let Some(blending1) = delta.get("blending[1]\0") {
+                        // blending is just [u8; 1]
+                        blending[1] = blending1[0];
                     }
                 }
 

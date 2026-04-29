@@ -138,16 +138,14 @@ impl TabProgram for Map2MdlGui {
                             egui::TextEdit::singleline(&mut self.map).hint_text("Choose .map file"),
                         );
                     });
-                    if ui.button("Add").clicked() {
-                        if let Some(path) = rfd::FileDialog::new()
+                    if ui.button("Add").clicked()
+                        && let Some(path) = rfd::FileDialog::new()
                             .add_filter("MAP", &["map"])
                             .pick_file()
-                        {
-                            if path.extension().is_some_and(|ext| ext == "map") {
-                                self.map = path.display().to_string();
-                                self.use_entity = false;
-                            }
-                        }
+                        && path.extension().is_some_and(|ext| ext == "map")
+                    {
+                        self.map = path.display().to_string();
+                        self.use_entity = false;
                     }
 
                     ui.end_row();
@@ -241,11 +239,12 @@ This option is to coerce every texture in this process to be upper case.")
         ctx.input(|i| {
             if i.raw.dropped_files.len() == 1 {
                 let item = i.raw.dropped_files[0].clone();
-                if let Some(item) = item.path {
-                    if item.is_file() && item.extension().is_some_and(|ext| ext == "map") {
-                        self.map = item.to_str().unwrap().to_string();
-                        self.use_entity = false;
-                    }
+                if let Some(item) = item.path
+                    && item.is_file()
+                    && item.extension().is_some_and(|ext| ext == "map")
+                {
+                    self.map = item.to_str().unwrap().to_string();
+                    self.use_entity = false;
                 }
             }
         });
