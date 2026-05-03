@@ -129,11 +129,20 @@ impl Mdl {
     }
 
     // TODO this only works for single skin family
-    fn build_skin_families(&mut self) {
+    fn maybe_build_skin_families(&mut self) {
+        if !self.skin_families.is_empty() {
+            return;
+        }
+
+        // skinfamilies must match textures count
         self.skin_families = vec![(0..(self.textures.len() as i16)).collect()];
     }
 
-    fn build_bbox(&mut self) {
+    fn maybe_build_extents(&mut self) {
+        if !self.hitboxes.is_empty() {
+            return;
+        }
+
         // initialize min/max to zero so that
         // origin is always part fo the bbox
         // it makes the model bigger than it is
@@ -191,10 +200,8 @@ impl Mdl {
             });
         }
 
-        // skinfamilies must match textures count
-        self.build_skin_families();
-
-        self.build_bbox();
+        self.maybe_build_skin_families();
+        self.maybe_build_extents();
     }
 
     /// Returns model triangle count at any typical given moment

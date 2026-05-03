@@ -11,10 +11,14 @@ impl WriteToWriter for &[Blend] {
         // need to use a different writer so that we can write offset at the end
         let mut motion_data_writer = ByteWriter::new();
 
+        let num_blends = self.len();
+        let num_bones = self.first().map(|b| b.len()).unwrap_or(0);
+
         // [[[offset; 6 motion types]; bone count]; blend count]
         let motion_idx_offsets = self
             .iter()
-            .map(|blend| {
+            .enumerate()
+            .map(|(blend_idx, blend)| {
                 blend
                     .iter()
                     .enumerate()
@@ -26,7 +30,13 @@ impl WriteToWriter for &[Blend] {
                                 if motion.is_zero() {
                                     0
                                 } else {
-                                    motion.write_to_writer(&mut motion_data_writer) - (bone_idx * 12)
+                                    let data_offset = motion.write_to_writer(&mut motion_data_writer);
+                                    
+                                    // The offset is relative to the start of the specific bone's offset struct.
+                                    // We must jump over the remaining offset headers for all blends to reach the data.
+                                    let base_offset = (num_blends - blend_idx) * num_bones * 12;
+                                    
+                                    data_offset + base_offset - (bone_idx * 12)
                                 }
                                 )
                             .collect()
@@ -59,12 +69,12 @@ impl WriteToWriter for AnimValues {
     fn write_to_writer(&self, writer: &mut ByteWriter) -> usize {
         let offset = writer.get_offset();
 
-        let frame_count = self.0.len();
-
         // TODO actually compressing stuffs
         // right now, it just sends all the frames
-        writer.append_u8_slice(&[frame_count as u8; 2]);
-        writer.append_i16_slice(&self.0);
+        for chunk in self.0.chunks(255) {
+            writer.append_u8_slice(&[chunk.len() as u8; 2]);
+            writer.append_i16_slice(chunk);
+        }
 
         // no need to write 0 0 at the end to stop
         // because the run length already meets the frame count

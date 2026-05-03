@@ -35,11 +35,9 @@ impl Model {
                 .to_string();
 
             let get_smd_vertex = |v: &Trivert| {
-                trivert_to_smd_vertex(
-                    v,
-                    self.vertex_info[v.header.vert_index as usize] as i32, // bone idx
-                    curr_texture,
-                )
+                let parent = self.vertex_info[v.header.vert_index as usize] as i32; // bone idx
+
+                trivert_to_smd_vertex(v, parent, curr_texture)
             };
 
             for mesh_tri in &mesh.triangles {
