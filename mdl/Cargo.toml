@@ -6,7 +6,7 @@ edition.workspace = true
 
 [dependencies]
 bitflags = "2.6.0"
-byte_writer = { version = "0.1.0", path = "../byte_writer" }
+byte_writer = { path = "../byte_writer" }
 smd = { path = "../smd" }
 glam = "0.32.1"
 nom = "8.0.0"

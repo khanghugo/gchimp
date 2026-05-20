@@ -3,8 +3,9 @@ members = ["map", "smd", "qc" , "wad", "bsp", "byte_writer", "vtf", "gchimp", "g
 
 [workspace.package]
 authors = [ "Lê Hàn Minh Khang (Khang Le) <mkhangle20@gmail.com>" ]
-version = "0.3.5"
+version = "26.21.0"
 edition = "2024"
 
 [profile.release]
 strip = true
+# lto = true
