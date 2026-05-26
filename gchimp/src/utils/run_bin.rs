@@ -1,5 +1,5 @@
-use std::path::Path;
 use std::{
+    path::{Path, PathBuf},
     process::{Command, Output},
     thread::{self, JoinHandle},
 };
@@ -34,18 +34,26 @@ pub fn run_crowbar(mdl: &Path, crowbar: &Path) -> JoinHandle<eyre::Result<Output
 
 #[cfg(target_os = "linux")]
 pub fn run_studiomdl(
-    qc: &Path,
-    studiomdl: &Path,
+    qc: impl Into<PathBuf> + AsRef<Path>,
+    studiomdl: impl Into<PathBuf> + AsRef<Path>,
     wineprefix: &str,
 ) -> JoinHandle<eyre::Result<Output>> {
     // `./studiomdl file.qc`
+    let qc = qc.as_ref();
+    let studiomdl = studiomdl.as_ref();
+
     let command = vec![studiomdl.display().to_string(), qc.display().to_string()];
     run_command_linux_with_wine(command, wineprefix.to_string())
 }
 
 #[cfg(target_os = "windows")]
-pub fn run_studiomdl(qc: &Path, studiomdl: &Path) -> JoinHandle<eyre::Result<Output>> {
+pub fn run_studiomdl(
+    qc: impl Into<PathBuf> + AsRef<Path>,
+    studiomdl: impl Into<PathBuf> + AsRef<Path>,
+) -> JoinHandle<eyre::Result<Output>> {
     // `./studiomdl file.qc`
+    let qc = qc.as_ref();
+    let studiomdl = studiomdl.as_ref();
     let command = vec![studiomdl.display().to_string(), qc.display().to_string()];
     run_command_windows(command)
 }

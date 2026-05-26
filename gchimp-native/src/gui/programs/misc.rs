@@ -6,18 +6,23 @@ use std::{
 
 use eframe::egui;
 
-use gchimp::modules::{
-    loop_wave::loop_wave,
-    resmake::{ResMake, ResMakeOptions},
-    split_model::split_model,
+use gchimp::{
+    modules::{
+        loop_wave::loop_wave,
+        resmake::{ResMake, ResMakeOptions},
+        split_model::split_model,
+    },
+    utils::{constants::STUDIOMDL_ERROR_PATTERN, run_bin::run_studiomdl},
 };
 
 use crate::{
     cli::{self},
+    config::Config,
     gui::{TabProgram, utils::preview_file_being_dropped},
 };
 
 pub struct Misc {
+    config: Config,
     qc: String,
     wav: String,
     bsp: String,
@@ -29,11 +34,13 @@ pub struct Misc {
     loop_wave_status: Arc<Mutex<String>>,
     resmake_status: Arc<Mutex<String>>,
     smd_compile_status: Arc<Mutex<String>>,
+    studiomdl_compile_status: Arc<Mutex<String>>,
 }
 
-impl Default for Misc {
-    fn default() -> Self {
+impl Misc {
+    pub fn new(config: Config) -> Self {
         Self {
+            config,
             qc: Default::default(),
             wav: Default::default(),
             bsp: Default::default(),
@@ -43,6 +50,7 @@ impl Default for Misc {
             loop_wave_status: Arc::new(Mutex::new(String::from("Idle"))),
             resmake_status: Arc::new(Mutex::new(String::from("Idle"))),
             smd_compile_status: Arc::new(Mutex::new(String::from("Idle"))),
+            studiomdl_compile_status: Arc::new(Mutex::new(String::from("Idle"))),
             loop_wave_loop: true,
             loop_wave_16_bit: true,
         }
@@ -213,6 +221,33 @@ If there are external WADs found, this option will create a new WAD file contain
             });
     }
 
+    fn studiomdl_compile(&mut self, ui: &mut eframe::egui::Ui) {
+        ui.label("StudioMDL Compile")
+            .on_hover_text("Compiles a .qc file without using the terminal");
+        egui::Grid::new("studiomdl_compile")
+            .num_columns(2)
+            .show(ui, |ui| {
+                ui.label("QC:");
+                ui.add(egui::TextEdit::singleline(&mut self.qc).hint_text("Choose .qc file"));
+                if ui.button("Add").clicked()
+                    && let Some(path) = rfd::FileDialog::new().add_filter("QC", &["qc"]).pick_file()
+                    && path.extension().is_some_and(|ext| ext == "qc")
+                {
+                    self.qc = path.display().to_string();
+                }
+
+                ui.end_row();
+
+                if ui.button("Run").clicked() {
+                    self.run_studiomdl_compile();
+                }
+
+                let binding = self.studiomdl_compile_status.lock().unwrap();
+                let mut status_text = binding.as_str();
+                ui.text_edit_singleline(&mut status_text)
+            });
+    }
+
     fn run_split_model(&mut self) {
         let qc = self.qc.clone();
         let status = self.split_model_status.clone();
@@ -294,6 +329,42 @@ If there are external WADs found, this option will create a new WAD file contain
             }
         });
     }
+
+    fn run_studiomdl_compile(&mut self) {
+        let qc = self.qc.clone();
+        let status = self.studiomdl_compile_status.clone();
+        "Running".clone_into(&mut status.lock().unwrap());
+
+        let studiomdl = self.config.studiomdl.clone();
+        #[cfg(not(windows))]
+        let wineprefix = self.config.wineprefix.clone().unwrap_or("".into());
+
+        #[cfg(not(windows))]
+        let res = run_studiomdl(qc, studiomdl, &wineprefix);
+        #[cfg(windows)]
+        let res = run_studiomdl(qc, studiomdl);
+
+        match res.join() {
+            Ok(x) => {
+                let output = x.expect("should have output");
+                let stdout = str::from_utf8(&output.stdout).expect("should have utf8 output");
+
+                let is_err = stdout.find(STUDIOMDL_ERROR_PATTERN).is_some();
+
+                if is_err {
+                    "There is an error. Ctrl+V in text editor to see error"
+                        .clone_into(&mut status.lock().unwrap());
+
+                    let _ = arboard::Clipboard::new().map(|mut x| x.set_text(stdout));
+                } else {
+                    "Done".clone_into(&mut status.lock().unwrap());
+                }
+            }
+            Err(_) => {
+                "Could not run studiomdl.exe".clone_into(&mut status.lock().unwrap());
+            }
+        };
+    }
 }
 
 impl TabProgram for Misc {
@@ -314,6 +385,9 @@ impl TabProgram for Misc {
         ui.separator();
 
         self.smd_compile(ui);
+        ui.separator();
+
+        self.studiomdl_compile(ui);
         ui.separator();
 
         let ctx = ui.ctx();

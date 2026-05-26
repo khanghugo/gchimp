@@ -81,7 +81,7 @@ pub fn create_tree(
         //     custom_renderer.mdlscrub_renderer,
         // )))),
         // tiles.insert_pane(Pane::DemDoc(DemDoc::default())),
-        tiles.insert_pane(Pane::Misc(Misc::default())),
+        tiles.insert_pane(Pane::Misc(Misc::new(app_config.clone()))),
     ];
 
     let root = tiles.insert_tab_tile(tabs);
