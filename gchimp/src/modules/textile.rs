@@ -46,7 +46,7 @@ impl Default for TexTileOptions {
             is_tiling: true,
             tiling_scalar: 2,
             is_transparent: false,
-            transparent_threshold: 0.75,
+            transparent_threshold: 0.25,
             change_name: true,
         }
     }
