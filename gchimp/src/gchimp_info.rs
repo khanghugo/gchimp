@@ -14,6 +14,21 @@ pub struct GchimpInfo {
     entity: Entity,
 }
 
+impl GchimpInfo {
+    pub fn is_jmdl_enabled(&self) -> bool {
+        self.spawnflags().contains(GchimpInfoOption::JoinMDL)
+    }
+
+    pub fn is_map2mdl_conversion_enabled(&self) -> bool {
+        self.spawnflags()
+            .contains(GchimpInfoOption::Map2MdlConversion)
+    }
+
+    pub fn is_map2mdl_export_enabled(&self) -> bool {
+        self.spawnflags().contains(GchimpInfoOption::Map2MdlExport)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum GchimpInfoError {
     #[error("gchimp_info does not exist in the map")]

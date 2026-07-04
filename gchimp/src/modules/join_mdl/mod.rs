@@ -35,7 +35,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
     let gchimp_info = GchimpInfo::from_map(map)?;
 
     // is enabled beause i want this to be standard
-    if !gchimp_info.spawnflags().contains(GchimpInfoOption::JoinMDL) {
+    if !gchimp_info.is_jmdl_enabled() {
         println!("JoinMDL is not enabled.");
         return Ok(0);
     }
