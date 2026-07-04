@@ -60,6 +60,7 @@ impl TexTileGui {
             is_transparent,
             transparent_threshold,
             change_name,
+            resize_image,
         } = self.options;
 
         let items = self.items.clone();
@@ -76,6 +77,7 @@ impl TexTileGui {
                 .tiling_scalar(tiling_scalar)
                 .transparent(is_transparent)
                 .transparent_threshold(transparent_threshold)
+                .resize_image(resize_image)
                 .sync(sync.clone());
 
             *sync.done().lock().unwrap() = false;
@@ -110,33 +112,43 @@ Space seperated",
         egui::Grid::new("TexTile option grid")
             .num_columns(6)
             .show(ui, |ui| {
-                ui.checkbox(&mut self.options.is_tiling, "Tiling");
-                ui.add_enabled(
-                    self.options.is_tiling,
-                    egui::DragValue::new(&mut self.options.tiling_scalar).range(0.0..=100.0),
-                )
-                .on_hover_text("The dimensions of a texture will multiply by this number.");
+                // row 1
+                {
+                    ui.checkbox(&mut self.options.is_tiling, "Tiling");
+                    ui.add_enabled(
+                        self.options.is_tiling,
+                        egui::DragValue::new(&mut self.options.tiling_scalar).range(0.0..=100.0),
+                    )
+                    .on_hover_text("The dimensions of a texture will multiply by this number.");
 
-                ui.checkbox(&mut self.options.is_transparent, "Transparent");
-                ui.add_enabled(
-                    self.options.is_transparent,
-                    egui::DragValue::new(&mut self.options.transparent_threshold)
-                        .range(0.0..=1.0)
-                        .speed(0.01),
-                )
-                .on_hover_text(
-                    "\
+                    ui.checkbox(&mut self.options.is_transparent, "Transparent");
+                    ui.add_enabled(
+                        self.options.is_transparent,
+                        egui::DragValue::new(&mut self.options.transparent_threshold)
+                            .range(0.0..=1.0)
+                            .speed(0.01),
+                    )
+                    .on_hover_text(
+                        "\
 The threshold to decide whether a texture is transparent. \n
 If the dominant color of an image exceeds this threshold, 
 it will be chosen as transparent mask.",
-                );
+                    );
 
-                ui.checkbox(&mut self.options.change_name, "Change file name")
-                    .on_hover_text(
-                        "\
+                    ui.checkbox(&mut self.options.change_name, "Change file name")
+                        .on_hover_text(
+                            "\
 Prepend \"{\" if transparent
 Append \"_<scalar>\" if tiling",
-                    );
+                        );
+                }
+
+                ui.end_row();
+
+                {
+                    ui.checkbox(&mut self.options.resize_image, "Resize")
+                        .on_hover_text("Resize image to GoldSrc compliant dimensions")
+                }
             });
 
         ui.separator();

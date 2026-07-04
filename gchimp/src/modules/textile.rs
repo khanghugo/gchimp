@@ -11,7 +11,8 @@ use rayon::prelude::*;
 use vtf::Vtf;
 
 use crate::utils::img_stuffs::{
-    GoldSrcBmp, eight_bpp_transparent_img, rgba8_to_8bpp, tile_and_resize, write_8bpp_to_file,
+    GoldSrcBmp, eight_bpp_transparent_img, maybe_resize_due_to_exceeding_max_goldsrc_texture_size,
+    rgba8_to_8bpp, tile_and_resize, write_8bpp_to_file,
 };
 
 pub struct TexTileBuilder {
@@ -32,6 +33,8 @@ pub struct TexTileOptions {
     ///
     /// Appends "`_<scalar>`" if tiling
     pub change_name: bool,
+    /// Resizes image to GoldSrc compliant dimensions
+    pub resize_image: bool,
 }
 
 impl Default for TexTileOptions {
@@ -43,11 +46,12 @@ impl Default for TexTileOptions {
                 "jpeg".to_string(),
                 "vtf".to_string(),
             ],
-            is_tiling: true,
+            is_tiling: false,
             tiling_scalar: 2,
-            is_transparent: false,
+            is_transparent: true,
             transparent_threshold: 0.25,
             change_name: true,
+            resize_image: true,
         }
     }
 }
@@ -183,6 +187,11 @@ impl TexTileBuilder {
         self
     }
 
+    pub fn resize_image(&mut self, a: bool) -> &mut Self {
+        self.options.resize_image = a;
+        self
+    }
+
     pub fn work(&mut self) -> eyre::Result<()> {
         // transparent shoudl be the last step
         // the reason is that transparent pixel could be interpolated when tiling or scaled down
@@ -247,6 +256,12 @@ impl TexTileBuilder {
 
         let mut rgba_images: Vec<(PathBuf, RgbaImage)> =
             rgba_images.into_iter().map(|res| res.unwrap()).collect();
+
+        if self.options.resize_image {
+            rgba_images.par_iter_mut().for_each(|(_, img)| {
+                *img = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
+            });
+        }
 
         if self.options.is_tiling {
             rgba_images.par_iter_mut().for_each(|(_, img)| {

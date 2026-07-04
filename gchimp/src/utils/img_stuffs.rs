@@ -37,7 +37,7 @@ fn quantize_image(img: RgbImage) -> eyre::Result<(RgbImage, Palette)> {
     Ok((img, palette))
 }
 
-fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: RgbaImage) -> RgbaImage {
+pub fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: &RgbaImage) -> RgbaImage {
     let (width, height) = img.dimensions();
 
     let bigger_side = if width >= height { width } else { height };
@@ -57,14 +57,14 @@ fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: RgbaImage) -> Rgb
         let (new_width, new_height) = make_multiple_of_16((width, height));
 
         // good enough? i guess?
-        imageops::resize(&img, new_width, new_height, imageops::FilterType::Lanczos3)
+        imageops::resize(img, new_width, new_height, imageops::FilterType::Lanczos3)
     } else {
         let (width, height) = (width as f32 / q, height as f32 / q);
         let (width, height) = (width.round() as u32, height.round() as u32);
         let (width, height) = make_multiple_of_16((width, height));
 
         imageops::resize(
-            &img,
+            img,
             width,
             height,
             // eh, meow?
@@ -145,7 +145,7 @@ pub fn any_format_to_bmp_write_to_file(
     img_path: impl AsRef<Path> + Into<PathBuf>,
 ) -> eyre::Result<()> {
     let img = generate_rgba8_from_image_path(img_path.as_ref())?;
-    let rgba8 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
+    let rgba8 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(&img);
     let GoldSrcBmp {
         image: img,
         palette,
@@ -188,7 +188,7 @@ pub fn any_format_to_png(
 
 pub fn any_format_to_8bpp(img_path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<GoldSrcBmp> {
     let img = generate_rgba8_from_image_path(img_path.as_ref())?;
-    let rgba8 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
+    let rgba8 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(&img);
     let res = rgba8_to_8bpp(rgba8)?;
 
     Ok(res)
@@ -455,7 +455,7 @@ fn _generate_mipmaps_indexed_bmp(
 
 // TODO: better mipmaps generation because this is very SHIT
 pub fn generate_mipmaps_from_rgba_image(img: RgbaImage) -> eyre::Result<GenerateMipmapsResult> {
-    let mip0 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img);
+    let mip0 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(&img);
 
     let mip0 = rgba8_to_rgb8(mip0);
 
