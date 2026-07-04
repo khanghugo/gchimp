@@ -5,7 +5,7 @@ use map::Map;
 use mdl::Mdl;
 
 use crate::{
-    gchimp_info::{GchimpInfo, GchimpInfoOption},
+    gchimp_info::GchimpInfo,
     modules::join_mdl::{
         entity::{
             JMDL_ATTR_MODEL_ENTITY, JMDL_ATTR_OUTPUT, JMDL_BRUSH_ENTITY_NAME, JMDL_ENTITY_NAME,
