@@ -31,11 +31,10 @@ impl WriteToWriter for &[Blend] {
                                     0
                                 } else {
                                     let data_offset = motion.write_to_writer(&mut motion_data_writer);
-                                    
                                     // The offset is relative to the start of the specific bone's offset struct.
                                     // We must jump over the remaining offset headers for all blends to reach the data.
                                     let base_offset = (num_blends - blend_idx) * num_bones * 12;
-                                    
+
                                     data_offset + base_offset - (bone_idx * 12)
                                 }
                                 )
