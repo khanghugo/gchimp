@@ -1,35 +1,27 @@
-use eyre::eyre;
 use glam::{DVec2, DVec3};
 use image::{RgbaImage, imageops};
-use qc::Qc;
+use mdl::Mdl;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use smd::{Smd, Triangle, Vertex};
+use smd::{Triangle, Vertex};
 use std::{
+    array::from_fn,
+    collections::HashMap,
     f64::consts::PI,
     path::{Path, PathBuf},
-    str::from_utf8,
 };
 
 use ndarray::prelude::*;
 
-use crate::{
-    err,
-    utils::{
-        constants::{MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
-        img_stuffs::{
-            GoldSrcBmp, generate_rgba8_from_image_path, rgba8_to_8bpp, write_8bpp_to_file,
-        },
-    },
+use crate::utils::{
+    constants::MAX_GOLDSRC_MODEL_TEXTURE_COUNT,
+    img_stuffs::{GoldSrcBmp, rgba8_to_8bpp},
+    studiomdl::StudioMdl,
 };
-
-#[cfg(target_arch = "x86_64")]
-use crate::utils::run_bin::run_studiomdl;
 
 #[derive(Clone)]
 pub struct SkyModOptions {
     pub skybox_size: u32,
-    pub texture_per_face: u32,
-    pub convert_texture: bool,
+    pub texture_per_side: u32,
     pub flatshade: bool,
     pub output_name: String,
 }
@@ -38,486 +30,328 @@ impl Default for SkyModOptions {
     fn default() -> Self {
         Self {
             skybox_size: 131072,
-            texture_per_face: 1,
-            convert_texture: true,
+            texture_per_side: 1,
             flatshade: true,
             output_name: "skybox".to_string(),
         }
     }
 }
 
-static MIN_TEXTURE_SIZE: u32 = 512;
+const MIN_TEXTURE_SIZE: u32 = 512;
 
-pub struct SkyModBuilder {
-    // order is: 0 up 1 left 2 front 3 right 4 back 5 down
-    textures: Vec<String>,
-    options: SkyModOptions,
-    studiomdl: Option<PathBuf>,
-    wineprefix: Option<String>,
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum SkymodError {
+    #[error("Not all textures are square")]
+    NotSquare,
+    #[error("Not all textures have same dimensions. Expect {dim}x{dim}")]
+    NotSameDimensions { dim: u32 },
+    #[error("Failed to compile model. Please open a GitHub issue with your textures.")]
+    FailCompile,
+    #[error("Failed to open texture files: {paths:?}")]
+    FailOpenTexture { paths: Vec<String> },
 }
 
-impl Default for SkyModBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub fn skymod(cubemap: [RgbaImage; 6], options: SkyModOptions) -> Result<Vec<Mdl>, SkymodError> {
+    let texture0_dimensions = cubemap[0].dimensions();
 
-impl SkyModBuilder {
-    pub fn new() -> Self {
-        Self {
-            textures: vec![String::new(); 6],
-            options: SkyModOptions::default(),
-            studiomdl: None,
-            wineprefix: None,
-        }
+    if !cubemap
+        .iter()
+        .any(|texture| texture.dimensions().0 == texture.dimensions().1)
+    {
+        return Err(SkymodError::NotSquare);
     }
 
-    pub fn up(&mut self, a: &str) -> &mut Self {
-        a.clone_into(&mut self.textures[0]);
-        self
+    if !cubemap
+        .iter()
+        .any(|texture| texture.dimensions() == texture0_dimensions)
+    {
+        return Err(SkymodError::NotSameDimensions {
+            dim: texture0_dimensions.0,
+        });
     }
 
-    pub fn lf(&mut self, a: &str) -> &mut Self {
-        a.clone_into(&mut self.textures[1]);
-        self
-    }
+    let texture_per_side = options.texture_per_side;
+    let texture_per_face = texture_per_side * texture_per_side;
 
-    pub fn ft(&mut self, a: &str) -> &mut Self {
-        a.clone_into(&mut self.textures[2]);
-        self
-    }
+    // ok do stuffs
+    // assumptions
+    // texture size is at least 512
+    // if texture size is greater than 512 eg 1024 2048,
+    // depending on the face count, there will be some cropping and resizing
+    // cropping is when face count is more than 1
+    // resize is when total amount of face count is "less" than texture size
+    let min_size = texture_per_side * MIN_TEXTURE_SIZE;
 
-    pub fn rt(&mut self, a: &str) -> &mut Self {
-        a.clone_into(&mut self.textures[3]);
-        self
-    }
+    let material_name = |index, x, y| {
+        format!(
+            "{}{}{:02}{:02}",
+            options.output_name,
+            map_index_to_suffix(index),
+            x,
+            y
+        )
+    };
 
-    pub fn bk(&mut self, a: &str) -> &mut Self {
-        a.clone_into(&mut self.textures[4]);
-        self
-    }
+    let model_name = |index: usize| format!("{}{}", options.output_name, index);
 
-    pub fn dn(&mut self, a: &str) -> &mut Self {
-        a.clone_into(&mut self.textures[5]);
-        self
-    }
+    // convert textures
+    let texture_lookup: HashMap<(u32, u32), GoldSrcBmp> = cubemap
+        .into_par_iter()
+        .enumerate()
+        .flat_map(|(_texture_index, texture)| {
+            let (width, _) = texture.dimensions();
 
-    pub fn studiomdl(&mut self, a: &str) -> &mut Self {
-        self.studiomdl = Some(a.into());
-        self
-    }
+            // it is best to resize first then we can crop accordingly to how many textures in a face
+            let texture = if min_size == width {
+                texture
+            } else {
+                imageops::resize(&texture, min_size, min_size, imageops::FilterType::Lanczos3)
+            };
 
-    pub fn wineprefix(&mut self, a: Option<String>) -> &mut Self {
-        self.wineprefix = a;
-        self
-    }
+            (0..texture_per_side)
+                .flat_map(|_x| {
+                    (0..texture_per_side)
+                        .map(|_y| {
+                            let x = MIN_TEXTURE_SIZE * _x;
+                            let y = MIN_TEXTURE_SIZE * _y;
 
-    pub fn output_name(&mut self, a: &str) -> &mut Self {
-        self.options.output_name = a.to_string();
-        self
-    }
+                            let section = imageops::crop_imm(
+                                &texture,
+                                x,
+                                y,
+                                MIN_TEXTURE_SIZE,
+                                MIN_TEXTURE_SIZE,
+                            )
+                            .to_image();
 
-    pub fn texture_per_face(&mut self, a: u32) -> &mut Self {
-        self.options.texture_per_face = a;
-        self
-    }
+                            // DEBUG
+                            // section
+                            //     .save(
+                            //         PathBuf::from("/home/khang/gchimp/examples/skybox/aaaaaaaaaa/")
+                            //             .join(material_name(_texture_index as u32, _x, _y))
+                            //             .with_extension("png"),
+                            //     )
+                            //     .unwrap();
 
-    pub fn skybox_size(&mut self, a: u32) -> &mut Self {
-        self.options.skybox_size = a;
-        self
-    }
+                            let mut res = rgba8_to_8bpp(section).unwrap();
+                            res.pad_palette(); // .mdl is hardcoded to have 256 colors
 
-    pub fn convert_texture(&mut self, a: bool) -> &mut Self {
-        self.options.convert_texture = a;
-        self
-    }
+                            ((_x, _y), res)
+                        })
+                        .collect::<HashMap<(u32, u32), GoldSrcBmp>>()
+                })
+                .collect::<HashMap<(u32, u32), GoldSrcBmp>>()
+        })
+        .collect();
 
-    pub fn flat_shade(&mut self, a: bool) -> &mut Self {
-        self.options.flatshade = a;
-        self
-    }
+    // skybox size 64 means it goes from +32 to -32
+    let skybox_coord = options.skybox_size as f64 / 2.;
+    // size of the texture in the world, like 64k x 64k
+    // TODO can move this to the loop so that all texture don't need uniform dimension side
+    let texture_world_size = options.skybox_size as f64 / texture_per_side as f64;
 
-    pub fn work(&self) -> eyre::Result<()> {
-        // check stuffs
-        for i in 0..6 {
-            if self.textures[i].is_empty() {
-                return Err(eyre!("Empty texture."));
-            }
-        }
+    // write .smd, plural
+    let _texture_count = texture_per_side * texture_per_side * 6;
+    let model_count = (texture_lookup.len() / MAX_GOLDSRC_MODEL_TEXTURE_COUNT) + 1;
 
-        if self.studiomdl.is_none() {
-            return Err(eyre!("No studiomdl.exe supplied"));
-        }
+    let mut studiomdls = vec![StudioMdl::new(); model_count];
 
-        #[cfg(target_os = "linux")]
-        if self.wineprefix.is_none() {
-            return Err(eyre!("No WINEPREFIX supplied"));
-        }
+    // adding vertices to model
+    for texture_index in 0..6 {
+        for _y in 0..texture_per_side {
+            for _x in 0..texture_per_side {
+                let material_name = material_name(texture_index, _x, _y);
 
-        let textures = self
-            .textures
-            .iter()
-            .map(generate_rgba8_from_image_path)
-            .collect::<Result<Vec<RgbaImage>, _>>()?;
+                // sequentially, what is the order of this texture
+                // if it is over MAX_GOLDSRC_MODEL_TEXTURE_COUNT then add the quad
+                // in a different smd
+                let curr_texture_overall_count =
+                    texture_index * texture_per_face + _y * texture_per_side + _x;
 
-        if textures.len() != 6 {
-            return Err(eyre!(
-                "Cannot parse all texture files ({}/6)",
-                textures.len()
-            ));
-        }
+                let mdl_index =
+                    curr_texture_overall_count as usize / MAX_GOLDSRC_MODEL_TEXTURE_COUNT;
 
-        let texture0_dimensions = textures[0].dimensions();
+                let texture_world_min_x = skybox_coord - texture_world_size * _x as f64;
+                let texture_world_min_y = skybox_coord - texture_world_size * _y as f64;
 
-        if !textures
-            .iter()
-            .all(|texture| texture.dimensions() == texture0_dimensions)
-        {
-            return err!(
-                "not all textures have the same dimensions (expect {}x{}",
-                texture0_dimensions.0,
-                texture0_dimensions.1
-            );
-        }
+                // triangle with normal vector pointing up
+                // orientation is "default" where top left is 1 1 and bottom right is -1, -1
+                // counter-clockwise
+                // A ---- D
+                // |      |
+                // B ---- C
+                // A has coordinate of `min`
+                // C has coordinate of `max`
+                let rot_mat = array![[1., 0.], [0., -1.]];
 
-        if !textures
-            .iter()
-            .all(|texture| texture.dimensions().0 == texture.dimensions().1)
-        {
-            return err!("not all textures are squares");
-        }
+                // fix the seam, i guess?
+                // zoom everything in so that the original size is 1 pixel outward diagonally for every corner
+                let what: f64 = -1. / MIN_TEXTURE_SIZE as f64;
 
-        let texture_per_side = (self.options.texture_per_face as f32).sqrt().floor() as u32;
-        if texture_per_side * texture_per_side != self.options.texture_per_face
-            || self.options.texture_per_face == 0
-        {
-            return Err(eyre!(
-                "Chosen texture per face is not a valid number. Use n^2."
-            ));
-        }
+                let mut vert_a_uv = array![0. - what, 0. - what].dot(&rot_mat);
+                let mut vert_b_uv = array![0. - what, 1. + what].dot(&rot_mat);
+                let mut vert_c_uv = array![1. + what, 1. + what].dot(&rot_mat);
+                let mut vert_d_uv = array![1. + what, 0. - what].dot(&rot_mat);
 
-        // ok do stuffs
-        // assumptions
-        // texture size is at least 512
-        // if texture size is greater than 512 eg 1024 2048,
-        // depending on the face count, there will be some cropping and resizing
-        // cropping is when face count is more than 1
-        // resize is when total amount of face count is "less" than texture size
+                // FIXME: dont do this
+                vert_a_uv[1] += 1.0;
+                vert_b_uv[1] += 1.0;
+                vert_c_uv[1] += 1.0;
+                vert_d_uv[1] += 1.0;
 
-        let first_texture_path = PathBuf::from(&self.textures[0]);
-        let root_path = first_texture_path.parent().unwrap();
+                let quad = array![
+                    // A
+                    [texture_world_min_x, texture_world_min_y, -skybox_coord],
+                    // B
+                    [
+                        texture_world_min_x,
+                        texture_world_min_y - texture_world_size,
+                        -skybox_coord
+                    ],
+                    // C
+                    [
+                        texture_world_min_x - texture_world_size,
+                        texture_world_min_y - texture_world_size,
+                        -skybox_coord
+                    ],
+                    // D
+                    [
+                        texture_world_min_x - texture_world_size,
+                        texture_world_min_y,
+                        -skybox_coord
+                    ]
+                ];
 
-        let min_size = texture_per_side * MIN_TEXTURE_SIZE;
+                let quad = rotate_matrix_by_index_relative_to_down(texture_index, quad);
+                let mut quad = quad.rows().into_iter();
 
-        // // writes .bmp
-        textures
-            .into_par_iter()
-            .enumerate()
-            .for_each(|(texture_index, texture)| {
-                if !self.options.convert_texture {
-                    return;
-                }
+                let vert_a = quad.next().unwrap();
+                let vert_b = quad.next().unwrap();
+                let vert_c = quad.next().unwrap();
+                let vert_d = quad.next().unwrap();
 
-                let (width, _) = texture.dimensions();
+                let vert_a = vert_a.as_slice().unwrap();
+                let vert_b = vert_b.as_slice().unwrap();
+                let vert_c = vert_c.as_slice().unwrap();
+                let vert_d = vert_d.as_slice().unwrap();
 
-                // it is best to resize first then we can crop accordingly to how many textures in a face
-                let texture = if min_size == width {
-                    texture
-                } else {
-                    imageops::resize(&texture, min_size, min_size, imageops::FilterType::Lanczos3)
+                let parent = 0;
+
+                let vert_a = Vertex {
+                    parent,
+                    pos: DVec3::from_slice(vert_a),
+                    norm: map_index_to_norm(texture_index),
+                    uv: DVec2::from_slice(vert_a_uv.as_slice().unwrap()),
+                    source: None,
+                };
+                let vert_b = Vertex {
+                    parent,
+                    pos: DVec3::from_slice(vert_b),
+                    norm: map_index_to_norm(texture_index),
+                    uv: DVec2::from_slice(vert_b_uv.as_slice().unwrap()),
+                    source: None,
+                };
+                let vert_c = Vertex {
+                    parent,
+                    pos: DVec3::from_slice(vert_c),
+                    norm: map_index_to_norm(texture_index),
+                    uv: DVec2::from_slice(vert_c_uv.as_slice().unwrap()),
+                    source: None,
+                };
+                let vert_d = Vertex {
+                    parent,
+                    pos: DVec3::from_slice(vert_d),
+                    norm: map_index_to_norm(texture_index),
+                    uv: DVec2::from_slice(vert_d_uv.as_slice().unwrap()),
+                    source: None,
                 };
 
-                for _y in 0..texture_per_side {
-                    for _x in 0..texture_per_side {
-                        let x = MIN_TEXTURE_SIZE * _x;
-                        let y = MIN_TEXTURE_SIZE * _y;
+                let material = material_name.as_str();
 
-                        let texture_file_name = format!(
-                            "{}{}{}{}.bmp",
-                            self.options.output_name,
-                            map_index_to_suffix(texture_index as u32),
-                            _x,
-                            _y
-                        );
-
-                        let section =
-                            imageops::crop_imm(&texture, x, y, MIN_TEXTURE_SIZE, MIN_TEXTURE_SIZE)
-                                .to_image();
-                        let GoldSrcBmp {
-                            image: img,
-                            palette,
-                            dimensions: dimension,
-                        } = rgba8_to_8bpp(section).unwrap();
-
-                        write_8bpp_to_file(
-                            &img,
-                            &palette,
-                            dimension,
-                            root_path.join(texture_file_name).as_path(),
-                        )
-                        .unwrap();
-                    }
-                }
-            });
-
-        // skybox size 64 means it goes from +32 to -32
-        let skybox_coord = self.options.skybox_size as f64 / 2.;
-        // size of the texture in the world, like 64k x 64k
-        let texture_world_size = self.options.skybox_size as f64 / texture_per_side as f64;
-
-        // write .smd, plural
-        let texture_count = self.options.texture_per_face * 6;
-        let model_count = texture_count / MAX_GOLDSRC_MODEL_TEXTURE_COUNT as u32 + 1;
-
-        let mut new_smds = vec![Smd::new_basic(); model_count as usize];
-
-        for texture_index in 0..6 {
-            for _y in 0..texture_per_side {
-                for _x in 0..texture_per_side {
-                    let texture_file_name = format!(
-                        "{}{}{}{}.bmp",
-                        self.options.output_name,
-                        map_index_to_suffix(texture_index),
-                        _x,
-                        _y
-                    );
-
-                    // sequentially, what is the order of this texture
-                    // if it is over MAX_GOLDSRC_MODEL_TEXTURE_COUNT then add the quad
-                    // in a different smd
-                    let curr_texture_overall_count =
-                        texture_index * self.options.texture_per_face + _y * texture_per_side + _x;
-
-                    let new_smd_index =
-                        curr_texture_overall_count as usize / MAX_GOLDSRC_MODEL_TEXTURE_COUNT;
-
-                    let texture_world_min_x = skybox_coord - texture_world_size * _x as f64;
-                    let texture_world_min_y = skybox_coord - texture_world_size * _y as f64;
-
-                    // triangle with normal vector pointing up
-                    // orientation is "default" where top left is 1 1 and bottom right is -1, -1
-                    // counter-clockwise
-                    // A ---- D
-                    // |      |
-                    // B ---- C
-                    // A has coordinate of `min`
-                    // C has coordinate of `max`
-                    let rot_mat = array![[1., 0.], [0., -1.]];
-
-                    // fix the seam, i guess?
-                    // zoom everything in so that the original size is 1 pixel outward diagonally for every corner
-                    let what: f64 = -1. / MIN_TEXTURE_SIZE as f64;
-
-                    let mut vert_a_uv = array![0. - what, 0. - what].dot(&rot_mat);
-                    let mut vert_b_uv = array![0. - what, 1. + what].dot(&rot_mat);
-                    let mut vert_c_uv = array![1. + what, 1. + what].dot(&rot_mat);
-                    let mut vert_d_uv = array![1. + what, 0. - what].dot(&rot_mat);
-
-                    // FIXME: dont do this
-                    vert_a_uv[1] += 1.0;
-                    vert_b_uv[1] += 1.0;
-                    vert_c_uv[1] += 1.0;
-                    vert_d_uv[1] += 1.0;
-
-                    let quad = array![
-                        // A
-                        [texture_world_min_x, texture_world_min_y, -skybox_coord],
-                        // B
-                        [
-                            texture_world_min_x,
-                            texture_world_min_y - texture_world_size,
-                            -skybox_coord
-                        ],
-                        // C
-                        [
-                            texture_world_min_x - texture_world_size,
-                            texture_world_min_y - texture_world_size,
-                            -skybox_coord
-                        ],
-                        // D
-                        [
-                            texture_world_min_x - texture_world_size,
-                            texture_world_min_y,
-                            -skybox_coord
-                        ]
-                    ];
-
-                    let quad = rotate_matrix_by_index_relative_to_down(texture_index, quad);
-                    let mut quad = quad.rows().into_iter();
-
-                    let vert_a = quad.next().unwrap();
-                    let vert_b = quad.next().unwrap();
-                    let vert_c = quad.next().unwrap();
-                    let vert_d = quad.next().unwrap();
-
-                    let vert_a = vert_a.as_slice().unwrap();
-                    let vert_b = vert_b.as_slice().unwrap();
-                    let vert_c = vert_c.as_slice().unwrap();
-                    let vert_d = vert_d.as_slice().unwrap();
-
-                    let parent = 0;
-
-                    let vert_a = Vertex {
-                        parent,
-                        pos: DVec3::from_slice(vert_a),
-                        norm: map_index_to_norm(texture_index),
-                        uv: DVec2::from_slice(vert_a_uv.as_slice().unwrap()),
-                        source: None,
-                    };
-                    let vert_b = Vertex {
-                        parent,
-                        pos: DVec3::from_slice(vert_b),
-                        norm: map_index_to_norm(texture_index),
-                        uv: DVec2::from_slice(vert_b_uv.as_slice().unwrap()),
-                        source: None,
-                    };
-                    let vert_c = Vertex {
-                        parent,
-                        pos: DVec3::from_slice(vert_c),
-                        norm: map_index_to_norm(texture_index),
-                        uv: DVec2::from_slice(vert_c_uv.as_slice().unwrap()),
-                        source: None,
-                    };
-                    let vert_d = Vertex {
-                        parent,
-                        pos: DVec3::from_slice(vert_d),
-                        norm: map_index_to_norm(texture_index),
-                        uv: DVec2::from_slice(vert_d_uv.as_slice().unwrap()),
-                        source: None,
-                    };
-
-                    let material = texture_file_name.as_str();
-
-                    let tri1 = Triangle {
-                        material: material.to_owned(),
-                        vertices: vec![vert_a.clone(), vert_b, vert_c.clone()],
-                    };
-
-                    let tri2 = Triangle {
-                        material: material.to_owned(),
-                        vertices: vec![vert_a, vert_c, vert_d],
-                    };
-
-                    new_smds[new_smd_index].add_triangle(tri1);
-                    new_smds[new_smd_index].add_triangle(tri2);
-                }
-            }
-        }
-
-        for (smd_index, new_smd) in new_smds.into_iter().enumerate() {
-            new_smd.write(
-                root_path
-                    .join(format!("{}{}.smd", self.options.output_name, smd_index))
-                    .to_str()
-                    .unwrap(),
-            )?;
-        }
-
-        // can reuse idle sequence for multiple smds
-        // idle sequence to be compliant
-        let idle_smd = Smd::new_basic();
-        idle_smd.write(root_path.join("idle.smd").to_str().unwrap())?;
-
-        // TODO dont add 0 at the end for 1 model
-        for model_index in 0..model_count {
-            // write qc
-            let mut qc = Qc::new_basic();
-
-            let model_name = first_texture_path
-                .with_file_name(format!("{}{}", &self.options.output_name, model_index))
-                .with_extension("mdl");
-
-            qc.set_model_name(model_name.to_str().unwrap());
-            qc.set_cd(root_path.to_str().unwrap());
-            qc.set_cd_texture(root_path.to_str().unwrap());
-
-            // add some texture flags
-            for texture_index in 0..6 {
-                for _y in 0..texture_per_side {
-                    for _x in 0..texture_per_side {
-                        let curr_texture_overall_count = texture_index
-                            * self.options.texture_per_face
-                            + _y * texture_per_side
-                            + _x;
-                        let new_qc_index =
-                            curr_texture_overall_count as usize / MAX_GOLDSRC_MODEL_TEXTURE_COUNT;
-
-                        if new_qc_index != model_index as usize {
-                            continue;
-                        }
-
-                        let texture_file_name = format!(
-                            "{}{}{}{}.bmp",
-                            self.options.output_name,
-                            map_index_to_suffix(texture_index),
-                            _x,
-                            _y
-                        );
-
-                        // always mipmap
-                        qc.add_texrendermode(&texture_file_name, qc::RenderMode::NoMips);
-
-                        if self.options.flatshade {
-                            qc.add_texrendermode(&texture_file_name, qc::RenderMode::FlatShade);
-                        }
-                    }
-                }
-            }
-
-            qc.add_body(
-                "studio0",
-                format!("{}{}", self.options.output_name, model_index).as_str(),
-                false,
-                None,
-            );
-            qc.add_sequence("idle", "idle", vec![]);
-
-            let qc_path = root_path.join(format!("{}{}.qc", self.options.output_name, model_index));
-
-            qc.write(qc_path.to_str().unwrap())?;
-
-            // run studiomdl
-            #[cfg(target_arch = "x86_64")]
-            {
-                #[cfg(target_os = "windows")]
-                let handle = run_studiomdl(qc_path.as_path(), self.studiomdl.as_ref().unwrap());
-
-                #[cfg(target_os = "linux")]
-                let handle = run_studiomdl(
-                    qc_path.as_path(),
-                    self.studiomdl.as_ref().unwrap(),
-                    self.wineprefix.as_ref().unwrap(),
-                );
-
-                match handle.join() {
-                    Ok(res) => {
-                        let output = res?;
-                        let stdout = from_utf8(&output.stdout).unwrap();
-
-                        let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
-
-                        if let Some(err_index) = maybe_err {
-                            let err =
-                                stdout[err_index + STUDIOMDL_ERROR_PATTERN.len()..].to_string();
-                            let err_str = format!("Cannot compile: {}", err.trim());
-                            return Err(eyre!(err_str));
-                        }
-                    }
-                    Err(_) => {
-                        let err_str =
-                            "No idea what happens with running studiomdl. Probably just a dream.";
-
-                        return Err(eyre!(err_str));
-                    }
+                let tri1 = Triangle {
+                    material: material.to_owned(),
+                    vertices: vec![vert_a.clone(), vert_b, vert_c.clone()],
                 };
+
+                let tri2 = Triangle {
+                    material: material.to_owned(),
+                    vertices: vec![vert_a, vert_c, vert_d],
+                };
+
+                // add vertices
+                studiomdls[mdl_index].add_triangle(tri1);
+                studiomdls[mdl_index].add_triangle(tri2);
+
+                // add materials
+                let current_material = texture_lookup
+                    .get(&(_x, _y))
+                    .expect("enumerate through texture side length does not match lookup table");
+
+                studiomdls[mdl_index].add_texture((
+                    material_name,
+                    current_material.dimensions,
+                    current_material.image.clone(),
+                    from_fn(|i| current_material.palette[i]),
+                    mdl::TextureFlag::NOMIPS
+                        | mdl::TextureFlag::FLATSHADE
+                        | mdl::TextureFlag::FULLBRIGHT,
+                ));
             }
         }
-
-        Ok(())
     }
+
+    // compile model
+    let mdls: Vec<Mdl> = studiomdls
+        .into_iter()
+        .enumerate()
+        .flat_map(|(mdl_index, mut studiomdl)| {
+            studiomdl.set_model_name(model_name(mdl_index));
+
+            studiomdl.compile()
+        })
+        .collect();
+
+    if mdls.len() != model_count {
+        return Err(SkymodError::FailCompile);
+    }
+
+    Ok(mdls)
 }
 
-fn map_index_to_suffix(i: u32) -> String {
+pub fn load_textures(texture_paths: [impl Into<String>; 6]) -> Result<[RgbaImage; 6], SkymodError> {
+    let texture_paths: Vec<PathBuf> = texture_paths
+        .into_iter()
+        .map(|x| {
+            let s: String = x.into();
+            PathBuf::from(s)
+        })
+        .collect();
+    let mut textures = Vec::with_capacity(texture_paths.len());
+    let mut failures = vec![];
+
+    for path in &texture_paths {
+        match image::open(path) {
+            Ok(img) => textures.push(img.to_rgba8()),
+            Err(_) => failures.push(path.display().to_string()),
+        }
+    }
+
+    if !failures.is_empty() {
+        return Err(SkymodError::FailOpenTexture { paths: failures });
+    }
+
+    // "sort" the list
+    for index in 0..texture_paths.len() {
+        let path = &texture_paths[index];
+        let target = map_file_name_to_index(path);
+
+        textures.swap(index, target as usize);
+    }
+
+    Ok(from_fn(|i| textures[i].clone()))
+}
+
+pub fn map_index_to_suffix(i: u32) -> String {
     match i {
         0 => "up",
         1 => "lf",
@@ -528,6 +362,26 @@ fn map_index_to_suffix(i: u32) -> String {
         _ => unreachable!(),
     }
     .to_string()
+}
+
+pub fn map_file_name_to_index(p: &Path) -> u32 {
+    // funny non ascii crash
+    fn take_last_n_chars(s: &str, n: usize) -> &str {
+        match s.char_indices().rev().nth(n - 1) {
+            Some((char_idx, _)) => &s[char_idx..],
+            None => s, // If s has fewer than n characters, return the whole string
+        }
+    }
+
+    match take_last_n_chars(&p.file_stem().unwrap().to_string_lossy(), 2) {
+        "up" => 0,
+        "lf" => 1,
+        "ft" => 2,
+        "rt" => 3,
+        "bk" => 4,
+        "dn" => 5,
+        _ => unreachable!(),
+    }
 }
 
 fn map_index_to_norm(i: u32) -> DVec3 {
@@ -662,60 +516,72 @@ fn fix_matheowis_hdri_to_cubemap_rotation(folder: impl Into<PathBuf> + AsRef<Pat
 
 #[cfg(test)]
 mod test {
+    use crate::utils::img_stuffs::hdri_to_cubemap;
+
     use super::*;
 
     #[test]
     #[ignore]
     fn run() {
-        let mut binding = SkyModBuilder::new();
-        let builder = binding
-            .bk("examples/skybox/test2bk.png")
-            .dn("examples/skybox/test2dn.png")
-            .ft("examples/skybox/test2ft.png")
-            .lf("examples/skybox/test2lf.png")
-            .rt("examples/skybox/test2rt.png")
-            .up("examples/skybox/test2up.png")
-            .studiomdl("/home/khang/gchimp/dist/studiomdl.exe")
-            .wineprefix(Some(
-                "/home/khang/.local/share/wineprefixes/wine32/".to_owned(),
-            ))
-            .output_name("nineface")
-            .skybox_size(512)
-            .texture_per_face(9)
-            .convert_texture(false);
+        let gchimp_modules = env!("CARGO_MANIFEST_DIR");
+        let paths = [
+            format!("{gchimp_modules}/../examples/skybox/test2bk.png"),
+            format!("{gchimp_modules}/../examples/skybox/test2dn.png"),
+            format!("{gchimp_modules}/../examples/skybox/test2ft.png"),
+            format!("{gchimp_modules}/../examples/skybox/test2lf.png"),
+            format!("{gchimp_modules}/../examples/skybox/test2rt.png"),
+            format!("{gchimp_modules}/../examples/skybox/test2up.png"),
+        ];
 
-        let res = builder.work();
+        let options = SkyModOptions {
+            skybox_size: Default::default(),
+            texture_per_side: 3,
+            flatshade: true,
+            output_name: "nineface".into(),
+        };
 
-        println!("{:?}", res);
+        let textures = load_textures(paths).unwrap();
 
-        assert!(res.is_ok());
+        let mdls = skymod(textures, options).unwrap();
+
+        assert_eq!(mdls.len(), 1);
+
+        let mdl = mdls[0].clone();
+
+        let write_bytes = mdl.write_to_bytes();
+
+        // parse test
+        mdl::Mdl::open_from_bytes(&write_bytes).unwrap();
+
+        mdl.write_to_file(format!(
+            "{gchimp_modules}/../examples/skybox/refactored_test2.mdl"
+        ))
+        .unwrap();
     }
 
     #[test]
     #[ignore]
     fn _run2() {
-        let mut binding = SkyModBuilder::new();
-        let builder = binding
-            .bk("examples/skybox/cyberwaveBK.png")
-            .dn("examples/skybox/cyberwaveDN.png")
-            .ft("examples/skybox/cyberwaveFT.png")
-            .lf("examples/skybox/cyberwaveLF.png")
-            .rt("examples/skybox/cyberwaveRT.png")
-            .up("examples/skybox/cyberwaveUP.png")
-            .studiomdl("/home/khang/gchimp/dist/studiomdl.exe")
-            .wineprefix(Some(
-                "/home/khang/.local/share/wineprefixes/wine32/".to_owned(),
-            ))
-            .output_name("gchimp_lets_go")
-            .skybox_size(512)
-            .texture_per_face(16)
-            .convert_texture(true);
+        let gchimp_modules = env!("CARGO_MANIFEST_DIR");
+        let paths = [
+            format!("{gchimp_modules}/..examples/skybox/cyberwaveRT.png"),
+            format!("{gchimp_modules}/..examples/skybox/cyberwaveBK.png"),
+            format!("{gchimp_modules}/..examples/skybox/cyberwaveLF.png"),
+            format!("{gchimp_modules}/..examples/skybox/cyberwaveDN.png"),
+            format!("{gchimp_modules}/..examples/skybox/cyberwaveUP.png"),
+            format!("{gchimp_modules}/..examples/skybox/cyberwaveFT.png"),
+        ];
 
-        let res = builder.work();
+        let options = SkyModOptions {
+            skybox_size: Default::default(),
+            texture_per_side: 4,
+            flatshade: true,
+            output_name: "gchimp_lets_go".into(),
+        };
 
-        println!("{:?}", res);
+        let textures = load_textures(paths).unwrap();
 
-        assert!(res.is_ok());
+        let mdls = skymod(textures, options).unwrap();
     }
 
     #[test]
@@ -724,5 +590,21 @@ mod test {
         let folder = "/home/khang/map/arte_dela/skybox/";
 
         fix_matheowis_hdri_to_cubemap_rotation(folder);
+    }
+
+    #[test]
+    #[ignore]
+    fn hdri_to_cubemap_test() {
+        let hdri = "/home/khang/Downloads/suburban_garden_4k.exr";
+        let img = image::open(hdri).unwrap();
+
+        let cubemap = hdri_to_cubemap(&img.into(), 512, 12.);
+        for (suffix, x) in cubemap {
+            x.save(format!(
+                "/home/khang/Downloads/suburban_garden_4k_{}.png",
+                suffix
+            ))
+            .unwrap();
+        }
     }
 }

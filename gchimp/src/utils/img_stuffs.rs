@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    f32,
     fs::OpenOptions,
     io::{BufReader, BufWriter, Cursor, Write},
     path::{Path, PathBuf},
@@ -7,7 +8,8 @@ use std::{
 
 use eyre::eyre;
 use image::{
-    GenericImageView, ImageDecoder, RgbImage, RgbaImage, codecs::bmp::BmpDecoder, imageops,
+    GenericImageView, ImageDecoder, RgbImage, Rgba32FImage, RgbaImage, codecs::bmp::BmpDecoder,
+    imageops,
 };
 use quantette::{ColorSpace, ImagePipeline, QuantizeMethod};
 use rayon::prelude::*;
@@ -546,4 +548,157 @@ pub struct GoldSrcBmp {
     pub image: Vec<u8>,
     pub palette: Vec<[u8; 3]>,
     pub dimensions: (u32, u32),
+}
+
+impl GoldSrcBmp {
+    pub fn pad_palette(&mut self) {
+        self.palette.resize(256, [0; 3]);
+    }
+}
+
+pub fn hdri_to_cubemap(
+    hdri: &Rgba32FImage, // must be this to have better precision
+    cube_dimension: u32,
+    exposure: f32,
+) -> [(&'static str, RgbaImage); 6] {
+    let mut faces = [
+        ("rt", RgbaImage::new(cube_dimension, cube_dimension)), // +X (Right)
+        ("lf", RgbaImage::new(cube_dimension, cube_dimension)), // -X (Left)
+        ("ft", RgbaImage::new(cube_dimension, cube_dimension)), // +Y (Front / Forward)
+        ("bk", RgbaImage::new(cube_dimension, cube_dimension)), // -Y (Back / Backward)
+        ("up", RgbaImage::new(cube_dimension, cube_dimension)), // +Z (Top / Up)
+        ("dn", RgbaImage::new(cube_dimension, cube_dimension)), // -Z (Bottom / Down)
+    ];
+
+    let hdri_w = hdri.width() as f32;
+    let hdri_h = hdri.height() as f32;
+
+    // Loop through each face and every pixel within that face
+    for face_idx in 0..6 {
+        for y in 0..cube_dimension {
+            for x in 0..cube_dimension {
+                // 1. Map pixel to [-1.0, 1.0] range
+                // Adding 0.5 samples from the center of the pixel
+                let a = (2.0 * (x as f32 + 0.5)) / cube_dimension as f32 - 1.0;
+                let b = (2.0 * (y as f32 + 0.5)) / cube_dimension as f32 - 1.0;
+
+                // 2. Generate 3D direction vector based on Z-up, X-right system
+                // Note: 'b' (the image y-axis) is inverted (-b) so that image coordinates
+                // (0,0 at top-left) map correctly to standard 3D world space orientation.
+                // let vec = match face_idx {
+                //     0 => [1.0, a, -b],   // +X (Right)
+                //     1 => [-1.0, -a, -b], // -X (Left)
+                //     2 => [-a, 1.0, -b],  // +Y (Front)
+                //     3 => [a, -1.0, -b],  // -Y (Back)
+                //     4 => [a, b, 1.0],    // +Z (Top)
+                //     5 => [a, -b, -1.0],  // -Z (Bottom)
+                //     _ => unreachable!(),
+                // };
+                let vec = match face_idx {
+                    0 => [1.0, -b, -a],  // +X (Right)
+                    1 => [-1.0, -b, a],  // -X (Left)
+                    2 => [a, 1.0, -b],   // +Y (Front)
+                    3 => [-a, -1.0, -b], // -Y (Back)
+                    4 => [a, -b, 1.0],   // +Z (Top)
+                    5 => [-a, b, -1.0],  // -Z (Bottom)
+                    _ => unreachable!(),
+                };
+
+                // 3. Normalize the 3D vector
+                let length = (vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]).sqrt();
+                let vn = [vec[0] / length, vec[1] / length, vec[2] / length];
+
+                // 4. Convert 3D vector to spherical coordinates (Z-up)
+                let phi = vn[2].asin(); // Latitude: [-PI/2, PI/2]
+                let theta = f32::atan2(vn[0], vn[1]); // Longitude: [-PI, PI], forward is +Y
+
+                // 5. Map spherical coordinates to HDRI UV space [0.0, 1.0]
+                let u = (theta + f32::consts::PI) / (2.0 * f32::consts::PI);
+                let v = 1.0 - ((phi + f32::consts::PI / 2.0) / f32::consts::PI); // Invert V so 0 is top of image
+
+                // 6. Sample HDRI using bilinear interpolation
+                let color = sample_bilinear(&hdri, u * hdri_w, v * hdri_h, hdri_w, hdri_h);
+
+                // apply exposure
+                let color_exp0 = color[0] * exposure;
+                let color_exp1 = color[1] * exposure;
+                let color_exp2 = color[2] * exposure;
+
+                // apply tone mapping
+                let color_toned0 = color_exp0 / (1.0 + color_exp0);
+                let color_toned1 = color_exp1 / (1.0 + color_exp1);
+                let color_toned2 = color_exp2 / (1.0 + color_exp2);
+
+                // clamp
+                let color0 = (color_toned0 * 255.).clamp(0., 255.) as u8;
+                let color1 = (color_toned1 * 255.).clamp(0., 255.) as u8;
+                let color2 = (color_toned2 * 255.).clamp(0., 255.) as u8;
+
+                faces[face_idx]
+                    .1
+                    .put_pixel(x, y, [color0, color1, color2, 255].into());
+            }
+        }
+    }
+
+    faces
+}
+
+/// Helper function to perform bilinear interpolation on the HDRI map
+fn sample_bilinear(hdri: &Rgba32FImage, x: f32, y: f32, width: f32, height: f32) -> [f32; 4] {
+    // Determine the coordinates of the 4 surrounding pixels
+    let x0 = (x.floor() as i32).rem_euclid(width as i32) as u32;
+    let y0 = (y.floor() as i32).clamp(0, height as i32 - 1) as u32;
+    let x1 = ((x0 + 1) as f32).rem_euclid(width) as u32;
+    let y1 = ((y0 + 1) as f32).clamp(0.0, height - 1.0) as u32;
+
+    // Interpolation weights
+    let fx = x.fract();
+    let fy = y.fract();
+
+    // Get the 4 pixels
+    let p00 = hdri.get_pixel(x0, y0).0;
+    let p10 = hdri.get_pixel(x1, y0).0;
+    let p00_1 = hdri.get_pixel(x0, y1).0; // p01
+    let p11 = hdri.get_pixel(x1, y1).0;
+
+    // Interpolate channels
+    let mut rgbaf32 = [0.; 4];
+    for i in 0..4 {
+        let c00 = p00[i] as f32;
+        let c10 = p10[i] as f32;
+        let c01 = p00_1[i] as f32;
+        let c11 = p11[i] as f32;
+
+        // Bilinear blend formula
+        let top = c00 + fx * (c10 - c00);
+        let bottom = c01 + fx * (c11 - c01);
+        let final_val = top + fy * (bottom - top);
+
+        rgbaf32[i] = final_val;
+    }
+
+    rgbaf32
+}
+
+pub fn adjust_hdri_exposure(hdri: &RgbaImage, exposure: f32) -> RgbaImage {
+    let mut adjusted = hdri.clone();
+
+    // Calculate the multiplier: 2^exposure
+    // Exposure of 1.0 doubles the brightness, -1.0 halves it, 0.0 does nothing.
+    let multiplier = 2.0f32.powf(exposure);
+
+    for pixel in adjusted.pixels_mut() {
+        // Leave the Alpha channel (index 3) untouched
+        for i in 0..3 {
+            let original_val = pixel.0[i] as f32;
+
+            // Apply exposure and clamp to valid u8 bounds [0, 255]
+            let new_val = (original_val * multiplier).clamp(0.0, 255.0);
+
+            pixel.0[i] = new_val as u8;
+        }
+    }
+
+    adjusted
 }
