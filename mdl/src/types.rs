@@ -186,6 +186,29 @@ pub struct Texture {
 }
 
 impl Texture {
+    pub fn new_texture(
+        name: &str,
+        dimensions: (u32, u32),
+        image: Vec<u8>,
+        palette: [[u8; 3]; PALETTE_COUNT],
+        flags: TextureFlag,
+    ) -> Self {
+        Self {
+            header: TextureHeader {
+                name: {
+                    let mut res = [0; 64];
+                    res[..name.len()].copy_from_slice(name.as_bytes());
+                    res
+                },
+                flags,
+                width: dimensions.0 as i32,
+                height: dimensions.1 as i32,
+                index: 0,
+            },
+            image,
+            palette,
+        }
+    }
     pub fn rgb8_bytes(&self) -> Vec<u8> {
         self.image
             .iter()
@@ -207,10 +230,34 @@ pub struct BodypartHeader {
     pub model_index: i32,
 }
 
+impl Default for BodypartHeader {
+    fn default() -> Self {
+        Self {
+            name: [0; 64],
+            num_models: Default::default(),
+            base: Default::default(),
+            model_index: Default::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Bodypart {
     pub header: BodypartHeader,
     pub models: Vec<Model>,
+}
+
+impl BodypartHeader {
+    pub fn set_name(&mut self, name: &str) {
+        self.name = [0; 64]; // truncate
+        self.name[..name.len()].copy_from_slice(name.as_bytes());
+    }
+}
+
+impl Bodypart {
+    pub fn set_name(&mut self, name: &str) {
+        self.header.set_name(name);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -232,7 +279,34 @@ pub struct ModelHeader {
     pub group_index: i32,
 }
 
-#[derive(Debug, Clone)]
+impl Default for ModelHeader {
+    fn default() -> Self {
+        Self {
+            name: [0; 64],
+            type_: Default::default(),
+            bounding_radius: Default::default(),
+            num_mesh: Default::default(),
+            mesh_index: Default::default(),
+            num_verts: Default::default(),
+            vert_info_index: Default::default(),
+            vert_index: Default::default(),
+            num_norms: Default::default(),
+            norm_info_index: Default::default(),
+            norm_index: Default::default(),
+            num_groups: Default::default(),
+            group_index: Default::default(),
+        }
+    }
+}
+
+impl ModelHeader {
+    pub fn set_name(&mut self, name: &str) {
+        self.name = [0; 64]; // truncate
+        self.name[..name.len()].copy_from_slice(name.as_bytes());
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Model {
     pub header: ModelHeader,
     pub meshes: Vec<Mesh>,
@@ -248,6 +322,12 @@ pub struct Model {
     ///
     /// This is the data used for any sort of manipulation.
     pub agnostic_mesh: Option<Vec<smd::Triangle>>,
+}
+
+impl Model {
+    pub fn set_name(&mut self, name: &str) {
+        self.header.set_name(name);
+    }
 }
 
 #[derive(Debug, Clone)]
