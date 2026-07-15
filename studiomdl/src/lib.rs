@@ -1,75 +1,12 @@
+mod errors;
+mod types;
+
+pub use errors::*;
+pub use types::*;
+
 use std::collections::{HashMap, HashSet};
 
-use mdl::{Mdl, PALETTE_COUNT};
-
-#[derive(Debug, Clone)]
-pub struct StudioMdl {
-    name: String,
-    meshes: Vec<Mesh>,
-    textures: Vec<Texture>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Mesh {
-    pub name: String,
-    pub mesh: Vec<smd::Triangle>,
-}
-
-impl Default for Mesh {
-    fn default() -> Self {
-        Self {
-            name: "default".into(),
-            mesh: Default::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Texture {
-    pub name: String,
-    pub dimensions: (u32, u32),
-    pub image: Vec<u8>,
-    pub palette: [[u8; 3]; PALETTE_COUNT],
-    pub flag: mdl::TextureFlag,
-}
-
-impl<S> Into<Texture>
-    for (
-        S,
-        (u32, u32),
-        Vec<u8>,
-        [[u8; 3]; PALETTE_COUNT],
-        mdl::TextureFlag,
-    )
-where
-    S: Into<String> + AsRef<str>,
-{
-    fn into(self) -> Texture {
-        Texture {
-            name: self.0.into(),
-            dimensions: self.1,
-            image: self.2,
-            palette: self.3,
-            flag: self.4,
-        }
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum StudioMdlError {
-    #[error("Missing textures: {textures:?}")]
-    MissingTextures { textures: Vec<String> },
-}
-
-impl Default for StudioMdl {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            meshes: Default::default(),
-            textures: Default::default(),
-        }
-    }
-}
+use mdl::Mdl;
 
 impl StudioMdl {
     pub fn new() -> Self {
@@ -143,6 +80,12 @@ impl StudioMdl {
         self.check_if_all_materials_are_listed()?;
 
         let mut mdl = Mdl::new_empty();
+        // let mut mdl =
+        //     Mdl::open_from_file("/home/khang/gchimp/examples/skybox/cyberwave0.mdl").unwrap();
+        // mdl.bodyparts = vec![];
+        // mdl.textures = vec![];
+
+        println!("mesh length {}", self.meshes.len());
 
         // add textures
         // TODO: this is actually double work considering that `mdl` does the look up again
@@ -152,6 +95,7 @@ impl StudioMdl {
             .into_iter()
             .enumerate()
             .for_each(|(texture_idx, texture)| {
+                println!("{}", texture.name);
                 let mut new_texture = mdl::Texture::new_texture(
                     &texture.name,
                     texture.dimensions,
@@ -173,12 +117,15 @@ impl StudioMdl {
                     let mut header = mdl::BodypartHeader::default();
 
                     header.set_name(&mesh.name);
+                    header.base = 1; // base = 1 or crash
 
                     header
                 },
                 models: {
                     let mut new_model = mdl::Model::default();
                     new_model.set_name(&mesh.name);
+
+                    println!("tri count {}", mesh.mesh.len());
 
                     new_model.agnostic_mesh = Some(mesh.mesh.clone());
 

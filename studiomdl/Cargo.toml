@@ -1,0 +1,10 @@
+[package]
+name = "studiomdl"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+mdl = { path = "../mdl" }
+smd = { path = "../smd" }
+thiserror = "2.0.18"
