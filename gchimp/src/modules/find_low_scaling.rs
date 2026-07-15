@@ -1,6 +1,6 @@
 use map::Map;
 
-use crate::utils::constants::NO_RENDER_TEXTURE;
+use common::constants::NO_RENDER_TEXTURE;
 
 pub fn find_low_scaling(map: &Map) {
     map.entities

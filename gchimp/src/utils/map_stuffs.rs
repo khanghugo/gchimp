@@ -488,7 +488,7 @@ mod test {
     use map::Attributes;
     use smd::Smd;
 
-    use crate::utils::constants::TRENCHBROOM_EMPTY_TEXTURE;
+    use common::constants::TRENCHBROOM_EMPTY_TEXTURE;
 
     use super::*;
 

@@ -6,7 +6,8 @@ use smd::{Smd, Triangle};
 
 use crate::err;
 
-use super::{constants::MAX_SMD_VERTEX, misc::remove_texture_prefix};
+use super::misc::remove_texture_prefix;
+use common::constants::MAX_SMD_VERTEX;
 
 pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
     maybe_split_smd(smd)

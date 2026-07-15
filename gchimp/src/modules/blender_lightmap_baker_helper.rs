@@ -16,11 +16,14 @@ use eyre::eyre;
 use crate::{
     err,
     utils::{
-        constants::{EPSILON, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
-        img_stuffs::{GoldSrcBmp, rgba8_to_8bpp, write_8bpp_to_file},
         simple_calculs::{Matrix2x2, Plane3D, Polygon3D},
         smd_stuffs::{maybe_split_smd, textures_used_in_triangles},
     },
+};
+
+use common::{
+    constants::{EPSILON, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, STUDIOMDL_ERROR_PATTERN},
+    img_stuffs::{GoldSrcBmp, rgba8_to_8bpp, write_8bpp_to_file},
 };
 
 #[cfg(target_arch = "x86_64")]

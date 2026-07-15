@@ -24,11 +24,6 @@ use crate::{
     err,
     gchimp_info::{GCHIMP_INFO_ENTITY, GchimpInfo, GchimpInfoOption},
     utils::{
-        constants::{
-            CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE,
-            NoRenderTexture, ORIGIN_TEXTURE,
-        },
-        img_stuffs::write_8bpp_to_file,
         map_stuffs::{
             brush_from_mins_maxs, brush_to_solid3d, convert_used_texture_to_uppercase,
             entity_to_triangulated_smd, map_to_triangulated_smd, solid3d_to_triangulated_smd,
@@ -43,6 +38,14 @@ use crate::{
         },
         wad_stuffs::{SimpleWad, export_texture},
     },
+};
+
+use common::{
+    constants::{
+        CLIP_TEXTURE, CONTENTWATER_TEXTURE, MAX_GOLDSRC_MODEL_TEXTURE_COUNT, NO_RENDER_TEXTURE,
+        NoRenderTexture, ORIGIN_TEXTURE,
+    },
+    img_stuffs::write_8bpp_to_file,
 };
 
 #[cfg(target_arch = "x86_64")]

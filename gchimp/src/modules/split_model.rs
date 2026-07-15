@@ -7,11 +7,10 @@ use smd::Smd;
 
 use crate::{
     err,
-    utils::{
-        constants::MAX_SMD_PER_MODEL,
-        smd_stuffs::{maybe_split_smd, source_smd_to_goldsrc_smd},
-    },
+    utils::smd_stuffs::{maybe_split_smd, source_smd_to_goldsrc_smd},
 };
+
+use common::constants::MAX_SMD_PER_MODEL;
 
 /// Splits an SMD into multiple SMD if exceeding vertices count.
 pub fn split_smd(smd_path: &str) -> eyre::Result<()> {

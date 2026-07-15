@@ -10,7 +10,7 @@ use image::RgbaImage;
 use rayon::prelude::*;
 use vtf::Vtf;
 
-use crate::utils::img_stuffs::{
+use common::img_stuffs::{
     GoldSrcBmp, eight_bpp_transparent_img, maybe_resize_due_to_exceeding_max_goldsrc_texture_size,
     rgba8_to_8bpp, tile_and_resize, write_8bpp_to_file,
 };

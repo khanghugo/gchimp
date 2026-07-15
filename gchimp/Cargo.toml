@@ -16,6 +16,7 @@ dem = "0.2.0"
 vtf = { path = "../vtf" }
 mdl = { path = "../mdl" }
 common = { path = "../common" }
+studiomdl = { path = "../studiomdl" }
 
 # dependencies
 glam = "0.32.1"

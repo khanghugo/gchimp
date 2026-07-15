@@ -6,7 +6,7 @@ use std::{
 use eyre::eyre;
 use wad::types::{FileEntry, Wad};
 
-use super::img_stuffs::write_8bpp_to_file;
+use common::img_stuffs::write_8bpp_to_file;
 
 #[derive(Debug, Clone, Default)]
 pub struct SimpleWadEntry {

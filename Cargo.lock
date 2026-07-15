@@ -1889,6 +1889,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smd",
+ "studiomdl",
  "thiserror 2.0.18",
  "toml",
  "vtf",

@@ -6,7 +6,7 @@ use eyre::eyre;
 
 use gcd::Gcd;
 
-use super::constants::EPSILON;
+use common::constants::EPSILON;
 
 use crate::err;
 

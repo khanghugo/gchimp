@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::constants::TEXTURE_PREFIXES;
+use common::constants::TEXTURE_PREFIXES;
 
 use crate::err;
 

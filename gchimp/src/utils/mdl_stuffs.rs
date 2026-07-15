@@ -5,7 +5,7 @@ use eyre::eyre;
 use glam::{DVec3, Mat3};
 use mdl::{Bodypart, Mdl, Texture, TrivertAffineTransformation, error::MdlError};
 
-use super::constants::STUDIOMDL_ERROR_PATTERN;
+use common::constants::STUDIOMDL_ERROR_PATTERN;
 
 pub fn handle_studiomdl_output(
     res: Result<Result<Output, eyre::Report>, Box<dyn Any + Send>>,

@@ -17,8 +17,6 @@ use vtf::Vtf;
 use crate::{
     err,
     utils::{
-        constants::STUDIOMDL_ERROR_PATTERN,
-        img_stuffs::png_to_bmp_folder,
         misc::{
             find_files_with_ext_in_folder, fix_backslash, maybe_add_extension_to_string,
             relative_to_less_relative,
@@ -27,6 +25,8 @@ use crate::{
         smd_stuffs::source_smd_to_goldsrc_smd,
     },
 };
+
+use common::{constants::STUDIOMDL_ERROR_PATTERN, img_stuffs::png_to_bmp_folder};
 
 #[cfg(target_arch = "x86_64")]
 use crate::utils::run_bin::{run_crowbar, run_studiomdl};

@@ -16,11 +16,10 @@ use rayon::prelude::*;
 
 use crate::{
     err,
-    utils::{
-        constants::{MODEL_ENTITIES, SOUND_ENTITIES, SPRITE_ENTITIES},
-        misc::{COMMON_GAME_MODS, DefaultResource, FileLookup, build_file_lookup},
-    },
+    utils::misc::{COMMON_GAME_MODS, DefaultResource, FileLookup, build_file_lookup},
 };
+
+use common::constants::{MODEL_ENTITIES, SOUND_ENTITIES, SPRITE_ENTITIES};
 
 pub struct ResMakeOptions {
     /// Whether to generate RES

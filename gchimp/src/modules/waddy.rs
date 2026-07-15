@@ -13,7 +13,7 @@ use rayon::prelude::*;
 use eyre::eyre;
 use wad::types::{Entry, FileEntry, Wad};
 
-use crate::utils::img_stuffs::{
+use common::img_stuffs::{
     GenerateMipmapsResult, eight_bpp_bitmap_to_png_bytes, generate_mipmaps_from_path,
     generate_mipmaps_from_rgba_image, write_8bpp_to_file,
 };

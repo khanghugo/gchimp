@@ -9,13 +9,13 @@ use std::{
     f64::consts::PI,
     path::{Path, PathBuf},
 };
+use studiomdl::StudioMdl;
 
 use ndarray::prelude::*;
 
-use crate::utils::{
+use common::{
     constants::MAX_GOLDSRC_MODEL_TEXTURE_COUNT,
     img_stuffs::{GoldSrcBmp, rgba8_to_8bpp},
-    studiomdl::StudioMdl,
 };
 
 #[derive(Clone)]
