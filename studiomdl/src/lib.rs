@@ -33,12 +33,12 @@ impl StudioMdl {
     }
 
     /// Adds triangle to the first bodypart
-    pub fn add_triangle(&mut self, triangle: smd::Triangle) -> &mut Self {
+    pub fn add_triangle(&mut self, triangle: impl Into<smd::Triangle>) -> &mut Self {
         if self.meshes.is_empty() {
             self.meshes.push(Mesh::default());
         }
 
-        self.meshes[0].mesh.push(triangle);
+        self.meshes[0].mesh.push(triangle.into());
 
         self
     }
@@ -76,7 +76,7 @@ impl StudioMdl {
         Ok(())
     }
 
-    pub fn compile(self) -> Result<Mdl, StudioMdlError> {
+    pub fn compile(mut self) -> Result<Mdl, StudioMdlError> {
         // do some checks first
         self.check_if_all_materials_are_listed()?;
 
@@ -112,7 +112,7 @@ impl StudioMdl {
             });
 
         // add meshes
-        self.meshes.iter().for_each(|mesh| {
+        self.meshes.iter_mut().for_each(|mesh| {
             let new_bodypart = mdl::Bodypart {
                 header: {
                     let mut header = mdl::BodypartHeader::default();
@@ -128,6 +128,9 @@ impl StudioMdl {
 
                     println!("tri count {}", mesh.mesh.len());
 
+                    mesh.reverse_winding_order(); // must reverse order
+                    mesh.fix_uv(); // y coordinate is different
+
                     new_model.agnostic_mesh = Some(mesh.mesh.clone());
 
                     vec![new_model]
@@ -140,7 +143,7 @@ impl StudioMdl {
         // other settings
         mdl.set_name(&self.name);
 
-        mdl.rebuild_data_for_export();
+        mdl.rebuild_data_for_export(); // this does lots of other stuffs, should use it
 
         Ok(mdl)
     }

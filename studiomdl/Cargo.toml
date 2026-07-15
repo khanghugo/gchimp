@@ -6,6 +6,7 @@ edition.workspace = true
 
 [dependencies]
 common = {  path = "../common" }
+image = "0.25.10"
 mdl = { path = "../mdl" }
 smd = { path = "../smd" }
 

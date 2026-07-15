@@ -992,8 +992,14 @@ name = "common"
 version = "26.21.0"
 dependencies = [
  "cgmath",
+ "eyre",
+ "image",
+ "lazy_static",
  "mdl",
  "nom 7.1.3",
+ "quantette",
+ "rayon",
+ "vtf",
 ]
 
 [[package]]
@@ -1872,13 +1878,11 @@ dependencies = [
  "getrandom 0.4.2",
  "glam 0.32.1",
  "image",
- "lazy_static",
  "map",
  "mdl",
  "ndarray",
  "nom 7.1.3",
  "qc",
- "quantette",
  "rand 0.10.1",
  "rayon",
  "rhai",
@@ -4664,6 +4668,17 @@ name = "strsim"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
+
+[[package]]
+name = "studiomdl"
+version = "26.21.0"
+dependencies = [
+ "common",
+ "image",
+ "mdl",
+ "smd",
+ "thiserror 2.0.18",
+]
 
 [[package]]
 name = "subtle"

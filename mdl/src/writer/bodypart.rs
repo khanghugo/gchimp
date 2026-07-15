@@ -91,7 +91,8 @@ impl WriteToWriterModel for Model {
         let mut mesh_entries = Vec::new();
 
         for (material, tris) in groups {
-            let skin_ref = *tex_lookup.get(&material).unwrap_or(&0);
+            // TODO: make this error
+            let skin_ref = *tex_lookup.get(&material).expect("fail to look up texture");
             let texture = &textures[skin_ref as usize];
 
             // unique normal is stored per mesh, not per model, very cool, FUCKFUCKFUCKFUCKFUCKFUCKFUCK
@@ -134,8 +135,10 @@ impl WriteToWriterModel for Model {
 
                     tri_indices[i] = ((*found_vertex, *found_normal), (s, t));
                 }
+
                 all_indices.push(tri_indices);
             }
+
             mesh_entries.push((skin_ref, all_indices, mesh_norm_index_start, mesh_num_norms));
         }
 

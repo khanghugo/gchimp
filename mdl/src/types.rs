@@ -234,9 +234,9 @@ impl Default for BodypartHeader {
     fn default() -> Self {
         Self {
             name: [0; 64],
-            num_models: Default::default(),
-            base: Default::default(),
-            model_index: Default::default(),
+            num_models: 0,
+            base: 1, // should always be 1 just to be safe
+            model_index: 0,
         }
     }
 }

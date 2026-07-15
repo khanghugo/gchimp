@@ -24,6 +24,10 @@ fn trivert_to_smd_vertex(trivert: &Trivert, parent: i32, texture: &Texture) -> s
 
 impl Model {
     /// Replaces [`Model.agnostic_mesh`] with derived SMD mesh data from [`Model.meshes`]
+    // BIG TODO: smd and mdl has different uv and winding order
+    // currently, studiomdl module has to fix that difference
+    // eventually, this piece of code will end up in studiomdl crate
+    // by then, remember that this function should flip the UV to correctly extract smd mesh
     pub fn build_agnostic_data(&mut self, textures: &[Texture]) {
         let mut smd_mesh: Vec<smd::Triangle> = Vec::new();
 

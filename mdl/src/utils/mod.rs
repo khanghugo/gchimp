@@ -109,12 +109,7 @@ impl Default for Header {
 impl Mdl {
     pub fn new_empty() -> Self {
         Self {
-            header: Header {
-                // this is redundant
-                num_seq: 1,
-                num_seq_group: 1,
-                ..Default::default()
-            },
+            header: Header::default(),
             sequences: vec![Sequence::new_empty()],
             textures: vec![],
             bodyparts: vec![],
