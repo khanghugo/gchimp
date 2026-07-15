@@ -1,5 +1,7 @@
 use nom::{IResult as _IResult, combinator::fail};
 
+pub mod constants;
+pub mod img_stuffs;
 pub mod setup_studio_model_transformations;
 
 pub type IResult<'a, T> = _IResult<&'a str, T>;

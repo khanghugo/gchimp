@@ -5,6 +5,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+common = {  path = "../common" }
 mdl = { path = "../mdl" }
 smd = { path = "../smd" }
+
 thiserror = "2.0.18"

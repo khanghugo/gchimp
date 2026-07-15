@@ -1,4 +1,5 @@
 mod errors;
+mod tests;
 mod types;
 
 pub use errors::*;
