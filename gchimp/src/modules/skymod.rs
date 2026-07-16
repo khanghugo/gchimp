@@ -95,10 +95,11 @@ pub fn skymod(cubemap: [RgbaImage; 6], options: SkyModOptions) -> Result<Vec<Mdl
     let model_name = |index: usize| format!("{}{}", options.output_name, index);
 
     // convert textures
-    let texture_lookup: HashMap<(u32, u32), GoldSrcBmp> = cubemap
+    // texture index, texture section x, texture section y
+    let texture_lookup: HashMap<(u32, u32, u32), GoldSrcBmp> = cubemap
         .into_par_iter()
         .enumerate()
-        .flat_map(|(_texture_index, texture)| {
+        .flat_map(|(texture_index, texture)| {
             let (width, _) = texture.dimensions();
 
             // it is best to resize first then we can crop accordingly to how many textures in a face
@@ -136,11 +137,11 @@ pub fn skymod(cubemap: [RgbaImage; 6], options: SkyModOptions) -> Result<Vec<Mdl
                             let mut res = rgba8_to_8bpp(section).unwrap();
                             res.pad_palette(); // .mdl is hardcoded to have 256 colors
 
-                            ((_x, _y), res)
+                            ((texture_index as u32, _x, _y), res)
                         })
-                        .collect::<HashMap<(u32, u32), GoldSrcBmp>>()
+                        .collect::<HashMap<(u32, u32, u32), GoldSrcBmp>>()
                 })
-                .collect::<HashMap<(u32, u32), GoldSrcBmp>>()
+                .collect::<HashMap<(u32, u32, u32), GoldSrcBmp>>()
         })
         .collect();
 
@@ -284,7 +285,7 @@ pub fn skymod(cubemap: [RgbaImage; 6], options: SkyModOptions) -> Result<Vec<Mdl
 
                 // add materials
                 let current_material = texture_lookup
-                    .get(&(_x, _y))
+                    .get(&(texture_index, _x, _y))
                     .expect("enumerate through texture side length does not match lookup table");
 
                 studiomdls[mdl_index].add_texture((
@@ -329,9 +330,9 @@ pub fn load_textures(texture_paths: [impl Into<String>; 6]) -> Result<[RgbaImage
     let mut textures = Vec::with_capacity(texture_paths.len());
     let mut failures = vec![];
 
-    for path in &texture_paths {
-        match image::open(path) {
-            Ok(img) => textures.push(img.to_rgba8()),
+    for path in texture_paths {
+        match image::open(&path) {
+            Ok(img) => textures.push((path, img.to_rgba8())),
             Err(_) => failures.push(path.display().to_string()),
         }
     }
@@ -340,15 +341,12 @@ pub fn load_textures(texture_paths: [impl Into<String>; 6]) -> Result<[RgbaImage
         return Err(SkymodError::FailOpenTexture { paths: failures });
     }
 
-    // "sort" the list
-    for index in 0..texture_paths.len() {
-        let path = &texture_paths[index];
-        let target = map_file_name_to_index(path);
+    // sort the list
+    textures.sort_by(|(path_a, _), (path_b, _)| {
+        map_file_name_to_index(path_a).cmp(&map_file_name_to_index(path_b))
+    });
 
-        textures.swap(index, target as usize);
-    }
-
-    Ok(from_fn(|i| textures[i].clone()))
+    Ok(from_fn(|i| textures[i].1.clone()))
 }
 
 pub fn map_index_to_suffix(i: u32) -> String {
