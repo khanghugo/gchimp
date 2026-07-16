@@ -82,10 +82,6 @@ impl StudioMdl {
 
         let mut mdl = Mdl::new_empty();
 
-        // add textures
-        // TODO: this is actually double work considering that `mdl` does the look up again
-        let mut texture_lookup: HashMap<String, usize> = HashMap::new();
-
         self.textures
             .into_iter()
             .enumerate()
@@ -101,7 +97,6 @@ impl StudioMdl {
                 new_texture.header.index = texture_idx as i32;
 
                 mdl.textures.push(new_texture);
-                texture_lookup.insert(texture.name, texture_idx);
             });
 
         // add meshes
