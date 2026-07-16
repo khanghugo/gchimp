@@ -219,4 +219,47 @@ mod test {
         // println!("{:?}", mdl.transitions);
         println!("{:?}", mdl.header);
     }
+
+    #[test]
+    fn parse_write_chick() {
+        let bytes = include_bytes!("./tests/chick.mdl");
+
+        let mut mdl = Mdl::open_from_bytes(bytes).unwrap();
+
+        println!("{}", mdl.sequences[0].header.num_pivots);
+
+        mdl.rebuild_data_for_export();
+
+        mdl.write_to_file("/home/khang/gchimp/mdl/src/tests/chick_parse_write.mdl")
+            .unwrap();
+    }
+
+    #[test]
+    fn parse_write_player() {
+        let bytes = include_bytes!("/home/khang/gchimp/examples/skybox/cyberwave0.mdl");
+
+        let mut mdl = Mdl::open_from_bytes(bytes).unwrap();
+        mdl.rebuild_data_for_export();
+        let mdl_out = mdl.write_to_bytes();
+        let mut mdl = Mdl::open_from_bytes(&mdl_out).unwrap();
+
+        mdl.bodyparts.iter().enumerate().for_each(|(bp_idx, bp)| {
+            println!("{:?}", bp.header);
+            bp.models.iter().enumerate().for_each(|(mdl_idx, mdl)| {
+                println!("{:?}", mdl.header);
+            });
+        });
+
+        mdl.bones.iter().for_each(|bone| {
+            println!("{:?}", bone);
+        });
+
+        mdl.sequences.iter().for_each(|sequence| {
+            println!("{:?}", sequence);
+        });
+
+        mdl.rebuild_data_for_export();
+        mdl.write_to_file("/home/khang/gchimp/examples/skybox/cyberwave0_parse_write.mdl")
+            .unwrap();
+    }
 }

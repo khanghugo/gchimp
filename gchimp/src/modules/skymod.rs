@@ -516,7 +516,7 @@ fn fix_matheowis_hdri_to_cubemap_rotation(folder: impl Into<PathBuf> + AsRef<Pat
 
 #[cfg(test)]
 mod test {
-    use crate::utils::img_stuffs::hdri_to_cubemap;
+    use common::img_stuffs::hdri_to_cubemap;
 
     use super::*;
 
@@ -533,9 +533,11 @@ mod test {
             format!("{gchimp_modules}/../examples/skybox/test2up.png"),
         ];
 
+        let texture_per_side = 1;
+
         let options = SkyModOptions {
-            skybox_size: Default::default(),
-            texture_per_side: 3,
+            skybox_size: 1024,
+            texture_per_side,
             flatshade: true,
             output_name: "nineface".into(),
         };
@@ -551,7 +553,22 @@ mod test {
         let write_bytes = mdl.write_to_bytes();
 
         // parse test
-        mdl::Mdl::open_from_bytes(&write_bytes).unwrap();
+        let read_mdl = mdl::Mdl::open_from_bytes(&write_bytes).unwrap();
+
+        assert_eq!(read_mdl.bodyparts.len(), 1);
+        assert_eq!(read_mdl.bodyparts[0].models.len(), 1);
+
+        {
+            let model = &read_mdl.bodyparts[0].models[0];
+            assert_eq!(
+                model.header.num_mesh as u32,
+                texture_per_side * texture_per_side * 6
+            );
+
+            // println!("{:?}", model.header);
+        }
+
+        // println!("{:?}", read_mdl.sequences[0]);
 
         mdl.write_to_file(format!(
             "{gchimp_modules}/../examples/skybox/refactored_test2.mdl"
@@ -574,7 +591,7 @@ mod test {
 
         let options = SkyModOptions {
             skybox_size: Default::default(),
-            texture_per_side: 4,
+            texture_per_side: 1,
             flatshade: true,
             output_name: "gchimp_lets_go".into(),
         };

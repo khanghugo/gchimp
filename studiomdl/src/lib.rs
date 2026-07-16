@@ -81,12 +81,6 @@ impl StudioMdl {
         self.check_if_all_materials_are_listed()?;
 
         let mut mdl = Mdl::new_empty();
-        // let mut mdl =
-        //     Mdl::open_from_file("/home/khang/gchimp/examples/skybox/cyberwave0.mdl").unwrap();
-        // mdl.bodyparts = vec![];
-        // mdl.textures = vec![];
-
-        println!("mesh length {}", self.meshes.len());
 
         // add textures
         // TODO: this is actually double work considering that `mdl` does the look up again
@@ -96,7 +90,6 @@ impl StudioMdl {
             .into_iter()
             .enumerate()
             .for_each(|(texture_idx, texture)| {
-                println!("{}", texture.name);
                 let mut new_texture = mdl::Texture::new_texture(
                     &texture.name,
                     texture.dimensions,
@@ -125,8 +118,6 @@ impl StudioMdl {
                 models: {
                     let mut new_model = mdl::Model::default();
                     new_model.set_name(&mesh.name);
-
-                    println!("tri count {}", mesh.mesh.len());
 
                     mesh.reverse_winding_order(); // must reverse order
                     mesh.fix_uv(); // y coordinate is different
