@@ -9,7 +9,7 @@ use eframe::egui::{self, ScrollArea, Vec2};
 
 use common::{constants::MAX_GOLDSRC_TEXTURE_SIZE, img_stuffs::hdri_to_cubemap};
 
-use gchimp::modules::skymod::{SkyModOptions, map_file_name_to_index, skymod};
+use gchimp::modules::skymod::{self, SkyModOptions, map_file_name_to_index, skymod};
 use image::{Rgba32FImage, RgbaImage};
 
 use crate::{
@@ -71,74 +71,90 @@ impl SkyModGui {
         }
     }
 
-    fn run(&mut self) {
+    fn finalize_options(&mut self) -> Result<(), ()> {
         let texture_per_face = self.texture_per_face.parse::<u32>();
         let skybox_size = self.skybox_size.parse::<u32>();
 
         let output = self.status.clone();
-        "Running".clone_into(&mut output.lock().unwrap());
 
         if texture_per_face.is_err() {
             "Texture per face is not a number".clone_into(&mut output.lock().unwrap());
-            return;
+            return Err(());
         }
 
         if skybox_size.is_err() {
             "Skybox size is not a number".clone_into(&mut output.lock().unwrap());
-            return;
+            return Err(());
         }
 
         if self.options.output_name.is_empty() {
             "Output name is empty".clone_into(&mut output.lock().unwrap());
-            return;
+            return Err(());
         }
 
-        self.idle = false;
-
-        let mut options = self.options.clone();
-
         // modify options finally
-        options.texture_per_side = texture_per_face.unwrap();
-        options.skybox_size = skybox_size.unwrap();
+        self.options.texture_per_side = texture_per_face.unwrap();
+        self.options.skybox_size = skybox_size.unwrap();
 
-        // let displayed_textures = std::mem::take(&mut self.displayed_textures);
-        let (save_path, cubemap) = match &self.displayed_textures {
+        Ok(())
+    }
+
+    fn turn_to_cubemap(
+        &mut self,
+        override_dimension: Option<u32>,
+    ) -> Result<(PathBuf, [RgbaImage; 6]), ()> {
+        self.finalize_options()?;
+
+        let output = self.status.clone();
+
+        match &self.displayed_textures {
             DisplayedTexture::None => {
                 "No textures selected".clone_into(&mut output.lock().unwrap());
                 self.idle = true;
-                return;
+                return Err(());
             }
             DisplayedTexture::Cubemap(cubemap) => {
                 if cubemap.cubemap.iter().any(|x| x.is_none()) {
                     "Not all 6 textures are selected".clone_into(&mut output.lock().unwrap());
                     self.idle = true;
-                    return;
+                    return Err(());
                 }
 
-                (
+                Ok((
                     cubemap.paths[0].clone().unwrap(),
                     from_fn(|i| cubemap.cubemap[i].clone().unwrap()),
-                )
+                ))
             }
-            DisplayedTexture::HDRI(hdri) => (
+            DisplayedTexture::HDRI(hdri) => Ok((
                 hdri.path.to_owned(),
                 hdri_to_cubemap(
                     &hdri.image,
-                    options.texture_per_side * MAX_GOLDSRC_TEXTURE_SIZE,
+                    override_dimension
+                        .unwrap_or(self.options.texture_per_side * MAX_GOLDSRC_TEXTURE_SIZE),
                     hdri.exposure,
                 )
                 .map(|(_, x)| x),
-            ),
-        };
+            )),
+        }
+    }
 
-        let res = skymod(cubemap, options.clone());
+    fn run(&mut self) -> Result<(), ()> {
+        {
+            let output = self.status.clone();
+            "Running".clone_into(&mut output.lock().unwrap());
+            self.idle = false;
+        }
+
+        let (first_img_path, cubemap) = self.turn_to_cubemap(None)?;
+        let res = skymod(cubemap, self.options.clone());
+        let output = self.status.clone();
 
         match res {
             Ok(mdls) => {
                 mdls.into_iter().enumerate().for_each(|(idx, x)| {
                     let res = x.write_to_file(
-                        save_path
-                            .with_file_name(format!("{}{}", options.output_name, idx))
+                        first_img_path
+                            .with_file_name(format!("{}{}", self.options.output_name, idx))
                             .with_extension("mdl"),
                     );
 
@@ -158,6 +174,8 @@ impl SkyModGui {
         }
 
         self.idle = true;
+
+        Ok(())
     }
 
     fn load_image_to_tile(
@@ -332,10 +350,11 @@ impl TabProgram for SkyModGui {
                     let output_folder = hdri.path.parent().unwrap();
                     let file_name = self.options.output_name.clone();
 
-                    // redo the calculation here because the texture lives in GPU now
+                    let texture_per_face = self.texture_per_face.parse::<u32>().unwrap_or(1);
+
                     let cubemap = hdri_to_cubemap(
                         &hdri.image,
-                        512 * (self.options.texture_per_side as f32).sqrt().round() as u32,
+                        512 * texture_per_face,
                         hdri_exposure_value,
                     );
 
@@ -391,7 +410,7 @@ Recommeded to leave it checked for uniformly lit texture.",
                         // TODO make it truly multithreaded like s2g
                         // kindda lazy to do it tbh
                         // it works ok enough and there isn't much on the output to report
-                        self.run();
+                        let _ = self.run();
                     }
                 });
                 ui.add_enabled_ui(!self.idle, |ui| {
@@ -399,6 +418,30 @@ Recommeded to leave it checked for uniformly lit texture.",
                         self.idle = true;
                     }
                 });
+
+                ui.add_enabled_ui(
+                    !matches!(self.displayed_textures, DisplayedTexture::None),
+                    |ui| {
+                        if ui.button("Export TGA").clicked() {
+                            if let Ok((first_img_path, cubemap)) = self.turn_to_cubemap(Some(256)) {
+                                cubemap.into_iter().enumerate().for_each(|(idx, x)| {
+                                    let _ = x.save(
+                                        first_img_path
+                                            .with_file_name(format!(
+                                                "{}{}",
+                                                self.options.output_name,
+                                                skymod::map_index_to_suffix(idx as u32)
+                                            ))
+                                            .with_extension("tga"),
+                                    );
+                                });
+
+                                let output = self.status.clone();
+                                "Exported TGA".clone_into(&mut output.lock().unwrap());
+                            }
+                        }
+                    },
+                );
             });
         });
 
