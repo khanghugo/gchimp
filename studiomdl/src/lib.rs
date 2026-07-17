@@ -5,7 +5,7 @@ mod types;
 pub use errors::*;
 pub use types::*;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use mdl::Mdl;
 

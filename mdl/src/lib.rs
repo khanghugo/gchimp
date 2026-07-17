@@ -210,7 +210,7 @@ mod test {
     fn parse_write_parse_arte_farte2() {
         let bytes = include_bytes!("/home/khang/map/arte_dela/bake/final_1p1b/final_1p1b_blbh.mdl");
 
-        let mut mdl = Mdl::open_from_bytes(bytes).unwrap();
+        let mdl = Mdl::open_from_bytes(bytes).unwrap();
 
         // println!("{:?}", mdl.sequences);
         // println!("{:?}", mdl.bones);
@@ -243,9 +243,9 @@ mod test {
         let mdl_out = mdl.write_to_bytes();
         let mut mdl = Mdl::open_from_bytes(&mdl_out).unwrap();
 
-        mdl.bodyparts.iter().enumerate().for_each(|(bp_idx, bp)| {
+        mdl.bodyparts.iter().enumerate().for_each(|(_bp_idx, bp)| {
             println!("{:?}", bp.header);
-            bp.models.iter().enumerate().for_each(|(mdl_idx, mdl)| {
+            bp.models.iter().enumerate().for_each(|(_mdl_idx, mdl)| {
                 println!("{:?}", mdl.header);
             });
         });
