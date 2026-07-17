@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-pub static MAX_GOLDSRC_TEXTURE_SIZE: u32 = 512;
+pub const MAX_GOLDSRC_TEXTURE_SIZE: u32 = 512;
 
 // // divided by 2 just to be safe
 // // divided by 2 again because what the fuck
