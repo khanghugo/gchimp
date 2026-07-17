@@ -4,7 +4,8 @@ use eframe::egui::{
     self, Align2, Color32, ColorImage, Id, LayerId, Order, TextStyle, TextureHandle,
 };
 
-use gchimp::utils::img_stuffs::generate_rgba8_from_image_path;
+use common::img_stuffs::generate_rgba8_from_image_path;
+use image::RgbaImage;
 
 /// Preview hovering files:
 pub fn preview_file_being_dropped(ctx: &egui::Context) {
@@ -116,20 +117,28 @@ impl WadImage {
     }
 }
 
-pub fn load_egui_image_to_texture(
+pub fn load_image_path_to_egui_texture(
     ui: &mut egui::Ui,
     path: impl Into<PathBuf> + AsRef<Path>,
 ) -> eyre::Result<egui::TextureHandle> {
-    let image_buffer = generate_rgba8_from_image_path(path.as_ref())?;
+    let img = generate_rgba8_from_image_path(path.as_ref())?;
     let path: PathBuf = path.into();
+
+    load_rgba8_to_egui_texture(ui, &path.to_string_lossy(), &img)
+}
+
+pub fn load_rgba8_to_egui_texture(
+    ui: &mut egui::Ui,
+    name: &str,
+    img: &RgbaImage,
+) -> eyre::Result<egui::TextureHandle> {
+    let image_buffer = img;
 
     let size = [image_buffer.width() as _, image_buffer.height() as _];
     let pixels: image::FlatSamples<&[u8]> = image_buffer.as_flat_samples();
     let color_image = ColorImage::from_rgba_unmultiplied(size, pixels.as_slice());
 
-    let handle = ui
-        .ctx()
-        .load_texture(path.to_str().unwrap(), color_image, Default::default());
+    let handle = ui.ctx().load_texture(name, color_image, Default::default());
 
     Ok(handle)
 }

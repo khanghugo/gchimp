@@ -12,8 +12,10 @@ use gchimp::{
         resmake::{ResMake, ResMakeOptions},
         split_model::split_model,
     },
-    utils::{constants::STUDIOMDL_ERROR_PATTERN, run_bin::run_studiomdl},
+    utils::run_bin::run_studiomdl,
 };
+
+use common::constants::STUDIOMDL_ERROR_PATTERN;
 
 use crate::{
     cli::{self},
