@@ -1,7 +1,7 @@
 use glam::{DVec2, DVec3};
 use image::{RgbaImage, imageops};
 use mdl::Mdl;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::prelude::*;
 use smd::{Triangle, Vertex};
 use std::{
     array::from_fn,
@@ -51,6 +51,7 @@ pub enum SkymodError {
     FailOpenTexture { paths: Vec<String> },
 }
 
+/// Order: [up, lf, ft, rt, bk, dn]
 pub fn skymod(cubemap: [RgbaImage; 6], options: SkyModOptions) -> Result<Vec<Mdl>, SkymodError> {
     let texture0_dimensions = cubemap[0].dimensions();
 
@@ -97,7 +98,7 @@ pub fn skymod(cubemap: [RgbaImage; 6], options: SkyModOptions) -> Result<Vec<Mdl
     // convert textures
     // texture index, texture section x, texture section y
     let texture_lookup: HashMap<(u32, u32, u32), GoldSrcBmp> = cubemap
-        .into_par_iter()
+        .par_iter()
         .enumerate()
         .flat_map(|(texture_index, texture)| {
             let (width, _) = texture.dimensions();
@@ -106,7 +107,7 @@ pub fn skymod(cubemap: [RgbaImage; 6], options: SkyModOptions) -> Result<Vec<Mdl
             let texture = if min_size == width {
                 texture
             } else {
-                imageops::resize(&texture, min_size, min_size, imageops::FilterType::Lanczos3)
+                &imageops::resize(texture, min_size, min_size, imageops::FilterType::Lanczos3)
             };
 
             (0..texture_per_side)
@@ -117,7 +118,7 @@ pub fn skymod(cubemap: [RgbaImage; 6], options: SkyModOptions) -> Result<Vec<Mdl
                             let y = MIN_TEXTURE_SIZE * _y;
 
                             let section = imageops::crop_imm(
-                                &texture,
+                                texture,
                                 x,
                                 y,
                                 MIN_TEXTURE_SIZE,
@@ -364,21 +365,21 @@ pub fn map_index_to_suffix(i: u32) -> String {
 
 pub fn map_file_name_to_index(p: &Path) -> u32 {
     // funny non ascii crash
-    fn take_last_n_chars(s: &str, n: usize) -> &str {
+    fn take_last_n_chars(s: &str, n: usize) -> String {
         match s.char_indices().rev().nth(n - 1) {
-            Some((char_idx, _)) => &s[char_idx..],
-            None => s, // If s has fewer than n characters, return the whole string
+            Some((char_idx, _)) => s[char_idx..].to_lowercase(),
+            None => s.to_string(), // If s has fewer than n characters, return the whole string
         }
     }
 
-    match take_last_n_chars(&p.file_stem().unwrap().to_string_lossy(), 2) {
+    match take_last_n_chars(&p.file_stem().unwrap().to_string_lossy(), 2).as_str() {
         "up" => 0,
         "lf" => 1,
         "ft" => 2,
         "rt" => 3,
         "bk" => 4,
         "dn" => 5,
-        _ => unreachable!(),
+        _ => 0,
     }
 }
 
@@ -596,7 +597,7 @@ mod test {
 
         let textures = load_textures(paths).unwrap();
 
-        let mdls = skymod(textures, options).unwrap();
+        let _mdls = skymod(textures, options).unwrap();
     }
 
     #[test]
