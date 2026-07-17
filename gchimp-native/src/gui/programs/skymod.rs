@@ -42,9 +42,12 @@ pub struct SkyModGui {
     displayed_textures: DisplayedTexture,
     texture_handles: [Option<egui::TextureHandle>; 6],
     options: SkyModOptions,
+
     // need this because text input is string and we want number
     skybox_size: String,
     texture_per_face: String,
+    force_load_hdri: bool,
+
     idle: bool,
     status: Arc<Mutex<String>>,
 }
@@ -68,6 +71,7 @@ impl SkyModGui {
             texture_per_face: String::from("1"),
             idle: true,
             status: Arc::new(Mutex::new(String::from("Idle"))),
+            force_load_hdri: false,
         }
     }
 
@@ -198,7 +202,8 @@ impl SkyModGui {
                 .extension()
                 .and_then(|x| x.to_str())
                 .unwrap_or("dummy dummm"),
-        ) {
+        ) || self.force_load_hdri
+        {
             let rgba32f = img.to_rgba32f();
 
             let res = self.displayed_textures = DisplayedTexture::HDRI(HDRI {
@@ -395,6 +400,11 @@ If a model has more than 64 textures, it will be split into smaller models",
                     "\
 Mark texture with flatshade flag. \n
 Recommeded to leave it checked for uniformly lit texture.",
+                );
+
+            ui.checkbox(&mut self.force_load_hdri, "Force HDRI")
+                .on_hover_text(
+                    "Only tick this if you have HDRI file that is not typical .hdri or .exr",
                 );
 
             ui.label("Output name: ");
