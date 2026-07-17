@@ -117,7 +117,7 @@ impl WadImage {
     }
 }
 
-pub fn load_image_path_to_egui_texture(
+pub fn _load_image_path_to_egui_texture(
     ui: &mut egui::Ui,
     path: impl Into<PathBuf> + AsRef<Path>,
 ) -> eyre::Result<egui::TextureHandle> {
