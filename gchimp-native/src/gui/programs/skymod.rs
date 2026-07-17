@@ -95,7 +95,11 @@ impl SkyModGui {
 
         self.idle = false;
 
-        let options = self.options.clone();
+        let mut options = self.options.clone();
+
+        // modify options finally
+        options.texture_per_side = texture_per_face.unwrap();
+        options.skybox_size = skybox_size.unwrap();
 
         // let displayed_textures = std::mem::take(&mut self.displayed_textures);
         let (save_path, cubemap) = match &self.displayed_textures {
@@ -341,7 +345,7 @@ impl TabProgram for SkyModGui {
                 }
 
             // only update once dragging stops
-            if res.drag_stopped() {
+            if res.drag_stopped() || res.lost_focus() {
                 self.update_hdri_display(ui);
             }
         }
