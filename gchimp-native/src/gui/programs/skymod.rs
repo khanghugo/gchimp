@@ -23,7 +23,7 @@ use crate::{
 
 static FACE_SIZE: f32 = 94.;
 
-struct HDRI {
+struct Hdri {
     path: PathBuf,
     image: Rgba32FImage,
     // don't store processed cube map because it saves RAM :DDDD
@@ -56,8 +56,8 @@ pub struct SkyModGui {
 enum DisplayedTexture {
     #[default]
     None,
-    Cubemap(Cubemap),
-    HDRI(HDRI),
+    Cubemap(Box<Cubemap>),
+    Hdri(Hdri),
 }
 
 impl SkyModGui {
@@ -115,12 +115,14 @@ impl SkyModGui {
             DisplayedTexture::None => {
                 "No textures selected".clone_into(&mut output.lock().unwrap());
                 self.idle = true;
-                return Err(());
+
+                Err(())
             }
             DisplayedTexture::Cubemap(cubemap) => {
                 if cubemap.cubemap.iter().any(|x| x.is_none()) {
                     "Not all 6 textures are selected".clone_into(&mut output.lock().unwrap());
                     self.idle = true;
+
                     return Err(());
                 }
 
@@ -129,7 +131,7 @@ impl SkyModGui {
                     from_fn(|i| cubemap.cubemap[i].clone().unwrap()),
                 ))
             }
-            DisplayedTexture::HDRI(hdri) => Ok((
+            DisplayedTexture::Hdri(hdri) => Ok((
                 hdri.path.to_owned(),
                 hdri_to_cubemap(
                     &hdri.image,
@@ -206,7 +208,7 @@ impl SkyModGui {
         {
             let rgba32f = img.to_rgba32f();
 
-            let res = self.displayed_textures = DisplayedTexture::HDRI(HDRI {
+            self.displayed_textures = DisplayedTexture::Hdri(Hdri {
                 path: path.to_path_buf(),
                 image: rgba32f,
                 exposure: 1., // default exposure
@@ -214,8 +216,6 @@ impl SkyModGui {
 
             // update display
             self.update_hdri_display(ui);
-
-            res
         } else {
             let img = img.to_rgba8();
             let pathbuf = path.to_path_buf();
@@ -226,13 +226,13 @@ impl SkyModGui {
             self.texture_handles[index] = handle.into();
 
             self.displayed_textures = match mem::take(&mut self.displayed_textures) {
-                DisplayedTexture::None | DisplayedTexture::HDRI(_) => DisplayedTexture::Cubemap({
+                DisplayedTexture::None | DisplayedTexture::Hdri(_) => DisplayedTexture::Cubemap({
                     let mut res = Cubemap::default();
 
                     res.cubemap[index] = img.into();
                     res.paths[index] = pathbuf.into();
 
-                    res
+                    Box::new(res)
                 }),
                 DisplayedTexture::Cubemap(mut cubemap) => {
                     cubemap.cubemap[index] = img.into();
@@ -280,7 +280,7 @@ impl SkyModGui {
 
     // hdr slider is not very responsive because we don't render 3d :(
     fn update_hdri_display(&mut self, ui: &mut eframe::egui::Ui) {
-        if let DisplayedTexture::HDRI(hdri) = &self.displayed_textures {
+        if let DisplayedTexture::Hdri(hdri) = &self.displayed_textures {
             // doesn't need high cube dimension here
             let cubemap = hdri_to_cubemap(&hdri.image, 256, hdri.exposure).map(|(_, x)| x);
 
@@ -338,11 +338,11 @@ impl TabProgram for SkyModGui {
         // dumb, optional ui.horizontal here can be empty and it leads to empty space in ui
         // cannot draw it optionally that depends on self because of borrowing
         // i commit a sin
-        let should_draw_hdri_ui = matches!(self.displayed_textures, DisplayedTexture::HDRI(_));
+        let should_draw_hdri_ui = matches!(self.displayed_textures, DisplayedTexture::Hdri(_));
 
         if should_draw_hdri_ui {
             ui.horizontal(|ui| {
-        if let DisplayedTexture::HDRI(hdri) = &mut self.displayed_textures {
+        if let DisplayedTexture::Hdri(hdri) = &mut self.displayed_textures {
             ui.label("Exposure");
 
             let hdri_exposure_value = hdri.exposure; // copy
@@ -432,23 +432,23 @@ Recommeded to leave it checked for uniformly lit texture.",
                 ui.add_enabled_ui(
                     !matches!(self.displayed_textures, DisplayedTexture::None),
                     |ui| {
-                        if ui.button("Export TGA").clicked() {
-                            if let Ok((first_img_path, cubemap)) = self.turn_to_cubemap(Some(256)) {
-                                cubemap.into_iter().enumerate().for_each(|(idx, x)| {
-                                    let _ = x.save(
-                                        first_img_path
-                                            .with_file_name(format!(
-                                                "{}{}",
-                                                self.options.output_name,
-                                                skymod::map_index_to_suffix(idx as u32)
-                                            ))
-                                            .with_extension("tga"),
-                                    );
-                                });
+                        if ui.button("Export TGA").clicked()
+                            && let Ok((first_img_path, cubemap)) = self.turn_to_cubemap(Some(256))
+                        {
+                            cubemap.into_iter().enumerate().for_each(|(idx, x)| {
+                                let _ = x.save(
+                                    first_img_path
+                                        .with_file_name(format!(
+                                            "{}{}",
+                                            self.options.output_name,
+                                            skymod::map_index_to_suffix(idx as u32)
+                                        ))
+                                        .with_extension("tga"),
+                                );
+                            });
 
-                                let output = self.status.clone();
-                                "Exported TGA".clone_into(&mut output.lock().unwrap());
-                            }
+                            let output = self.status.clone();
+                            "Exported TGA".clone_into(&mut output.lock().unwrap());
                         }
                     },
                 );
@@ -476,12 +476,10 @@ Recommeded to leave it checked for uniformly lit texture.",
         // Collect dropped files:
         let collected_paths = ctx.input(|i| {
             let items = i.raw.dropped_files.clone();
-            let paths = items
+            items
                 .iter()
                 .filter_map(|e| e.path.clone())
-                .collect::<Vec<PathBuf>>();
-
-            paths
+                .collect::<Vec<PathBuf>>()
         });
 
         collected_paths.iter().for_each(|path| {

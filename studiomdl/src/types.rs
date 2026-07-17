@@ -3,7 +3,7 @@ use std::array::from_fn;
 use common::img_stuffs::GoldSrcBmp;
 use mdl::PALETTE_COUNT;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct StudioMdl {
     pub name: String,
     pub meshes: Vec<Mesh>,
@@ -50,52 +50,49 @@ pub struct Texture {
     pub flag: mdl::TextureFlag,
 }
 
-impl<S> Into<Texture>
-    for (
+impl<S>
+    From<(
         S,
         (u32, u32),
         Vec<u8>,
         [[u8; 3]; PALETTE_COUNT],
         mdl::TextureFlag,
-    )
+    )> for Texture
 where
     S: Into<String> + AsRef<str>,
 {
-    fn into(self) -> Texture {
+    fn from(
+        value: (
+            S,
+            (u32, u32),
+            Vec<u8>,
+            [[u8; 3]; PALETTE_COUNT],
+            mdl::TextureFlag,
+        ),
+    ) -> Self {
         Texture {
-            name: self.0.into(),
-            dimensions: self.1,
-            image: self.2,
-            palette: self.3,
-            flag: self.4,
+            name: value.0.into(),
+            dimensions: value.1,
+            image: value.2,
+            palette: value.3,
+            flag: value.4,
         }
     }
 }
 
-impl<S> Into<Texture> for (S, GoldSrcBmp, mdl::TextureFlag)
+impl<S> From<(S, GoldSrcBmp, mdl::TextureFlag)> for Texture
 where
     S: Into<String> + AsRef<str>,
 {
-    fn into(mut self) -> Texture {
-        // padd palette
-        self.1.pad_palette();
+    fn from(mut value: (S, GoldSrcBmp, mdl::TextureFlag)) -> Self {
+        value.1.pad_palette();
 
         Texture {
-            name: self.0.into(),
-            dimensions: self.1.dimensions,
-            image: self.1.image,
-            palette: from_fn(|i| self.1.palette[i]),
-            flag: self.2,
-        }
-    }
-}
-
-impl Default for StudioMdl {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            meshes: Default::default(),
-            textures: Default::default(),
+            name: value.0.into(),
+            dimensions: value.1.dimensions,
+            image: value.1.image,
+            palette: from_fn(|i| value.1.palette[i]),
+            flag: value.2,
         }
     }
 }

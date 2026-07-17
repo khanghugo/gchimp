@@ -572,7 +572,7 @@ pub fn hdri_to_cubemap(
     let hdri_w = hdri.width() as f32;
     let hdri_h = hdri.height() as f32;
 
-    for face_idx in 0..6 {
+    for (face_idx, face) in faces.iter_mut().enumerate() {
         for y in 0..cube_dimension {
             for x in 0..cube_dimension {
                 // Convert pixel to [-1, 1] range
@@ -620,9 +620,7 @@ pub fn hdri_to_cubemap(
                 let color1 = (color_toned1 * 255.0).clamp(0.0, 255.0) as u8;
                 let color2 = (color_toned2 * 255.0).clamp(0.0, 255.0) as u8;
 
-                faces[face_idx]
-                    .1
-                    .put_pixel(x, y, [color0, color1, color2, 255].into());
+                face.1.put_pixel(x, y, [color0, color1, color2, 255].into());
             }
         }
     }
@@ -651,10 +649,10 @@ fn sample_bilinear(hdri: &Rgba32FImage, x: f32, y: f32, width: f32, height: f32)
     // Interpolate channels
     let mut rgbaf32 = [0.; 4];
     for i in 0..4 {
-        let c00 = p00[i] as f32;
-        let c10 = p10[i] as f32;
-        let c01 = p00_1[i] as f32;
-        let c11 = p11[i] as f32;
+        let c00 = p00[i];
+        let c10 = p10[i];
+        let c01 = p00_1[i];
+        let c11 = p11[i];
 
         // Bilinear blend formula
         let top = c00 + fx * (c10 - c00);
