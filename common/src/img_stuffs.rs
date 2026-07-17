@@ -554,83 +554,71 @@ impl GoldSrcBmp {
     }
 }
 
+// written by both gemini and deepseek with great debug work from your truly
 pub fn hdri_to_cubemap(
-    hdri: &Rgba32FImage, // must be this to have better precision
+    hdri: &Rgba32FImage,
     cube_dimension: u32,
     exposure: f32,
 ) -> [(&'static str, RgbaImage); 6] {
     let mut faces = [
-        ("rt", RgbaImage::new(cube_dimension, cube_dimension)), // +X (Right)
-        ("lf", RgbaImage::new(cube_dimension, cube_dimension)), // -X (Left)
-        ("ft", RgbaImage::new(cube_dimension, cube_dimension)), // +Y (Front / Forward)
-        ("bk", RgbaImage::new(cube_dimension, cube_dimension)), // -Y (Back / Backward)
-        ("up", RgbaImage::new(cube_dimension, cube_dimension)), // +Z (Top / Up)
-        ("dn", RgbaImage::new(cube_dimension, cube_dimension)), // -Z (Bottom / Down)
+        ("up", RgbaImage::new(cube_dimension, cube_dimension)), // 0: U
+        ("lf", RgbaImage::new(cube_dimension, cube_dimension)), // 1: L
+        ("bk", RgbaImage::new(cube_dimension, cube_dimension)), // 2: B
+        ("rt", RgbaImage::new(cube_dimension, cube_dimension)), // 3: R
+        ("ft", RgbaImage::new(cube_dimension, cube_dimension)), // 4: F
+        ("dn", RgbaImage::new(cube_dimension, cube_dimension)), // 5: D
     ];
 
     let hdri_w = hdri.width() as f32;
     let hdri_h = hdri.height() as f32;
 
-    // Loop through each face and every pixel within that face
     for face_idx in 0..6 {
         for y in 0..cube_dimension {
             for x in 0..cube_dimension {
-                // 1. Map pixel to [-1.0, 1.0] range
-                // Adding 0.5 samples from the center of the pixel
+                // Convert pixel to [-1, 1] range
                 let a = (2.0 * (x as f32 + 0.5)) / cube_dimension as f32 - 1.0;
                 let b = (2.0 * (y as f32 + 0.5)) / cube_dimension as f32 - 1.0;
 
-                // 2. Generate 3D direction vector based on Z-up, X-right system
-                // Note: 'b' (the image y-axis) is inverted (-b) so that image coordinates
-                // (0,0 at top-left) map correctly to standard 3D world space orientation.
-                // let vec = match face_idx {
-                //     0 => [1.0, a, -b],   // +X (Right)
-                //     1 => [-1.0, -a, -b], // -X (Left)
-                //     2 => [-a, 1.0, -b],  // +Y (Front)
-                //     3 => [a, -1.0, -b],  // -Y (Back)
-                //     4 => [a, b, 1.0],    // +Z (Top)
-                //     5 => [a, -b, -1.0],  // -Z (Bottom)
-                //     _ => unreachable!(),
-                // };
-                let vec = match face_idx {
-                    0 => [1.0, -b, -a],  // +X (Right)
-                    1 => [-1.0, -b, a],  // -X (Left)
-                    2 => [a, 1.0, -b],   // +Y (Front)
-                    3 => [-a, -1.0, -b], // -Y (Back)
-                    4 => [a, -b, 1.0],   // +Z (Top)
-                    5 => [-a, b, -1.0],  // -Z (Bottom)
+                // Z-up cube face directions
+                // Using standard Z-up convention: X=right, Y=forward, Z=up
+                let [px, py, pz] = match face_idx {
+                    0 => [b, a, 1.0],    // up
+                    1 => [-1.0, -a, -b], // lf
+                    2 => [-a, 1.0, -b],  // bk
+                    3 => [1.0, a, -b],   // rt
+                    4 => [a, -1.0, -b],  // ft
+                    5 => [-b, a, -1.0],  // dn
                     _ => unreachable!(),
                 };
 
-                // 3. Normalize the 3D vector
-                let length = (vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]).sqrt();
-                let vn = [vec[0] / length, vec[1] / length, vec[2] / length];
+                // Normalize
+                let len = (px * px + py * py + pz * pz).sqrt();
+                let (nx, ny, nz) = (px / len, py / len, pz / len);
 
-                // 4. Convert 3D vector to spherical coordinates (Z-up)
-                let phi = vn[2].asin(); // Latitude: [-PI/2, PI/2]
-                let theta = f32::atan2(vn[0], vn[1]); // Longitude: [-PI, PI], forward is +Y
+                // Convert to spherical coordinates (Z-up)
+                // theta: angle in XY plane from Y axis, phi: angle from Z axis
+                let theta = f32::atan2(nx, ny); // [-PI, PI]
+                let phi = f32::acos(nz); // [0, PI]
 
-                // 5. Map spherical coordinates to HDRI UV space [0.0, 1.0]
+                // Map to HDRI UV: u = longitude, v = latitude
                 let u = (theta + f32::consts::PI) / (2.0 * f32::consts::PI);
-                let v = 1.0 - ((phi + f32::consts::PI / 2.0) / f32::consts::PI); // Invert V so 0 is top of image
+                let v = phi / f32::consts::PI; // 0 at top (Z+), 1 at bottom (Z-)
 
-                // 6. Sample HDRI using bilinear interpolation
-                let color = sample_bilinear(&hdri, u * hdri_w, v * hdri_h, hdri_w, hdri_h);
+                // Sample HDRI
+                let color = sample_bilinear(hdri, u * hdri_w, v * hdri_h, hdri_w, hdri_h);
 
-                // apply exposure
+                // Apply exposure and tone mapping
                 let color_exp0 = color[0] * exposure;
                 let color_exp1 = color[1] * exposure;
                 let color_exp2 = color[2] * exposure;
 
-                // apply tone mapping
                 let color_toned0 = color_exp0 / (1.0 + color_exp0);
                 let color_toned1 = color_exp1 / (1.0 + color_exp1);
                 let color_toned2 = color_exp2 / (1.0 + color_exp2);
 
-                // clamp
-                let color0 = (color_toned0 * 255.).clamp(0., 255.) as u8;
-                let color1 = (color_toned1 * 255.).clamp(0., 255.) as u8;
-                let color2 = (color_toned2 * 255.).clamp(0., 255.) as u8;
+                let color0 = (color_toned0 * 255.0).clamp(0.0, 255.0) as u8;
+                let color1 = (color_toned1 * 255.0).clamp(0.0, 255.0) as u8;
+                let color2 = (color_toned2 * 255.0).clamp(0.0, 255.0) as u8;
 
                 faces[face_idx]
                     .1
