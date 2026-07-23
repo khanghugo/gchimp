@@ -19,6 +19,12 @@ use crate::constants::MAX_GOLDSRC_TEXTURE_SIZE;
 
 type Palette = Vec<quantette::palette::rgb::Rgb<quantette::palette::encoding::Srgb, u8>>;
 
+const OTHER_OBVIOUS_TRANSPARENT_COLORS: &[[u8; 3]] = &[
+    [0, 255, 0],   // green
+    [0, 0, 255],   // blue
+    [255, 0, 255], // magenta
+];
+
 /// The pixels are quantized with following palette.
 ///
 /// ## Must convert image to 8bpp with the palette.
@@ -316,11 +322,18 @@ fn get_a_color_that_does_not_exist(palette: &[[u8; 3]], count: usize) -> [u8; 3]
     let mut local_count = 0;
 
     // not 255 inclusive so it does not exceed 255 when adding
-    for base in 0..255u8 {
-        for r in 0..=1 {
-            for g in 0..=1 {
-                for b in 0..=1 {
-                    let curr_color = [base + r, base + g, base + b];
+    for base in (0..255u8).rev() {
+        // starting from very bright color because it is easier to dither
+        // the problem right now is that if the color is too dark, this color will be part of the dithering
+        // resulting in transparent pixel being dark dots
+        for r in [0, 255] {
+            for g in [0, 255] {
+                for b in [0, 255] {
+                    let curr_color = [
+                        if r == 255 { base } else { 0 },
+                        if g == 255 { base } else { 0 },
+                        if b == 255 { base } else { 0 },
+                    ];
 
                     if !palette.contains(&curr_color) {
                         if local_count == count {
@@ -335,7 +348,7 @@ fn get_a_color_that_does_not_exist(palette: &[[u8; 3]], count: usize) -> [u8; 3]
     }
 
     // it is not possible for this to happen
-    unreachable!()
+    [0, 0, 255] // but still use blue
 }
 
 // threshold is between 0 and 1
@@ -378,12 +391,6 @@ pub fn eight_bpp_transparent_img(
     // pad palette
     let pad_color = get_a_color_that_does_not_exist(palette, 0);
     new_palette.resize(256, pad_color);
-
-    const OTHER_OBVIOUS_TRANSPARENT_COLORS: &[[u8; 3]] = &[
-        [0, 255, 0],   // green
-        [0, 0, 255],   // blue
-        [255, 0, 255], // magenta
-    ];
 
     // if we can't use these obvious transparent colors, then just fall back to adaptive color stuff
     let maybe_have_obvious_transparent_colors = OTHER_OBVIOUS_TRANSPARENT_COLORS
@@ -458,53 +465,53 @@ fn _generate_mipmaps_indexed_bmp(
 // TODO: better mipmaps generation because this is very SHIT
 pub fn generate_mipmaps_from_rgba_image(img: RgbaImage) -> eyre::Result<GenerateMipmapsResult> {
     let mip0 = maybe_resize_due_to_exceeding_max_goldsrc_texture_size(&img);
-
-    let mip0 = rgba8_to_rgb8(mip0);
-
-    if let Err(err) = mip0 {
-        return Err(eyre!("Cannot convert rgba8 to rgb8: {}", err));
-    }
-
-    let mip0 = mip0.unwrap();
-
-    let quantize_res = quantize_image(mip0);
+    let quantize_res = rgba8_to_8bpp(mip0);
 
     if let Err(err) = quantize_res {
         return Err(eyre!("Cannot quantize image: {}", err));
     }
 
-    let (mip0, palette_color) = quantize_res.unwrap();
-
-    let (width, height) = mip0.dimensions();
-
-    let palette = format_quantette_palette(palette_color);
+    let GoldSrcBmp {
+        image: mip0,
+        palette,
+        dimensions: (width, height),
+    } = quantize_res.unwrap();
 
     // must use nearest filter type here
     // to avoid making new color palette
-    let mip1 = imageops::resize(&mip0, width / 2, height / 2, imageops::FilterType::Nearest);
-    let mip2 = imageops::resize(
-        &mip0,
-        width / 2 / 2,
-        height / 2 / 2,
-        imageops::FilterType::Nearest,
-    );
-    let mip3 = imageops::resize(
-        &mip0,
-        width / 2 / 2 / 2,
-        height / 2 / 2 / 2,
-        imageops::FilterType::Nearest,
-    );
-
-    let mip0 = rgb8_to_8bpp(mip0, &palette);
-    let mip1 = rgb8_to_8bpp(mip1, &palette);
-    let mip2 = rgb8_to_8bpp(mip2, &palette);
-    let mip3 = rgb8_to_8bpp(mip3, &palette);
+    let (mip1, _, _) = generate_indexed_mipmap(&mip0, width, height, 1);
+    let (mip2, _, _) = generate_indexed_mipmap(&mip0, width, height, 2);
+    let (mip3, _, _) = generate_indexed_mipmap(&mip0, width, height, 3);
 
     Ok(GenerateMipmapsResult {
         mips: [mip0, mip1, mip2, mip3],
         palette,
         dimensions: (width, height),
     })
+}
+
+// thanks gemini
+fn generate_indexed_mipmap(
+    src_pixels: &[u8],
+    src_width: u32,
+    src_height: u32,
+    level: u32,
+) -> (Vec<u8>, u32, u32) {
+    let step = 1 << level; // 2^level stride
+    let target_width = (src_width >> level).max(1);
+    let target_height = (src_height >> level).max(1);
+
+    let mut pixels = Vec::with_capacity(target_width as usize * target_height as usize);
+
+    for y in 0..(target_height as usize) {
+        let row_offset = (y * step) * src_width as usize;
+
+        for x in 0..(target_width as usize) {
+            pixels.push(src_pixels[row_offset + (x * step)]);
+        }
+    }
+
+    (pixels, target_width, target_height)
 }
 
 pub fn generate_mipmaps_from_path(
