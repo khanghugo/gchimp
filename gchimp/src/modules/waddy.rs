@@ -324,7 +324,7 @@ impl Waddy {
         &mut self,
         texture_name: &str,
         res: GenerateMipmapsResult,
-    ) {
+    ) -> eyre::Result<()> {
         let GenerateMipmapsResult {
             mips: [mip0, mip1, mip2, mip3],
             palette,
@@ -343,6 +343,12 @@ impl Waddy {
         self.wad.header.num_dirs += 1;
 
         self.wad.entries.push(new_entry);
+
+        if texture_name.starts_with("{") {
+            self.turn_tile_to_transparent(self.wad.entries.len() - 1)?;
+        }
+
+        Ok(())
     }
 
     pub fn add_texture_from_rgba_image(
@@ -352,7 +358,7 @@ impl Waddy {
     ) -> eyre::Result<()> {
         let res = generate_mipmaps_from_rgba_image(image)?;
 
-        self.add_texture_from_generated_mipmaps(texture_name, res);
+        self.add_texture_from_generated_mipmaps(texture_name, res)?;
 
         Ok(())
     }
@@ -365,7 +371,7 @@ impl Waddy {
 
         let texture_name = path.as_ref().file_stem().unwrap().to_str().unwrap();
 
-        self.add_texture_from_generated_mipmaps(texture_name, res);
+        self.add_texture_from_generated_mipmaps(texture_name, res)?;
 
         Ok(())
     }
@@ -380,7 +386,12 @@ impl Waddy {
         // attempt to change name before doing anything
         // good low hanging fruit to prevent people from doing wrong stuffs
         // change name
-        let mut new_name = format!("{{{}", entry.directory_entry.texture_name.get_string());
+        let old_name = entry.directory_entry.texture_name.get_string();
+        let mut new_name = if old_name.starts_with("{") {
+            old_name
+        } else {
+            format!("{{{}", entry.directory_entry.texture_name.get_string())
+        };
         new_name.truncate(15);
         entry.set_name(&new_name)?;
 

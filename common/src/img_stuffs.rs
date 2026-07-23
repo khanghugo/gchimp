@@ -96,7 +96,7 @@ fn rgba8_to_rgb8(img: RgbaImage) -> eyre::Result<RgbImage> {
     let (width, height) = img.dimensions();
 
     let palette = get_palette_from_rgbaimage(&img);
-    let transparent_color = get_a_color_that_does_not_exist(&palette, 10);
+    let transparent_color = get_a_color_that_does_not_exist(&palette, 0);
 
     let buf = img
         .par_chunks_exact(4)
