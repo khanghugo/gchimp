@@ -165,6 +165,12 @@ impl Palette {
     }
 }
 
+impl From<Vec<[u8; 3]>> for Palette {
+    fn from(value: Vec<[u8; 3]>) -> Self {
+        Self(value)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Qpic {
     pub width: u32,
@@ -193,6 +199,16 @@ impl MipMap {
         Self {
             data: Image::new(s.into()),
         }
+    }
+
+    pub fn get_bytes(&self) -> &Vec<u8> {
+        self.data.get_bytes()
+    }
+}
+
+impl From<Vec<u8>> for MipMap {
+    fn from(value: Vec<u8>) -> Self {
+        MipMap { data: Image(value) }
     }
 }
 
