@@ -34,4 +34,17 @@ mod test {
 
         assert_eq!((vtf.header.width, vtf.header.height), (2048, 2048));
     }
+
+    #[test]
+    fn parse4() {
+        let vtf_bytes = include_bytes!("tests/nuke_metalgrate_01.vtf");
+        let vtf = Vtf::from_bytes(vtf_bytes).unwrap();
+
+        vtf.get_high_res_image()
+            .unwrap()
+            .save("/home/khang/gchimp/vtf/src/tests/out.png")
+            .unwrap();
+
+        // assert_eq!((vtf.header.width, vtf.header.height), (2048, 2048));
+    }
 }
