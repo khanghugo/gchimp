@@ -14,8 +14,8 @@ use eyre::eyre;
 use wad::types::{Entry, FileEntry, Wad};
 
 use common::img_stuffs::{
-    GenerateMipmapsResult, eight_bpp_bitmap_to_png_bytes, generate_mipmaps_from_path,
-    generate_mipmaps_from_rgba_image, write_8bpp_to_file,
+    GenerateMipmapsResult, eight_bpp_bitmap_to_png_bytes, eight_bpp_transparent_img,
+    generate_mipmaps_from_path, generate_mipmaps_from_rgba_image, write_8bpp_to_file,
 };
 
 pub struct Waddy {
@@ -372,6 +372,46 @@ impl Waddy {
 
     pub fn save_to_file(&self, path: impl AsRef<Path> + Into<PathBuf>) -> eyre::Result<()> {
         self.wad.write_to_file(path).map_err(|op| eyre!(op))
+    }
+
+    pub fn turn_tile_to_transparent(&mut self, idx: usize) -> eyre::Result<()> {
+        let entry = &mut self.wad.entries[idx];
+
+        // attempt to change name before doing anything
+        // good low hanging fruit to prevent people from doing wrong stuffs
+        // change name
+        let mut new_name = format!("{{{}", entry.directory_entry.texture_name.get_string());
+        new_name.truncate(15);
+        entry.set_name(&new_name)?;
+
+        let FileEntry::MipTex(miptex) = &mut entry.file_entry else {
+            return Err(eyre!("Cannot edit non miptex entries"));
+        };
+
+        // continue with changing name
+        miptex.texture_name.set_name(&new_name)?;
+
+        // change mips
+        let (mip0, new_palette) = eight_bpp_transparent_img(
+            miptex.mip_images[0].get_bytes(),
+            miptex.palette.get_bytes(),
+            0.05,
+        );
+
+        // TODO this seems bad because this might change per image and most use color is not consistent across all mipmaps
+        let rest: Vec<wad::types::MipMap> = miptex.mip_images[1..]
+            .iter()
+            .map(|x| {
+                eight_bpp_transparent_img(x.get_bytes(), miptex.palette.get_bytes(), 0.05)
+                    .0
+                    .into()
+            })
+            .collect();
+
+        miptex.mip_images = vec![vec![mip0.into()], rest].concat();
+        miptex.palette = new_palette.into();
+
+        Ok(())
     }
 }
 

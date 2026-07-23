@@ -34,7 +34,11 @@ struct WaddyInstance {
     // so the user can save the file
     is_changed: bool,
     selected: Vec<usize>,
+
+    // change stuffs en masse
     to_delete: Vec<usize>,
+    to_transparent: Vec<usize>,
+
     search: SearchBar,
 }
 
@@ -328,6 +332,19 @@ impl WaddyGui {
                 });
             }
         });
+
+        ui.separator();
+
+        // convert to transparent button
+        if ui.button("Convert to transparent").clicked() {
+            let mut to_transparent = self.instances[instance_index].selected.clone();
+
+            self.instances[instance_index]
+                .to_transparent
+                .append(&mut to_transparent);
+
+            ui.close()
+        }
 
         ui.separator();
 
@@ -805,6 +822,25 @@ impl WaddyGui {
             }
         });
 
+        // Convert textures to transparent if there is any
+        if !self.instances[instance_index].to_transparent.is_empty() {
+            let mut to_transparent = self.instances[instance_index].to_transparent.clone();
+            to_transparent.sort();
+
+            to_transparent.iter().rev().for_each(|&transparent| {
+                let _ = self.instances[instance_index]
+                    .waddy
+                    .turn_tile_to_transparent(transparent);
+
+                // need to update ui afterward
+                self.update_tile(ui, instance_index, transparent);
+            });
+
+            self.instances[instance_index].to_transparent.clear();
+            self.instances[instance_index].selected.clear();
+            self.instances[instance_index].is_changed = true;
+        }
+
         // Delete textures if there's any
         if !self.instances[instance_index].to_delete.is_empty() {
             let mut to_delete = self.instances[instance_index].to_delete.clone();
@@ -861,20 +897,32 @@ impl WaddyGui {
     // call it right after adding ONE image to the underlying WAD file to add new tile
     fn update_after_add_image(&mut self, ui: &mut Ui, instance_index: usize) {
         // after adding a new texture, we have to update the gui to include that new file
-        let new_entry = self.instances[instance_index]
+        self.update_tile(
+            ui,
+            instance_index,
+            self.instances[instance_index].waddy.wad().entries.len(),
+        );
+    }
+
+    fn update_tile(&mut self, ui: &mut Ui, instance_index: usize, tile_index: usize) {
+        let entry_count = self.instances[instance_index].waddy.wad().entries.len();
+        let access_entry_index = tile_index.min(entry_count.saturating_sub(1));
+
+        let access_entry = self.instances[instance_index]
             .waddy
             .wad()
             .entries
-            .last()
+            .iter()
+            .nth(access_entry_index)
             .unwrap();
 
-        let texture_name = new_entry.directory_entry.texture_name.get_string();
-        let dimensions = if let FileEntry::MipTex(miptex) = &new_entry.file_entry {
+        let texture_name = access_entry.directory_entry.texture_name.get_string();
+        let dimensions = if let FileEntry::MipTex(miptex) = &access_entry.file_entry {
             (miptex.width, miptex.height)
         } else {
             unreachable!()
         };
-        let wad_image = if let FileEntry::MipTex(miptex) = &new_entry.file_entry {
+        let wad_image = if let FileEntry::MipTex(miptex) = &access_entry.file_entry {
             WadImage::from_wad_image(
                 ui,
                 texture_name.clone(),
@@ -886,9 +934,15 @@ impl WaddyGui {
             unreachable!()
         };
 
-        self.instances[instance_index]
-            .texture_tiles
-            .push(TextureTile::new(instance_index, wad_image));
+        let new_tile = TextureTile::new(instance_index, wad_image);
+
+        // underlying wad should already have the wad texture added
+        // but the displaying texture does not have it added yet so the length comparison here is different
+        if access_entry_index < self.instances[instance_index].texture_tiles.len() {
+            self.instances[instance_index].texture_tiles[access_entry_index] = new_tile;
+        } else {
+            self.instances[instance_index].texture_tiles.push(new_tile);
+        }
 
         self.instances[instance_index].is_changed = true;
     }
@@ -950,6 +1004,7 @@ impl WaddyGui {
             is_changed,
             selected: vec![],
             to_delete: vec![],
+            to_transparent: vec![],
             search: SearchBar::default(),
         });
 
