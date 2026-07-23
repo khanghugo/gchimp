@@ -52,12 +52,13 @@ pub fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: &RgbaImage) -
         )
     };
 
+    // must use nearest filter to avoid making new colors
     if q <= 1. {
         // make sure that is is multiple of 16
         let (new_width, new_height) = make_multiple_of_16((width, height));
 
         // good enough? i guess?
-        imageops::resize(img, new_width, new_height, imageops::FilterType::Lanczos3)
+        imageops::resize(img, new_width, new_height, imageops::FilterType::Nearest)
     } else {
         let (width, height) = (width as f32 / q, height as f32 / q);
         let (width, height) = (width.round() as u32, height.round() as u32);
@@ -68,7 +69,7 @@ pub fn maybe_resize_due_to_exceeding_max_goldsrc_texture_size(img: &RgbaImage) -
             width,
             height,
             // eh, meow?
-            imageops::FilterType::Lanczos3,
+            imageops::FilterType::Nearest,
         )
     }
 }
@@ -305,7 +306,8 @@ pub fn tile_and_resize(img: &RgbaImage, scalar: u32) -> RgbaImage {
 
     imageops::tile(&mut res, img);
 
-    // this doesn't modify the original image, LOL wtf
+    // resize here can use higher quality lanczos3 because
+    // we care more about perceptivity than
     imageops::resize(&res, width, height, imageops::FilterType::Lanczos3)
 }
 
@@ -477,6 +479,8 @@ pub fn generate_mipmaps_from_rgba_image(img: RgbaImage) -> eyre::Result<Generate
 
     let palette = format_quantette_palette(palette_color);
 
+    // must use nearest filter type here
+    // to avoid making new color palette
     let mip1 = imageops::resize(&mip0, width / 2, height / 2, imageops::FilterType::Nearest);
     let mip2 = imageops::resize(
         &mip0,
