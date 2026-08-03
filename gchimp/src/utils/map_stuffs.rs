@@ -80,7 +80,7 @@ pub fn entity_to_triangulated_smd(
         .collect())
 }
 
-fn brush_to_triangulated_smd(
+pub fn brush_to_triangulated_smd(
     brush: &Brush,
     wads: &SimpleWad,
     three_planes: bool,
@@ -149,11 +149,16 @@ pub fn solid_3d_to_convex_hull(solid: &Solid3D, three_planes: bool) -> ConvexHul
     }
 }
 
-// technical debt
+// technically not technical debt
+// it does what it said perfectly
+// i thought i could break this down but that would be useless
+// the issue here is that if i break it down to 2 parts, converting to geometry and then geometry with data
+// that is not right
+// it is just more convenient to convert to geometry with data right away
+// solid3d is just the geometry, brush is the geometry with data, and smd triangle is the output geometry with data
+// building the simple wad is required though for correct UV
+// anyway, this function is perfect
 pub fn solid3d_to_triangulated_smd(
-    // brush is still needed here so we can get correct triangle data
-    // TODO: refactor this so that this function doesnt do too much
-    // right now, it does not only turn brush into triangles, but also makes them SMD triangles
     brush: &Brush,
     solid: &Solid3D,
     wads: &SimpleWad,
@@ -328,7 +333,7 @@ pub fn textures_used_in_entity(entity: &Entity) -> HashSet<String> {
 }
 
 /// Creates a .map rectangular prism brush from two lists of mins and maxs
-pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush {
+pub fn brush_from_mins_maxs(mins: DVec3, maxs: DVec3, texture: &str) -> Brush {
     let (rotation, u_scale, v_scale) = (0., 1., 1.);
 
     let left = BrushPlane {
@@ -468,7 +473,7 @@ pub fn brush_from_mins_maxs(mins: &[f64], maxs: &[f64], texture: &str) -> Brush 
     }
 }
 
-pub fn convert_used_texture_to_uppercase(mut map: Map) -> Map {
+pub fn convert_used_texture_to_uppercase(map: &mut Map) {
     map.entities.iter_mut().for_each(|entity| {
         if let Some(brushes) = entity.brushes.as_mut() {
             brushes.iter_mut().for_each(|brush| {
@@ -479,8 +484,6 @@ pub fn convert_used_texture_to_uppercase(mut map: Map) -> Map {
             });
         }
     });
-
-    map
 }
 
 #[cfg(test)]
@@ -510,9 +513,9 @@ mod test {
     fn devtex() -> SimpleWad {
         let mut res = SimpleWad::default();
 
-        res.insert("devcrate64".to_owned(), 0, (64, 64));
-        res.insert("devcross".to_owned(), 0, (128, 128));
-        res.insert("devwallgray".to_owned(), 0, (128, 128));
+        res.insert("devcrate64".to_owned(), (0, 0), (64, 64));
+        res.insert("devcross".to_owned(), (0, 0), (128, 128));
+        res.insert("devwallgray".to_owned(), (0, 0), (128, 128));
 
         res
     }
@@ -806,8 +809,8 @@ mod test {
         let path = "/home/khang/gchimp/examples/map2prop/marked/fuck.map";
         let mut map = Map::from_file(path).unwrap();
         let brush = brush_from_mins_maxs(
-            &[0., 0., 0.],
-            &[364., 364., 364.],
+            [0., 0., 0.].into(),
+            [364., 364., 364.].into(),
             TRENCHBROOM_EMPTY_TEXTURE,
         );
 

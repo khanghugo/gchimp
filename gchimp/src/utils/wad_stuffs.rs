@@ -12,13 +12,14 @@ use common::img_stuffs::write_8bpp_to_file;
 pub struct SimpleWadEntry {
     // instead of storing the name, for now just store the index instead
     // this implies we have to keep track of the orginal Vec<Wad> to index correctly
-    wad_file_index: usize,
+    /// (File index, Entry index)
+    index: (usize, usize),
     dimensions: (u32, u32),
 }
 
 impl SimpleWadEntry {
-    pub fn wad_file_index(&self) -> usize {
-        self.wad_file_index
+    pub fn index(&self) -> (usize, usize) {
+        self.index
     }
 
     pub fn dimensions(&self) -> (u32, u32) {
@@ -27,27 +28,30 @@ impl SimpleWadEntry {
 }
 
 #[derive(Debug, Clone, Default)]
-/// Just WAD(s) data indexed by texture name
+/// Just WAD(s) data indexed by texture name. Not something meant to be used by anything other than gchimp internal
 ///
 /// HashMap of (texture name, { wad file index, dimensions })
-pub struct SimpleWad(HashMap<String, SimpleWadEntry>);
+pub(crate) struct SimpleWad(pub HashMap<String, SimpleWadEntry>);
 
 impl From<&[&Wad]> for SimpleWad {
     fn from(value: &[&Wad]) -> Self {
         let mut res = Self::default();
 
-        value.iter().enumerate().for_each(|(wad_file_index, wad)| {
-            wad.entries.iter().for_each(|entry| {
-                if let FileEntry::MipTex(miptex) = &entry.file_entry {
-                    res.0.insert(
-                        entry.directory_entry.texture_name.get_string(),
-                        SimpleWadEntry {
-                            wad_file_index,
-                            dimensions: (miptex.width, miptex.height),
-                        },
-                    );
-                }
-            });
+        value.iter().enumerate().for_each(|(file_index, wad)| {
+            wad.entries
+                .iter()
+                .enumerate()
+                .for_each(|(entry_index, entry)| {
+                    if let FileEntry::MipTex(miptex) = &entry.file_entry {
+                        res.0.insert(
+                            entry.directory_entry.texture_name.get_string(),
+                            SimpleWadEntry {
+                                index: (file_index, entry_index),
+                                dimensions: (miptex.width, miptex.height),
+                            },
+                        );
+                    }
+                });
         });
 
         res
@@ -76,15 +80,8 @@ impl FromIterator<(std::string::String, SimpleWadEntry)> for SimpleWad {
     fn from_iter<T: IntoIterator<Item = (std::string::String, SimpleWadEntry)>>(iter: T) -> Self {
         let mut res = SimpleWad::new();
 
-        for (
-            key,
-            SimpleWadEntry {
-                wad_file_index,
-                dimensions,
-            },
-        ) in iter
-        {
-            res.insert(key, wad_file_index, dimensions);
+        for (key, SimpleWadEntry { index, dimensions }) in iter {
+            res.insert(key, index, dimensions);
         }
 
         res
@@ -108,11 +105,16 @@ impl SimpleWad {
         self.0.iter()
     }
 
-    pub fn insert(&mut self, k: impl AsRef<str> + Into<String>, index: usize, v: (u32, u32)) {
+    pub fn insert(
+        &mut self,
+        k: impl AsRef<str> + Into<String>,
+        index: (usize, usize),
+        v: (u32, u32),
+    ) {
         self.0.insert(
             k.into(),
             SimpleWadEntry {
-                wad_file_index: index,
+                index,
                 dimensions: v,
             },
         );
@@ -122,11 +124,7 @@ impl SimpleWad {
         let mut res = Self::new();
 
         self.0.into_iter().for_each(|(key, value)| {
-            res.insert(
-                key.to_uppercase(),
-                value.wad_file_index(),
-                value.dimensions(),
-            );
+            res.insert(key.to_uppercase(), value.index(), value.dimensions());
         });
 
         res

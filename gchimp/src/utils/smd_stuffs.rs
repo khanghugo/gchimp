@@ -38,43 +38,44 @@ pub fn source_smd_to_goldsrc_smd(smd: &Smd) -> Vec<Smd> {
 
 /// Splits one SMD to multiple SMD if number of vertices exceeds the limit.
 pub fn maybe_split_smd(smd: &Smd) -> Vec<Smd> {
-    let mut res: Vec<Smd> = vec![];
-
     // No triangles means no need to split so just use the original
     if smd.triangles.is_empty() {
-        res.push(smd.clone());
-
-        return res;
+        return vec![smd.clone()];
     }
 
+    let triangle_list = smd.triangles.clone();
+    let split_triangles = maybe_split_triangles(triangle_list);
+
+    split_triangles
+        .into_iter()
+        .map(|triangles| Smd {
+            nodes: smd.nodes.clone(),
+            skeleton: smd.skeleton.clone(),
+            triangles,
+            ..Default::default()
+        })
+        .collect()
+}
+
+pub fn maybe_split_triangles(mut triangles: Vec<Triangle>) -> Vec<Vec<Triangle>> {
     let mut vertex_list: HashMap<String, smd::Vertex> = HashMap::new();
 
-    for triangle in &smd.triangles {
+    for triangle in &triangles {
         for vertex in &triangle.vertices {
             vertex_list.insert(vertex.bad_hash(), vertex.to_owned());
         }
     }
 
-    let mut triangle_list = smd.triangles.clone();
+    let mut res = vec![];
 
-    // the strategy is
-    // traverse by triangle
-    // test whether adding all of the vertex of the current triangle to the current mesh
-    // will exceed the vertex count or not
-    // if it does, make new mesh
-    // if it does not, repeat
-    // brought to you by DeepSeek
-
-    let mut res: Vec<Smd> = vec![];
-
-    while !triangle_list.is_empty() {
+    while !triangles.is_empty() {
         // triangle cannot repeat
         let mut curr_smd_triangles: Vec<Triangle> = vec![];
         // vertex can repeat
         let mut curr_smd_vertices: HashSet<String> = HashSet::new();
         let mut curr_smd_normals: HashSet<String> = HashSet::new();
 
-        while let Some(curr_triangle) = triangle_list.pop() {
+        while let Some(curr_triangle) = triangles.pop() {
             let vert0_hash = curr_triangle.vertices[0].bad_pos_hash();
             let vert1_hash = curr_triangle.vertices[1].bad_pos_hash();
             let vert2_hash = curr_triangle.vertices[2].bad_pos_hash();
@@ -94,21 +95,14 @@ pub fn maybe_split_smd(smd: &Smd) -> Vec<Smd> {
             if curr_smd_vertices.len() > MAX_SMD_VERTEX || curr_smd_normals.len() > MAX_SMD_VERTEX {
                 // if after adding those 3 vertices and the vertex count is exceeded
                 // return the triangle back to the list and we are done with the current smd
-                triangle_list.push(curr_triangle);
+                triangles.push(curr_triangle);
                 break;
             }
 
             curr_smd_triangles.push(curr_triangle);
         }
 
-        let new_smd = Smd {
-            nodes: smd.nodes.clone(),
-            skeleton: smd.skeleton.clone(),
-            triangles: curr_smd_triangles,
-            ..Default::default()
-        };
-
-        res.push(new_smd);
+        res.push(curr_smd_triangles);
     }
 
     res
@@ -122,6 +116,8 @@ pub fn find_centroid(smd: &Smd) -> Option<DVec3> {
     find_centroid_from_triangles(smd.triangles.as_slice())
 }
 
+// there is a problem with this function and that is it is tessellation biases
+// for many mesh runs, vertices are shared and that is counted in this average function
 pub fn find_centroid_from_triangles(triangles: &[Triangle]) -> Option<DVec3> {
     if triangles.is_empty() {
         return None;
@@ -140,6 +136,24 @@ pub fn find_centroid_from_triangles(triangles: &[Triangle]) -> Option<DVec3> {
             / triangles.len() as f64
             / 3.,
     )
+}
+
+pub fn find_aabb_center_from_triangles(triangles: &[Triangle]) -> Option<DVec3> {
+    if triangles.is_empty() {
+        return None;
+    }
+
+    let mut min = DVec3::MAX;
+    let mut max = DVec3::MIN;
+
+    for tri in triangles {
+        for v in &tri.vertices {
+            min = min.min(v.pos);
+            max = max.max(v.pos);
+        }
+    }
+
+    Some((min + max) * 0.5)
 }
 
 /// Mutates the original smd
@@ -192,7 +206,7 @@ pub fn with_selected_textures(smd: &Smd, textures: &[&String]) -> eyre::Result<S
     Ok(new_smd)
 }
 
-pub fn find_mins_maxs(triangles: &[Triangle]) -> [[f64; 3]; 2] {
+pub fn find_mins_maxs(triangles: &[Triangle]) -> (DVec3, DVec3) {
     let minx = triangles.iter().fold(f64::MAX, |acc, e| {
         acc.min(e.vertices[0].pos.x)
             .min(e.vertices[1].pos.x)
@@ -225,7 +239,7 @@ pub fn find_mins_maxs(triangles: &[Triangle]) -> [[f64; 3]; 2] {
             .max(e.vertices[2].pos.z)
     });
 
-    [[minx, miny, minz], [maxx, maxy, maxz]]
+    ([minx, miny, minz].into(), [maxx, maxy, maxz].into())
 }
 
 pub fn textures_used_in_triangles(triangles: &[Triangle]) -> HashSet<String> {
