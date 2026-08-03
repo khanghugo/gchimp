@@ -125,6 +125,30 @@ impl Entity {
     pub fn classname(&self) -> Option<&String> {
         self.attributes.get("classname")
     }
+
+    pub fn classname_mut(&mut self) -> Option<&mut String> {
+        self.attributes.get_mut("classname")
+    }
+
+    pub fn rendermode(&self) -> Option<&String> {
+        self.attributes.get("rendermode")
+    }
+}
+
+impl Entity {
+    pub fn to_func_detail(&mut self) {
+        self.attributes.clear();
+
+        self.attributes = Attributes::from([
+            ("classname".into(), "func_detail".into()),
+            ("zhlt_detaillevel".into(), "1".into()),
+            ("zhlt_chopdown".into(), "0".into()),
+            ("zhlt_chopup".into(), "0".into()),
+            ("zhlt_coplanarpriority".into(), "0".into()),
+            ("zhlt_clipnodedetaillevel".into(), "1".into()),
+            ("zhlt_noclip".into(), "".into()),
+        ])
+    }
 }
 
 fn parse_triplet(i: &str) -> Option<DVec3> {

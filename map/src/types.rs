@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use glam::{DVec3, DVec4};
+use glam::{DVec3, DVec4, Vec4Swizzles};
 
 use crate::parser::{parse_brush, parse_brush_plane, parse_entity};
 
@@ -17,6 +17,31 @@ pub struct BrushPlane {
     pub rotation: f64,
     pub u_scale: f64,
     pub v_scale: f64,
+}
+
+impl BrushPlane {
+    pub fn normal(&self) -> DVec3 {
+        let edge1 = self.p2 - self.p1;
+        let edge2 = self.p3 - self.p1;
+
+        edge1.cross(edge2).normalize()
+    }
+
+    pub fn move_along_normal(&mut self, distance: f64) {
+        let offset = self.normal() * distance;
+
+        // change pos
+        self.p1 += offset;
+        self.p2 += offset;
+        self.p3 += offset;
+
+        // update uv
+        let u_xyz = self.u.xyz();
+        let v_xyz = self.v.xyz();
+
+        self.u.w -= u_xyz.dot(offset);
+        self.v.w -= v_xyz.dot(offset);
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -53,6 +78,14 @@ impl TryFrom<&str> for BrushPlane {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Brush {
     pub planes: Vec<BrushPlane>,
+}
+
+impl Brush {
+    pub fn expand(&mut self, distance: f64) {
+        self.planes.iter_mut().for_each(|plane| {
+            plane.move_along_normal(distance);
+        });
+    }
 }
 
 impl TryFrom<&str> for Brush {
