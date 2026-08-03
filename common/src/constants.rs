@@ -58,3 +58,31 @@ impl NoRenderTexture {
         NO_RENDER_TEXTURE.contains(&s) || NO_RENDER_TEXTURE_UPPER.iter().any(|t| t.as_str() == s)
     }
 }
+
+#[repr(u32)]
+#[derive(Default, PartialEq, Clone, Copy)]
+pub enum RenderMode {
+    #[default]
+    Normal = 0,
+    PureColor = 1,
+    Texture = 2,
+    Glow = 3,
+    Solid = 4,
+    Additive = 5,
+}
+
+impl TryFrom<u32> for RenderMode {
+    type Error = ();
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Normal),
+            1 => Ok(Self::PureColor),
+            2 => Ok(Self::PureColor),
+            3 => Ok(Self::Glow),
+            4 => Ok(Self::Solid),
+            5 => Ok(Self::Additive),
+            _ => Err(()),
+        }
+    }
+}
