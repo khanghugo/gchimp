@@ -2,12 +2,16 @@ use std::array::from_fn;
 
 use common::img_stuffs::GoldSrcBmp;
 use mdl::PALETTE_COUNT;
+use smd::Triangle;
 
 #[derive(Debug, Clone, Default)]
 pub struct StudioMdl {
     pub name: String,
     pub meshes: Vec<Mesh>,
     pub textures: Vec<Texture>,
+
+    // internal variables
+    pub(crate) bodypart_index: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -52,11 +56,11 @@ pub struct Texture {
 
 impl<S>
     From<(
-        S,
-        (u32, u32),
-        Vec<u8>,
-        [[u8; 3]; PALETTE_COUNT],
-        mdl::TextureFlag,
+        S,                        // Texture name
+        (u32, u32),               // Dimensions
+        Vec<u8>,                  // Image data
+        [[u8; 3]; PALETTE_COUNT], // Palette
+        mdl::TextureFlag,         // Flag
     )> for Texture
 where
     S: Into<String> + AsRef<str>,
@@ -93,6 +97,15 @@ where
             image: value.1.image,
             palette: from_fn(|i| value.1.palette[i]),
             flag: value.2,
+        }
+    }
+}
+
+impl From<(String, Vec<Triangle>)> for Mesh {
+    fn from(value: (String, Vec<Triangle>)) -> Self {
+        Self {
+            name: value.0,
+            mesh: value.1,
         }
     }
 }

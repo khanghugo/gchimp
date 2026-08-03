@@ -20,8 +20,8 @@ impl StudioMdl {
         self
     }
 
-    pub fn add_bodypart(&mut self, mesh: Mesh) -> &mut Self {
-        self.meshes.push(mesh);
+    pub fn add_bodypart(&mut self, mesh: impl Into<Mesh>) -> &mut Self {
+        self.meshes.push(mesh.into());
 
         self
     }
@@ -32,15 +32,19 @@ impl StudioMdl {
         self
     }
 
-    /// Adds triangle to the first bodypart
     pub fn add_triangle(&mut self, triangle: impl Into<smd::Triangle>) -> &mut Self {
         if self.meshes.is_empty() {
             self.meshes.push(Mesh::default());
         }
 
-        self.meshes[0].mesh.push(triangle.into());
+        self.meshes[self.bodypart_index].mesh.push(triangle.into());
 
         self
+    }
+
+    pub fn next_bodypart(&mut self) {
+        self.meshes.push(Mesh::default());
+        self.bodypart_index += 1;
     }
 
     fn list_used_materials(&self) -> HashSet<&str> {
