@@ -1,10 +1,6 @@
-use std::path::PathBuf;
-
-use crate::config::{Config, parse_config};
+use gchimp::modules::map2mdl::{convert_all_map2mdl_entities, entity::MAP2MDL_ENTITY_NAME};
 
 use super::*;
-
-use gchimp::modules::map2mdl::{Map2Mdl, entity::MAP2MDL_ENTITY_NAME};
 
 pub struct Map2MdlCli;
 impl Cli for Map2MdlCli {
@@ -21,40 +17,9 @@ impl Cli for Map2MdlCli {
             return CliRes::Err;
         }
 
-        let config = parse_config();
+        let map_path = &args[0];
 
-        if config.is_err() {
-            println!("Error parsing config.toml");
-            return CliRes::Err;
-        }
-
-        let Config {
-            studiomdl,
-            crowbar: _,
-            #[cfg(target_os = "linux")]
-                wineprefix: config_wineprefix,
-            ..
-        } = config.unwrap();
-
-        #[cfg(target_os = "linux")]
-        if config_wineprefix.is_none() {
-            println!("No WINECONFIG provided.");
-            return CliRes::Err;
-        }
-
-        let mut binding = Map2Mdl::default();
-        binding
-            .auto_pickup_wad(true)
-            .move_to_origin(true)
-            .export_texture(true)
-            .studiomdl(PathBuf::from(studiomdl).as_path())
-            .map(&args[0])
-            .marked_entity(true);
-
-        #[cfg(target_os = "linux")]
-        binding.wineprefix(&config_wineprefix.unwrap());
-
-        if let Err(err) = binding.work() {
+        if let Err(err) = convert_all_map2mdl_entities(map_path) {
             println!("{}", err);
             return CliRes::Err;
         }
@@ -65,8 +30,9 @@ impl Cli for Map2MdlCli {
     fn cli_help(&self) {
         println!(
             "\
-Converts {} into model. 
+Converts {} into model.
 Better read the documentation before you do what you do.
+CLI usage is intended to work along with map compiling process.
 
 ./gchimp map2mdl <.map>
 ",

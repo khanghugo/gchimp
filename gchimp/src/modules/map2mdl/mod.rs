@@ -14,7 +14,7 @@ use glam::DVec3;
 use map::{Brush, Entity};
 use smd::Triangle;
 use studiomdl::StudioMdl;
-use wad::types::Wad;
+use wad::{error::WadError, types::Wad};
 
 use rayon::prelude::*;
 
@@ -45,6 +45,7 @@ use crate::{
     },
 };
 
+/// Converts entire .map to model
 pub fn convert_entire_map(
     map_path: impl Into<PathBuf> + AsRef<Path>,
     entity_option: &Map2MdlOption,
@@ -65,6 +66,11 @@ pub fn convert_entire_map(
     convert_map(&map, entity_option)
 }
 
+/// Converts a TrenchBroom-copied entity brush to a model
+///
+/// The map is saved at <entity_option.output>/models.mdl
+///
+/// It is recommended to use gchimp binary path for <entity_option.output>
 pub fn convert_world_brush_entity(
     entity_text: &str, // entity text copied from trenchbroom is actually the map file but with only one entity
     entity_option: &Map2MdlOption,
@@ -78,17 +84,37 @@ pub fn convert_world_brush_entity(
 
 // DRY for convert world brush entity and entire map
 fn convert_map(map: &map::Map, entity_option: &Map2MdlOption) -> Result<(), Map2MdlError> {
+    if map.entities.is_empty() {
+        return Err(Map2MdlError::EmptyMap);
+    }
+
+    if map.entities[0].brushes.is_none() {
+        return Err(Map2MdlError::EmptyMap);
+    }
+
     let (simple_wad, wads) = generate_wad_info(map)?;
 
-    let triangles = map_to_triangulated_smd(map, &simple_wad, false).map_err(|x| {
-        Map2MdlError::GenericError {
-            value: x.to_string(),
-        }
-    })?;
+    let (triangles, celshade_texture) = convert_entity_to_triangles(
+        || {
+            map_to_triangulated_smd(map, &simple_wad, false).map_err(|x| {
+                Map2MdlError::FailToConvertBrushToTriangles {
+                    reason: x.to_string(),
+                }
+            })
+        },
+        &map.entities[0],
+        &entity_option,
+    )?;
 
     let triangles = process_special_textures(entity_option, &simple_wad, triangles)?;
     let triangle_chunks = partition_mesh2(triangles);
-    let mdls = generate_models(entity_option, &simple_wad, &wads, triangle_chunks);
+    let mdls = generate_models(
+        entity_option,
+        &simple_wad,
+        &wads,
+        triangle_chunks,
+        celshade_texture,
+    );
 
     mdls.into_par_iter().for_each(|(file_name, mdl)| {
         // there is no need for gchimp_info in this case
@@ -97,11 +123,17 @@ fn convert_map(map: &map::Map, entity_option: &Map2MdlOption) -> Result<(), Map2
         mdl.write_to_file(output_path)
             .expect("cannot write model file"); // TODO: too fatigued to handle error here
     });
+
     Ok(())
 }
 
 type Map2MdlConvertEntityResult = (Vec<(String, mdl::Mdl, map::Entity)>, Map2MdlOption);
 
+/// Converts all gchimp_map2mdl entities to individual .mdl(s)
+///
+/// This is the way to use Map2Mdl with map editor as it also does some IO stuffs
+// maybe in the future, should break this function down so others can call the common part
+// namingly, getting .mdl(s) and final .map file
 pub fn convert_all_map2mdl_entities(
     map_path: impl Into<PathBuf> + AsRef<Path>,
 ) -> Result<(), Map2MdlError> {
@@ -126,38 +158,25 @@ pub fn convert_all_map2mdl_entities(
     let (simple_wad, wads) = generate_wad_info(&map)?;
 
     // convert all gchimp_map2mdl
-    let convert_results: Vec<_> = entities
+    let convert_results = entities
         .par_iter()
         .map(|entity| convert_map2mdl_entity(&map, entity, &simple_wad, &wads))
-        .collect();
-
-    // clean up result
-    let convert_results: Vec<(Vec<(String, mdl::Mdl, Entity)>, Map2MdlOption)> = {
-        let mut res = vec![];
-
-        for i in convert_results {
-            let what = i?;
-            res.push(what);
-        }
-
-        res
-    };
+        .collect::<Result<Vec<_>, Map2MdlError>>()?;
 
     // delete older map2mdl entities
-    let entities_indices = entities_indices;
-
     // no need to sort here because it should be sorted
     assert_eq!(entities_indices, {
         let mut clone = entities_indices.clone();
-
         clone.sort();
-
         clone
     });
 
-    for index in entities_indices.iter().rev() {
-        map.entities.remove(*index);
-    }
+    let mut current_idx = 0;
+    map.entities.retain(|_| {
+        let keep = !entities_indices.contains(&current_idx);
+        current_idx += 1;
+        keep
+    });
 
     // convert all used textures to upper case
 
@@ -252,6 +271,7 @@ fn generate_wad_info(map: &map::Map) -> Result<(SimpleWad, Vec<Wad>), Map2MdlErr
 
                         if new_path.exists() {
                             path_as_string = new_path_string;
+                            return;
                         }
                     });
                 }
@@ -261,27 +281,55 @@ fn generate_wad_info(map: &map::Map) -> Result<(SimpleWad, Vec<Wad>), Map2MdlErr
         })
         .collect::<Vec<String>>();
 
-    let wads_results: Vec<_> = wads_paths
+    let wads = wads_paths
         .into_iter()
         .map(|path| Wad::from_file(path))
-        .collect();
-
-    let wads = {
-        let mut result = vec![];
-
-        for i in wads_results {
-            result.push(i.map_err(|x| Map2MdlError::GenericError {
-                value: x.to_string(),
-            })?);
-        }
-
-        result
-    };
+        .collect::<Result<Vec<_>, WadError>>()
+        .map_err(|x| Map2MdlError::GenericError {
+            value: x.to_string(),
+        })?;
 
     let simple_wad: SimpleWad = wads.as_slice().into();
     let simple_wad = simple_wad.uppercase(); // must use uppercase for compatibility
 
     Ok((simple_wad, wads))
+}
+
+type CustomTexture = (String, GoldSrcBmp);
+
+fn convert_entity_to_triangles(
+    make_triangles: impl Fn() -> Result<Vec<Triangle>, Map2MdlError>,
+    entity: &Entity,
+    option: &Map2MdlOption,
+) -> Result<(Vec<Triangle>, Option<CustomTexture>), Map2MdlError> {
+    let mut triangles = make_triangles()?;
+
+    // as celshade takes precedence
+    // does celshade stuffs
+    let mut celshade_custom_texture = None;
+
+    if option
+        .spawnflags
+        .contains(Map2MdlEntitySpawnflag::AsCelShade | Map2MdlEntitySpawnflag::WithCelShade)
+    {
+        // SAFETY: the previous entity_to_triangulated_smd should throw error if there are not brushes in this entity
+        let mut celshade_res =
+            generate_celshade(entity.brushes.as_ref().unwrap(), &option.celshade_options)?;
+
+        if option
+            .spawnflags
+            .contains(Map2MdlEntitySpawnflag::AsCelShade)
+        {
+            // as celshade will remove original brush
+            // as celshade takes precedence
+            triangles = celshade_res.mesh;
+        } else {
+            triangles.append(&mut celshade_res.mesh);
+        }
+        celshade_custom_texture = Some((celshade_res.texture_name, celshade_res.image));
+    }
+
+    Ok((triangles, celshade_custom_texture))
 }
 
 /// This function does not mutate map file
@@ -296,11 +344,17 @@ fn convert_map2mdl_entity(
     wads: &Vec<Wad>,
 ) -> Result<Map2MdlConvertEntityResult, Map2MdlError> {
     let entity_option = verify_and_get_entity_options(entity)?;
-    let triangles = entity_to_triangulated_smd(entity, simple_wad, false).map_err(|x| {
-        Map2MdlError::GenericError {
-            value: x.to_string(),
-        }
-    })?;
+    let (triangles, celshade_texture) = convert_entity_to_triangles(
+        || {
+            entity_to_triangulated_smd(entity, simple_wad, false).map_err(|x| {
+                Map2MdlError::FailToConvertBrushToTriangles {
+                    reason: x.to_string(),
+                }
+            })
+        },
+        entity,
+        &entity_option,
+    )?;
 
     // move the mesh
     let (model_world_origin, triangles) = modify_mesh_origin(map, &entity_option, triangles)?;
@@ -315,7 +369,13 @@ fn convert_map2mdl_entity(
     let triangle_chunks = partition_mesh2(triangles);
 
     // now write chunk to actual model
-    let mdls = generate_models(&entity_option, simple_wad, wads, triangle_chunks);
+    let mdls = generate_models(
+        &entity_option,
+        simple_wad,
+        wads,
+        triangle_chunks,
+        celshade_texture,
+    );
 
     // generate model entities to insert to the map
     let model_names: Vec<&str> = mdls.iter().map(|x| x.0.as_str()).collect();
@@ -346,19 +406,27 @@ fn modify_mesh_origin(
         .filter(|tri| tri.material == ORIGIN_TEXTURE)
         .cloned()
         .collect::<Vec<smd::Triangle>>();
-    let maybe_target_origin = if let Some(target_origin) = &option.target_origin
-        && let Some(entity_attributes) = map.entities.iter().find(|&entity| {
-            entity
-                .targetname()
-                .is_some_and(|targetname_curr| targetname_curr == target_origin)
-        }) {
-        let res = entity_attributes
-            .origin()
-            .ok_or(Map2MdlError::GenericError {
-                value: "Target entity does not have origin".into(),
-            })?;
+    let maybe_target_origin = if let Some(target_origin) = &option.target_origin {
+        // exclusive keyword "origin" to make it 0 0 0 without adding an extra entity
+        if target_origin == "origin" {
+            Some(DVec3::ZERO)
+        } else {
+            if let Some(entity_attributes) = map.entities.iter().find(|&entity| {
+                entity
+                    .targetname()
+                    .is_some_and(|targetname_curr| targetname_curr == target_origin)
+            }) {
+                let res = entity_attributes
+                    .origin()
+                    .ok_or(Map2MdlError::GenericError {
+                        value: "Target entity does not have origin".into(),
+                    })?;
 
-        Some(res)
+                Some(res)
+            } else {
+                None
+            }
+        }
     } else {
         None
     };
@@ -470,6 +538,7 @@ fn generate_models(
     simple_wad: &SimpleWad,
     wads: &Vec<Wad>,
     triangle_chunks: Vec<(Vec<String>, Vec<Triangle>)>,
+    custom_texture: Option<CustomTexture>,
 ) -> Vec<(String, mdl::Mdl)> {
     let model_basename = option
         .output
@@ -494,14 +563,33 @@ fn generate_models(
 
             // add texture
             texture_names.iter().for_each(|texture_name| {
-                let lookup = simple_wad
-                    .get(texture_name)
-                    .expect("used texture does not match simple wad");
-                let (wad_index, file_index) = lookup.index();
+                let (image, palette, dimensions) = {
+                    if let Some(lookup) = simple_wad.get(texture_name) {
+                        let (wad_index, file_index) = lookup.index();
 
-                let texture = &wads[wad_index].entries[file_index];
-                let wad::types::FileEntry::MipTex(texture) = &texture.file_entry else {
-                    unreachable!("Texture `{}` is not a miptex", texture_name);
+                        let texture = &wads[wad_index].entries[file_index];
+                        let wad::types::FileEntry::MipTex(texture) = &texture.file_entry else {
+                            unreachable!("Texture `{}` is not a miptex", texture_name);
+                        };
+
+                        (
+                            texture.mip_images[0].get_bytes().to_owned(),
+                            texture.palette.get_bytes().to_owned(),
+                            (texture.width, texture.height),
+                        )
+                    } else if let Some((custom_texture_name, custom_texture)) = &custom_texture
+                        && texture_name == custom_texture_name
+                    {
+                        // if cannot find from look up, look at custom texture instead
+                        // TODO: custom_texture should be consumed here, no debate, but this is fine too
+                        (
+                            custom_texture.image.clone(),
+                            custom_texture.palette.clone(),
+                            custom_texture.dimensions,
+                        )
+                    } else {
+                        unreachable!("should have textures")
+                    }
                 };
 
                 let mut texture_flag = mdl::TextureFlag::NOMIPS;
@@ -524,9 +612,9 @@ fn generate_models(
                 studiomdl.add_texture((
                     texture_name.to_owned(),
                     GoldSrcBmp {
-                        image: texture.mip_images[0].get_bytes().to_owned(),
-                        palette: texture.palette.get_bytes().to_owned(),
-                        dimensions: (texture.width, texture.height),
+                        image,
+                        palette,
+                        dimensions,
                     },
                     texture_flag,
                 ));
@@ -707,7 +795,10 @@ struct CelShadeResult {
     image: GoldSrcBmp,
 }
 
-fn generate_celshade(brushes: &Vec<Brush>, options: Map2MdlEntityCelShadeOption) -> CelShadeResult {
+fn generate_celshade(
+    brushes: &Vec<Brush>,
+    options: &Map2MdlEntityCelShadeOption,
+) -> Result<CelShadeResult, Map2MdlError> {
     let texture_name = format!(
         "{:03}{:03}{:03}",
         options.color[0], options.color[1], options.color[2]
@@ -720,7 +811,7 @@ fn generate_celshade(brushes: &Vec<Brush>, options: Map2MdlEntityCelShadeOption)
         (CELSHADE_TEXTURE_DIMENSION, CELSHADE_TEXTURE_DIMENSION),
     );
 
-    let triangulated_smds: Vec<smd::Triangle> = brushes
+    let triangulated_smds = brushes
         .iter()
         .cloned()
         .map(|mut x| {
@@ -733,9 +824,14 @@ fn generate_celshade(brushes: &Vec<Brush>, options: Map2MdlEntityCelShadeOption)
             x
         })
         .map(|brush| {
-            brush_to_triangulated_smd(&brush, &simple_wad, false)
-                .expect("cannot convert celshade brush to triangulated smd")
+            brush_to_triangulated_smd(&brush, &simple_wad, false).map_err(|x| {
+                Map2MdlError::FailToConvertBrushToTriangles {
+                    reason: x.to_string(),
+                }
+            })
         })
+        .collect::<Result<Vec<Vec<smd::Triangle>>, Map2MdlError>>()?
+        .into_iter()
         .flatten()
         .collect();
 
@@ -747,9 +843,9 @@ fn generate_celshade(brushes: &Vec<Brush>, options: Map2MdlEntityCelShadeOption)
         dimensions: (CELSHADE_TEXTURE_DIMENSION, CELSHADE_TEXTURE_DIMENSION),
     };
 
-    CelShadeResult {
+    Ok(CelShadeResult {
         mesh: triangulated_smds,
         texture_name,
         image: wad_image,
-    }
+    })
 }

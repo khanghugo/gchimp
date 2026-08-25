@@ -251,3 +251,228 @@ pub fn textures_used_in_triangles(triangles: &[Triangle]) -> HashSet<String> {
         acc
     })
 }
+
+#[cfg(test)]
+mod test {
+    use std::{
+        collections::{HashMap, VecDeque},
+        hash::{DefaultHasher, Hash, Hasher},
+        path::Path,
+    };
+
+    use glam::DVec3;
+    use rand::{RngExt, SeedableRng, rngs::StdRng};
+    use smd::{Smd, Triangle};
+
+    const SMD_PATH: &str = "/WD3/cube(2).smd";
+
+    fn seed_from_string(seed_str: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        seed_str.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    fn quantize_pos(pos: DVec3) -> (i64, i64, i64) {
+        let scale = 1000.0; // 1mm grid snapping
+        (
+            (pos.x * scale).round() as i64,
+            (pos.y * scale).round() as i64,
+            (pos.z * scale).round() as i64,
+        )
+    }
+
+    fn quantize_val(val: f64) -> i64 {
+        (val * 1000.0).round() as i64
+    }
+
+    #[test]
+    fn randomize_normal() {
+        let mut smd = Smd::from_file(SMD_PATH).unwrap();
+
+        let get_rand_dir = |seed: u64| {
+            let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+            rng.random::<f64>();
+
+            loop {
+                let v = DVec3::new(
+                    rng.random::<f64>() * 2.0 - 1.0,
+                    rng.random::<f64>() * 2.0 - 1.0,
+                    rng.random::<f64>() * 2.0 - 1.0,
+                );
+                // Ensure point is inside unit sphere to prevent corner bias
+                if v.length_squared() <= 1.0 && v.length_squared() > 1e-12 {
+                    return v.normalize();
+                }
+            }
+        };
+
+        smd.triangles.iter_mut().for_each(|triangle| {
+            triangle.vertices.iter_mut().for_each(|vertex| {
+                let seed = seed_from_string(&vertex.bad_norm_hash());
+                vertex.norm = get_rand_dir(seed);
+            });
+        });
+
+        smd.write(Path::new(SMD_PATH).with_file_name("randomized.smd"))
+            .unwrap();
+    }
+
+    fn quantize_vec(v: DVec3) -> (i64, i64, i64) {
+        let scale = 1000.0;
+        (
+            (v.x * scale).round() as i64,
+            (v.y * scale).round() as i64,
+            (v.z * scale).round() as i64,
+        )
+    }
+
+    #[test]
+    fn randomize_normal_connected_faces() {
+        let mut smd = Smd::from_file(SMD_PATH).unwrap();
+
+        let get_rand_dir = |seed: u64| {
+            let mut rng = StdRng::seed_from_u64(seed);
+            loop {
+                let v = DVec3::new(
+                    rng.random::<f64>() * 2.0 - 1.0,
+                    rng.random::<f64>() * 2.0 - 1.0,
+                    rng.random::<f64>() * 2.0 - 1.0,
+                );
+                let len_sq = v.length_squared();
+                if len_sq <= 1.0 && len_sq > 1e-12 {
+                    return v.normalize();
+                }
+            }
+        };
+
+        // --- STEP 1: Find which triangles share edges (2 vertices) ---
+        // We use edges rather than single vertices so we don't accidentally link diagonal corners
+        let mut edge_to_triangles: HashMap<((i64, i64, i64), (i64, i64, i64)), Vec<usize>> =
+            HashMap::new();
+
+        for (tri_idx, triangle) in smd.triangles.iter().enumerate() {
+            let p0 = quantize_vec(triangle.vertices[0].pos);
+            let p1 = quantize_vec(triangle.vertices[1].pos);
+            let p2 = quantize_vec(triangle.vertices[2].pos);
+
+            // Helper to sort edge coordinates so (A, B) matches (B, A)
+            let mut add_edge = |mut a, mut b| {
+                if a > b {
+                    std::mem::swap(&mut a, &mut b);
+                }
+                edge_to_triangles.entry((a, b)).or_default().push(tri_idx);
+            };
+
+            add_edge(p0, p1);
+            add_edge(p1, p2);
+            add_edge(p2, p0);
+        }
+
+        let mut adj: Vec<Vec<usize>> = vec![Vec::new(); smd.triangles.len()];
+        for tri_indices in edge_to_triangles.values() {
+            for &i in tri_indices {
+                for &j in tri_indices {
+                    if i != j {
+                        adj[i].push(j);
+                    }
+                }
+            }
+        }
+
+        // Helper: Gets the average original normal of a triangle
+        let get_tri_norm = |tri: &Triangle| {
+            let norm = (tri.vertices[0].norm + tri.vertices[1].norm + tri.vertices[2].norm) / 3.0;
+            quantize_vec(norm)
+        };
+
+        // --- STEP 2: Flood-fill to find connected "Faces" ---
+        let mut visited = vec![false; smd.triangles.len()];
+        let mut faces: Vec<Vec<usize>> = Vec::new();
+
+        for i in 0..smd.triangles.len() {
+            if visited[i] {
+                continue;
+            }
+
+            let mut face = Vec::new();
+            let mut queue = VecDeque::new();
+
+            let base_norm = get_tri_norm(&smd.triangles[i]);
+
+            queue.push_back(i);
+            visited[i] = true;
+
+            while let Some(tri_idx) = queue.pop_front() {
+                face.push(tri_idx);
+
+                for &neighbor in &adj[tri_idx] {
+                    if !visited[neighbor] {
+                        let neighbor_norm = get_tri_norm(&smd.triangles[neighbor]);
+
+                        // CORE LOGIC: Must share vertices AND have the same starting normal!
+                        if base_norm == neighbor_norm {
+                            visited[neighbor] = true;
+                            queue.push_back(neighbor);
+                        }
+                    }
+                }
+            }
+            faces.push(face);
+        }
+
+        // --- STEP 3: Assign one random normal per Face island ---
+        for face in faces {
+            // Find the physical center of this face to use as its unique seed.
+            // Because Ring 1 and Ring 2 are in different positions, their centers will create different seeds.
+            let mut face_centroid = DVec3::ZERO;
+            let mut count = 0.0;
+
+            for &tri_idx in &face {
+                for v in &smd.triangles[tri_idx].vertices {
+                    face_centroid += v.pos;
+                    count += 1.0;
+                }
+            }
+            face_centroid /= count;
+
+            let seed_str = format!("{:?}", quantize_vec(face_centroid));
+            let seed = seed_from_string(&seed_str);
+
+            let new_norm = get_rand_dir(seed);
+
+            for &tri_idx in &face {
+                let triangle = &mut smd.triangles[tri_idx];
+                for vertex in &mut triangle.vertices {
+                    vertex.norm = new_norm; // or apply jitter here
+                }
+            }
+        }
+
+        // print!("")
+
+        smd.write(Path::new(SMD_PATH).with_file_name("randomized_faces.smd"))
+            .unwrap();
+    }
+    #[test]
+    fn jitter_normal() {
+        let mut smd = Smd::from_file(SMD_PATH).unwrap();
+
+        // Scale factor for the jitter (e.g., 0.1 = subtle, 0.25 = moderate)
+        let jitter_amount = 0.20;
+
+        // Generates a float between -0.5 and 0.5
+        let get_rand_offset = || (rand::random::<f64>() - 0.5) * jitter_amount;
+
+        smd.triangles.iter_mut().for_each(|triangle| {
+            let offset = DVec3::new(get_rand_offset(), get_rand_offset(), get_rand_offset());
+
+            triangle.vertices.iter_mut().for_each(|vertex| {
+                // Add small offset to the original normal, then normalize back to length 1.0
+                vertex.norm = (vertex.norm + offset).normalize();
+            });
+        });
+
+        smd.write(Path::new(SMD_PATH).with_file_name("jittered.smd"))
+            .unwrap();
+    }
+}

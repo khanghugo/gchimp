@@ -31,7 +31,7 @@ impl SimpleWadEntry {
 /// Just WAD(s) data indexed by texture name. Not something meant to be used by anything other than gchimp internal
 ///
 /// HashMap of (texture name, { wad file index, dimensions })
-pub(crate) struct SimpleWad(pub HashMap<String, SimpleWadEntry>);
+pub struct SimpleWad(pub HashMap<String, SimpleWadEntry>);
 
 impl From<&[&Wad]> for SimpleWad {
     fn from(value: &[&Wad]) -> Self {

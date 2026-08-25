@@ -60,7 +60,7 @@ impl NoRenderTexture {
 }
 
 #[repr(u32)]
-#[derive(Default, PartialEq, Clone, Copy)]
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
 pub enum RenderMode {
     #[default]
     Normal = 0,

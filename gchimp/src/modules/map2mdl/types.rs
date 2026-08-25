@@ -37,6 +37,7 @@ impl Default for Map2MdlEntityCelShadeOption {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Map2MdlOption {
     /// Relative output for the model starting from <gamemod>
     ///
@@ -45,6 +46,9 @@ pub struct Map2MdlOption {
     pub output: PathBuf,
     pub model_entity: String,
     pub cliptype: Map2MdlEntityCliptype,
+    /// Without target_origin, model origin will be the center of the model AABB
+    ///
+    /// target_origin can be "origin", which is (0 0 0)
     pub target_origin: Option<String>,
     pub spawnflags: Map2MdlEntitySpawnflag,
     pub celshade_options: Map2MdlEntityCelShadeOption,
@@ -84,6 +88,8 @@ pub enum Map2MdlError {
     EmptyMap,
     #[error("Map does not have \"wad\" key to find used WAD files")]
     NoWadKey,
+    #[error("Cannot convert brushes to triangles: {reason}")]
+    FailToConvertBrushToTriangles { reason: String },
     #[error("Error: `{value}`")]
     GenericError { value: String },
 }

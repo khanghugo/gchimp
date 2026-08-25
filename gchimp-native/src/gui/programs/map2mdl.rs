@@ -1,8 +1,17 @@
-use std::{path::PathBuf, thread};
+use std::{
+    env,
+    path::Path,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use eframe::egui::{self, ScrollArea};
 
-use gchimp::modules::map2mdl::{Map2Mdl, Map2MdlOptions, Map2MdlSync, entity::MAP2MDL_ENTITY_NAME};
+use gchimp::modules::map2mdl::{
+    convert_all_map2mdl_entities, convert_entire_map, convert_world_brush_entity,
+    entity::MAP2MDL_ENTITY_NAME,
+    types::{Map2MdlEntitySpawnflag, Map2MdlOption},
+};
 
 use crate::{
     config::Config,
@@ -13,23 +22,29 @@ use crate::{
     },
 };
 
+struct ExtraOptions {
+    convert_only_marked_entity: bool,
+    center_model: bool,
+}
+
+impl Default for ExtraOptions {
+    fn default() -> Self {
+        Self {
+            convert_only_marked_entity: false,
+            center_model: true,
+        }
+    }
+}
+
 pub struct Map2MdlGui {
+    #[allow(unused)]
     app_config: Config,
     map: String,
     entity: String,
     use_entity: bool,
-    options: Map2MdlOptions,
-    gui_options: GuiOptions,
-    sync: Map2MdlSync,
-}
-
-#[derive(Default, Clone)]
-struct GuiOptions {
-    flatshade: bool,
-    reverse_normal: bool,
-    with_cel_shade: bool,
-    celshade_color: [u8; 3],
-    celshade_distance: f32,
+    options: Map2MdlOption,
+    extra_options: ExtraOptions,
+    status_text: Arc<Mutex<String>>,
 }
 
 impl Map2MdlGui {
@@ -39,82 +54,61 @@ impl Map2MdlGui {
             map: Default::default(),
             entity: Default::default(),
             use_entity: false,
-            options: Map2MdlOptions::default(),
-            gui_options: GuiOptions::default(),
-            sync: Map2MdlSync::default(),
+            options: Map2MdlOption::default(),
+            extra_options: ExtraOptions::default(),
+            status_text: Default::default(),
         }
     }
 
     fn run(&mut self) {
-        *self.sync.stdout().lock().unwrap() = "".to_string();
+        {
+            *self.status_text.lock().unwrap() = "Running".to_string();
+        }
 
-        let Config {
-            studiomdl,
-            crowbar: _,
-            #[cfg(target_os = "linux")]
-            wineprefix,
-            ..
-        } = self.app_config.clone();
-
-        let Map2MdlOptions {
-            auto_pickup_wad,
-            export_texture,
-            move_to_origin,
-            marked_entity,
-            uppercase,
-            ..
-        } = self.options;
-        let entity = self.entity.clone();
-        let map = self.map.clone();
+        let entity_text = self.entity.clone();
+        let map_path = self.map.clone();
         let use_entity = self.use_entity;
+        let convert_only_marked_entity = self.extra_options.convert_only_marked_entity;
 
-        let sync = self.sync.clone();
+        const ENTITY_TEXT_MODEL_FILE_NAME: &str = "map2mdl.mdl";
+        let current_exe =
+            env::current_exe().expect("cannot get currently running gchimp executable path`");
 
-        let gui_options = self.gui_options.clone();
+        let sync = self.status_text.clone();
+
+        let mut entity_option = self.options.clone();
 
         thread::spawn(move || {
-            let mut binding = Map2Mdl::default();
+            let res = if use_entity {
+                entity_option.output = current_exe.with_file_name(ENTITY_TEXT_MODEL_FILE_NAME);
 
-            binding
-                .auto_pickup_wad(auto_pickup_wad)
-                .move_to_origin(move_to_origin)
-                .export_texture(export_texture)
-                .studiomdl(PathBuf::from(&studiomdl).as_path())
-                .marked_entity(marked_entity)
-                .flatshade(gui_options.flatshade)
-                .uppercase(uppercase)
-                .reverse_normal(gui_options.reverse_normal)
-                .sync(sync.clone());
-
-            if gui_options.with_cel_shade {
-                binding
-                    .celshade_color(gui_options.celshade_color)
-                    .celshade_distance(gui_options.celshade_distance);
-            }
-
-            if use_entity {
-                binding.entity(&entity);
+                convert_world_brush_entity(&entity_text, &entity_option)
             } else {
-                binding.map(&map);
+                if convert_only_marked_entity {
+                    convert_all_map2mdl_entities(map_path)
+                } else {
+                    entity_option.output = Path::new(&map_path).to_path_buf();
+
+                    convert_entire_map(map_path, &entity_option)
+                }
             };
 
-            #[cfg(target_os = "linux")]
-            binding.wineprefix(wineprefix.as_ref().unwrap());
-
-            if let Err(err) = binding.work() {
-                let mut lock = sync.stdout().lock().unwrap();
-                *lock += "\n";
-                *lock += err.to_string().as_str();
+            if let Err(err) = res {
+                let mut lock = sync.lock().unwrap();
+                *lock = err.to_string();
             } else {
                 let mut ok_text = "OK".to_string();
 
                 if use_entity {
-                    ok_text += &("\n".to_owned()
-                        + "Model is saved as map2mdl.mdl at "
-                        + studiomdl.replace("studiomdl.exe", "").as_str());
+                    ok_text = format!(
+                        "{ok_text}\nModel is saved at {}",
+                        current_exe
+                            .with_file_name(ENTITY_TEXT_MODEL_FILE_NAME)
+                            .display()
+                    );
                 }
 
-                *sync.stdout().lock().unwrap() += ok_text.as_str();
+                *sync.lock().unwrap() += ok_text.as_str();
             }
         });
     }
@@ -173,42 +167,72 @@ impl TabProgram for Map2MdlGui {
         ui.label("Options:");
 
         ui.horizontal(|ui| {
-            ui.checkbox(&mut self.options.auto_pickup_wad, "Auto pickup WADs").on_hover_text("Look for WAD files from \"wad\" key in the map file or worldbrush entity");
-            ui.checkbox(&mut self.options.export_texture, "Export textures").on_hover_text("Export textures into the map file folder OR studiomdl.exe folder if converting entity");
-            ui.checkbox(&mut self.options.uppercase, "Uppercase texture").on_hover_text("\
-For .map exported from .jmf/rmf, the texture used inside source map file does not match WAD file.
-This option is to coerce every texture in this process to be upper case.")
-        });
-
-        ui.horizontal(|ui| {
             ui.checkbox(
-                &mut self.options.marked_entity,
+                &mut self.extra_options.convert_only_marked_entity,
                 "Only convert marked entity",
             )
             .on_hover_text(format!(
                 "Only convert brush entities {} and this would modify the original map file",
                 MAP2MDL_ENTITY_NAME
             ));
-            ui.checkbox(&mut self.options.move_to_origin, "Center the model")
-                .on_hover_text("The center of the model is the origin");
-            ui.checkbox(&mut self.gui_options.flatshade, "Flatshade")
-                .on_hover_text("Model is flatshade");
+            ui.checkbox(&mut self.extra_options.center_model, "Center the model")
+                .on_hover_text("Model origin is at center of its volume");
+
+            {
+                let mut flatshade = self
+                    .options
+                    .spawnflags
+                    .contains(Map2MdlEntitySpawnflag::FlatShade);
+
+                if ui
+                    .checkbox(&mut flatshade, "Flatshade")
+                    .on_hover_text("Model is flatshade")
+                    .changed()
+                {
+                    self.options
+                        .spawnflags
+                        .set(Map2MdlEntitySpawnflag::FlatShade, flatshade);
+                }
+            }
         });
 
         ui.horizontal(|ui| {
-            ui.checkbox(&mut self.gui_options.reverse_normal, "Reverse normal")
-                .on_hover_text("Reverses every vertex normals");
+            let mut reverse_normal = self
+                .options
+                .spawnflags
+                .contains(Map2MdlEntitySpawnflag::ReverseNormals);
+            let mut with_cel_shade = self
+                .options
+                .spawnflags
+                .contains(Map2MdlEntitySpawnflag::WithCelShade);
 
-            ui.checkbox(&mut self.gui_options.with_cel_shade, "CelShade")
-                .on_hover_text("Enable cell shading");
+            if ui
+                .checkbox(&mut reverse_normal, "Reverse normal")
+                .on_hover_text("Reverses every vertex normals")
+                .changed()
+            {
+                self.options
+                    .spawnflags
+                    .set(Map2MdlEntitySpawnflag::ReverseNormals, reverse_normal);
+            }
 
-            ui.add_enabled_ui(self.gui_options.with_cel_shade, |ui| {
+            if ui
+                .checkbox(&mut with_cel_shade, "CelShade")
+                .on_hover_text("Enable cel shading")
+                .changed()
+            {
+                self.options
+                    .spawnflags
+                    .set(Map2MdlEntitySpawnflag::WithCelShade, with_cel_shade);
+            }
+
+            ui.add_enabled_ui(with_cel_shade, |ui| {
                 // let color_picker = egui::color_picker::color_picker_color32(ui, srgba, alpha)
                 ui.label("Color");
-                ui.color_edit_button_srgb(&mut self.gui_options.celshade_color);
+                ui.color_edit_button_srgb(&mut self.options.celshade_options.color);
 
                 ui.label("Distance");
-                let drag = egui::DragValue::new(&mut self.gui_options.celshade_distance)
+                let drag = egui::DragValue::new(&mut self.options.celshade_options.distance)
                     .range(0.0..=128.0);
                 ui.add(drag);
             });
@@ -222,7 +246,7 @@ This option is to coerce every texture in this process to be upper case.")
 
         ui.separator();
 
-        let binding = self.sync.stdout().lock().unwrap();
+        let binding = self.status_text.lock().unwrap();
         let mut readonly_buffer = binding.as_str();
 
         ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
