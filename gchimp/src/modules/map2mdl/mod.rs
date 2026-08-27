@@ -37,7 +37,7 @@ use crate::{
     utils::{
         map_stuffs::{
             brush_from_mins_maxs, brush_to_triangulated_smd, convert_used_texture_to_uppercase,
-            entity_to_triangulated_smd, map_to_triangulated_smd,
+            entity_to_triangulated_smd,
         },
         misc::{f64_3_to_u8_3, parse_triplet},
         smd_stuffs::{find_aabb_center_from_triangles, find_mins_maxs, maybe_split_triangles},
@@ -88,32 +88,42 @@ fn convert_map(map: &map::Map, entity_option: &Map2MdlOption) -> Result<(), Map2
         return Err(Map2MdlError::EmptyMap);
     }
 
-    if map.entities[0].brushes.is_none() {
-        return Err(Map2MdlError::EmptyMap);
-    }
-
     let (simple_wad, wads) = generate_wad_info(map)?;
 
-    let (triangles, celshade_texture) = convert_entity_to_triangles(
-        || {
-            map_to_triangulated_smd(map, &simple_wad, false).map_err(|x| {
-                Map2MdlError::FailToConvertBrushToTriangles {
-                    reason: x.to_string(),
-                }
-            })
-        },
-        &map.entities[0],
-        &entity_option,
-    )?;
+    // there is map_to_triangulated_smd
+    // but it should not be used because that will pass the entire map geometry to the special texture processing function
+    // if CONTENTWATER is used, the entire map is duplicated
+    let (triangles, extra_textures) = map
+        .entities
+        .iter()
+        .filter(|x| x.brushes.is_some()) // only work on entities with brush
+        .map(|entity| {
+            convert_entity_to_triangles(
+                || {
+                    entity_to_triangulated_smd(entity, &simple_wad, false).map_err(|x| {
+                        Map2MdlError::FailToConvertBrushToTriangles {
+                            reason: x.to_string(),
+                        }
+                    })
+                },
+                &map.entities[0],
+                &entity_option,
+            )
+        })
+        .try_fold((Vec::new(), Vec::new()), |(mut tris, mut texs), res| {
+            let (t, x) = res?;
+            tris.extend(t);
+            texs.extend(x);
+            Ok::<_, Map2MdlError>((tris, texs))
+        })?;
 
-    let triangles = process_special_textures(entity_option, &simple_wad, triangles)?;
     let triangle_chunks = partition_mesh2(triangles);
     let mdls = generate_models(
         entity_option,
         &simple_wad,
         &wads,
         triangle_chunks,
-        celshade_texture,
+        extra_textures,
     );
 
     mdls.into_par_iter().for_each(|(file_name, mdl)| {
@@ -301,12 +311,12 @@ fn convert_entity_to_triangles(
     make_triangles: impl Fn() -> Result<Vec<Triangle>, Map2MdlError>,
     entity: &Entity,
     option: &Map2MdlOption,
-) -> Result<(Vec<Triangle>, Option<CustomTexture>), Map2MdlError> {
+) -> Result<(Vec<Triangle>, Vec<CustomTexture>), Map2MdlError> {
     let mut triangles = make_triangles()?;
 
     // as celshade takes precedence
     // does celshade stuffs
-    let mut celshade_custom_texture = None;
+    let mut celshade_custom_texture = vec![];
 
     if option
         .spawnflags
@@ -326,8 +336,10 @@ fn convert_entity_to_triangles(
         } else {
             triangles.append(&mut celshade_res.mesh);
         }
-        celshade_custom_texture = Some((celshade_res.texture_name, celshade_res.image));
+        celshade_custom_texture.push((celshade_res.texture_name, celshade_res.image));
     }
+
+    let triangles = process_special_textures(&option, triangles)?;
 
     Ok((triangles, celshade_custom_texture))
 }
@@ -358,10 +370,6 @@ fn convert_map2mdl_entity(
 
     // move the mesh
     let (model_world_origin, triangles) = modify_mesh_origin(map, &entity_option, triangles)?;
-
-    // process special texture
-    // either remove NULL and alike or make it CONTENTWATER correct
-    let triangles = process_special_textures(&entity_option, simple_wad, triangles)?;
 
     let exts = find_mins_maxs(&triangles);
 
@@ -450,52 +458,45 @@ fn modify_mesh_origin(
     Ok((brush_world_centroid, triangles))
 }
 
-// TODO: this should be done per brush basis, not per entire entity
-// the expectation is that for any entities that use special textures like CONTENTWATER,
-// faces shall be duplicated pertaining to that brush only
-// currently the code treats everything as one single brush
-// this means the output of conversion code should be Vec<Vec<Triangle>>, not Vec<Triangle>
-// then I must have to think how long do I keep that structure
+// This function should be called for EACH ENTITY
+// There is CONTENTWATER processing and that duplicates geometry
+// TODO: this should be better isolated to PER BRUSH, but for now it is OK
 fn process_special_textures(
     option: &Map2MdlOption,
-    simple_wad: &SimpleWad,
     mut triangles: Vec<smd::Triangle>,
 ) -> Result<Vec<smd::Triangle>, Map2MdlError> {
-    // if an entity has CONTENTWATER texture, then the entire entity
-    let is_content_water = simple_wad.0.keys().any(|x| x == CONTENTWATER_TEXTURE);
+    let is_content_water = triangles
+        .iter()
+        .any(|triangle| triangle.material == CONTENTWATER_TEXTURE);
 
     let mut extra_triangles = vec![];
 
-    triangles
-        .iter()
-        .filter(|tri| !NoRenderTexture.contains(tri.material.as_str()))
-        .for_each(|tri| {
+    // first remove all no render textures
+    triangles.retain(|tri| !NoRenderTexture.contains(tri.material.as_str()));
+
+    // then process special textures like CONTENTWATER
+    triangles.iter_mut().for_each(|tri| {
+        if option
+            .spawnflags
+            .contains(Map2MdlEntitySpawnflag::ReverseNormals)
+        {
+            tri.vertices.iter_mut().for_each(|vertex| {
+                vertex.norm *= -1.;
+            });
+        }
+
+        if is_content_water {
             let mut new_tri = tri.clone();
 
-            if option
-                .spawnflags
-                .contains(Map2MdlEntitySpawnflag::ReverseNormals)
-            {
-                new_tri.vertices.iter_mut().for_each(|vertex| {
-                    vertex.norm *= -1.;
-                });
-            }
+            new_tri.vertices.iter_mut().for_each(|vertex| {
+                // reverse normal just to be safe
+                vertex.norm *= -1.;
+            });
 
+            new_tri.vertices.swap(0, 1);
             extra_triangles.push(new_tri);
-
-            // no way to skip special textures
-            if is_content_water {
-                let mut new_tri = tri.clone();
-
-                new_tri.vertices.iter_mut().for_each(|vertex| {
-                    // reverse normal just to be safe
-                    vertex.norm *= -1.;
-                });
-
-                new_tri.vertices.swap(0, 1);
-                extra_triangles.push(new_tri);
-            }
-        });
+        }
+    });
 
     triangles.append(&mut extra_triangles);
 
@@ -538,7 +539,7 @@ fn generate_models(
     simple_wad: &SimpleWad,
     wads: &Vec<Wad>,
     triangle_chunks: Vec<(Vec<String>, Vec<Triangle>)>,
-    custom_texture: Option<CustomTexture>,
+    custom_texture: Vec<CustomTexture>,
 ) -> Vec<(String, mdl::Mdl)> {
     let model_basename = option
         .output
@@ -577,8 +578,9 @@ fn generate_models(
                             texture.palette.get_bytes().to_owned(),
                             (texture.width, texture.height),
                         )
-                    } else if let Some((custom_texture_name, custom_texture)) = &custom_texture
-                        && texture_name == custom_texture_name
+                    } else if let Some((_, custom_texture)) = custom_texture
+                        .iter()
+                        .find(|(custom_texture_name, _)| custom_texture_name == texture_name)
                     {
                         // if cannot find from look up, look at custom texture instead
                         // TODO: custom_texture should be consumed here, no debate, but this is fine too

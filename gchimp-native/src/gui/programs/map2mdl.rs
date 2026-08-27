@@ -108,7 +108,7 @@ impl Map2MdlGui {
                     );
                 }
 
-                *sync.lock().unwrap() += ok_text.as_str();
+                *sync.lock().unwrap() = ok_text;
             }
         });
     }
