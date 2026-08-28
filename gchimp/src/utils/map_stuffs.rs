@@ -61,7 +61,14 @@ pub fn entity_to_triangulated_smd(
         .as_ref()
         .unwrap()
         .par_iter()
-        .map(|brush| brush_to_triangulated_smd(brush, wads, three_planes))
+        // TODO: stupid shit
+        // convex hull clipping algorithmn here is very integrated with the wad file
+        // because it needs to calculate correct UV
+        // right now, ignoring UV value only applies to doing celshade, which uses this function alone
+        // other stuffs like entity_to_triangulated_smd cares about UV
+        // need to think about this problem deeply
+        // the reason why this is even a problem is that brush expansion is done before convex hull clipping
+        .map(|brush| brush_to_triangulated_smd(brush, wads, three_planes, false)) //
         .collect::<Vec<eyre::Result<Vec<Triangle>>>>();
 
     let err = res
@@ -84,10 +91,11 @@ pub fn brush_to_triangulated_smd(
     brush: &Brush,
     wads: &SimpleWad,
     three_planes: bool,
+    ignore_wads: bool,
 ) -> eyre::Result<Vec<Triangle>> {
     let solid = brush_to_solid3d(brush);
 
-    solid3d_to_triangulated_smd(brush, &solid, wads, three_planes)
+    solid3d_to_triangulated_smd(brush, &solid, wads, three_planes, ignore_wads)
 }
 
 // technical debt
@@ -163,6 +171,7 @@ pub fn solid3d_to_triangulated_smd(
     solid: &Solid3D,
     wads: &SimpleWad,
     three_planes: bool,
+    ignore_wads: bool,
 ) -> eyre::Result<Vec<Triangle>> {
     let convex_hull = solid_3d_to_convex_hull(solid, three_planes);
     // it is convex so no worry that the center is outside the brush
@@ -231,10 +240,13 @@ pub fn solid3d_to_triangulated_smd(
                     // seems very inefficient to do check here instead
                     // using get_string_standard() because the assumption is that
                     // all textures are uppercase
-                    let tex_dimensions = wads
-                        .get(&brush_plane.texture_name.get_string_standard())
-                        .unwrap()
-                        .dimensions();
+                    let tex_dimensions = if ignore_wads {
+                        (16, 16)
+                    } else {
+                        wads.get(&brush_plane.texture_name.get_string_standard())
+                            .unwrap()
+                            .dimensions()
+                    };
 
                     let p1: DVec3 = triangle_3d.get_triangle()[0].into();
                     let p2: DVec3 = triangle_3d.get_triangle()[1].into();
@@ -523,7 +535,7 @@ mod test {
     #[test]
     fn normal_cube() {
         let cube = default_cube();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -548,7 +560,7 @@ mod test {
 ( 16 45.25483399593904 67.88225099390857 ) ( 16 44.547727214752484 68.58935777509511 ) ( 16 45.961940777125584 68.58935777509511 ) devcrate64 [ 0 0.7071067811865475 0.7071067811865477 0 ] [ 0 0.7071067811865476 -0.7071067811865475 0 ] 315 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -573,7 +585,7 @@ mod test {
 ( -45.254833995939045 67.88225099390856 16 ) ( -45.254833995939045 67.88225099390856 17 ) ( -45.96194077712559 68.58935777509511 16 ) devcrate64 [ -0.7071067811865476 0.7071067811865475 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -598,7 +610,7 @@ mod test {
 ( 56.5685424949238 80 -33.941125496954285 ) ( 56.5685424949238 81 -33.941125496954285 ) ( 57.27564927611034 80 -34.64823227814083 ) devcrate64 [ 0.7071067811865475 0 -0.7071067811865477 80 ] [ 0 -1 0 16 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -622,7 +634,7 @@ mod test {
 ( 0 0 16 ) ( 16 16 -16 ) ( 16 -16 -16 ) devcrate64 [ 2.220446049250313e-16 0 1 112 ] [ 0 -1 0 16 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         assert_eq!(triangles.len(), 4 + 2);
 
@@ -650,7 +662,7 @@ mod test {
 ( 16 -16 16 ) ( 16 16 16 ) ( 16 16 -16 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         assert_eq!(triangles.len(), 14);
 
@@ -673,7 +685,7 @@ mod test {
 ( 16 -16 16 ) ( 16 16 -16 ) ( 16 -16 -16 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         assert_eq!(triangles.len(), 4);
 
@@ -698,7 +710,7 @@ mod test {
 ( 128 128 32 ) ( 128 128 33 ) ( 128 129 32 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         let mut new_smd = Smd::new_basic();
         triangles.into_iter().for_each(|tri| {
@@ -722,7 +734,7 @@ mod test {
 ( 31.42562584220407 -6.766459915428641 46.72387209269332 ) ( 31.92562584220407 -6.154087479732851 47.33624452838911 ) ( 31.42562584220407 -6.059353134242087 46.016765311506774 ) devcrate64 [ 0 0.7071067811865474 -0.7071067811865477 37.82338 ] [ -0.5000000000000001 -0.6123724356957947 -0.6123724356957945 -39.818367 ] 39.467796 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         let mut new_smd = Smd::new_basic();
         triangles.into_iter().for_each(|tri| {
@@ -737,7 +749,7 @@ mod test {
     #[test]
     fn normal_cube_new() {
         let cube = default_cube();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         assert_eq!(triangles.len(), 12);
 
@@ -762,7 +774,7 @@ mod test {
 ( 128 128 32 ) ( 128 128 33 ) ( 128 129 32 ) devcrate64 [ 0 1 0 0 ] [ 0 0 -1 0 ] 0 1 1
 ";
         let cube = Brush::try_from(slanted_block).unwrap();
-        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false).unwrap();
+        let triangles = brush_to_triangulated_smd(&cube, &devtex(), false, false).unwrap();
 
         let mut new_smd = Smd::new_basic();
         triangles.into_iter().for_each(|tri| {

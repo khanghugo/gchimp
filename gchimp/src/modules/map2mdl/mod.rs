@@ -137,7 +137,11 @@ fn convert_map(map: &map::Map, entity_option: &Map2MdlOption) -> Result<(), Map2
     Ok(())
 }
 
-type Map2MdlConvertEntityResult = (Vec<(String, mdl::Mdl, map::Entity)>, Map2MdlOption);
+// model count is independent from entity count
+// it is possible that entity count exceeds model count but not the other way around
+// if there are 2 models, then there should be at least 2 entities
+// if there are 2 models, it is possible to have 3 entites where the third entity is the brush entity
+type Map2MdlConvertEntityResult = (Vec<(String, mdl::Mdl)>, Vec<map::Entity>, Map2MdlOption);
 
 /// Converts all gchimp_map2mdl entities to individual .mdl(s)
 ///
@@ -164,6 +168,8 @@ pub fn convert_all_map2mdl_entities(
     let entities_indices = map.get_entities_by_classname_all(MAP2MDL_ENTITY_NAME);
     let entities: Vec<&Entity> = entities_indices.iter().map(|x| &map.entities[*x]).collect();
 
+    println!("Found {} {} entities", entities.len(), MAP2MDL_ENTITY_NAME);
+
     // generate wad info
     let (simple_wad, wads) = generate_wad_info(&map)?;
 
@@ -173,49 +179,46 @@ pub fn convert_all_map2mdl_entities(
         .map(|entity| convert_map2mdl_entity(&map, entity, &simple_wad, &wads))
         .collect::<Result<Vec<_>, Map2MdlError>>()?;
 
-    // delete older map2mdl entities
-    // no need to sort here because it should be sorted
-    assert_eq!(entities_indices, {
-        let mut clone = entities_indices.clone();
-        clone.sort();
-        clone
-    });
-
-    let mut current_idx = 0;
-    map.entities.retain(|_| {
-        let keep = !entities_indices.contains(&current_idx);
-        current_idx += 1;
-        keep
-    });
-
     // convert all used textures to upper case
+    let total_model_count = convert_results.iter().fold(0, |acc, e| e.0.len() + acc);
+    let total_entity_count = convert_results.iter().fold(0, |acc, e| e.1.len() + acc);
 
-    // insert new entities and write models
-    // separate result entities from mdl
-    let mut map2mdl_results = Vec::with_capacity(convert_results.len());
-    let mut entities_to_insert = Vec::with_capacity(convert_results.len());
+    println!(
+        "Writing ({}) models and ({}) entities",
+        total_model_count, total_entity_count
+    );
 
-    for (entity_result, option) in convert_results {
-        let mut new_inner = Vec::with_capacity(entity_result.len());
-        let mut new_inner_entities = Vec::with_capacity(entity_result.len());
+    // flatten the result so it is easier to process
+    let mut map2mdl_results = Vec::with_capacity(total_model_count);
+    let mut entities_to_insert = Vec::with_capacity(total_entity_count);
 
-        for (name, mdl, entity) in entity_result {
-            new_inner.push((name, mdl));
-            new_inner_entities.push(entity);
-        }
-
-        map2mdl_results.push((new_inner, option));
-        entities_to_insert.push(new_inner_entities);
+    for (models, entities, option) in convert_results {
+        map2mdl_results.push((models, option));
+        entities_to_insert.push(entities);
     }
 
     // insert new entities
     // have to stucture entity as Vec<Vec<Entity>>
     // because it preserves the entity order
+    {
+        // it is surely sorted, the code is here just in case
+        assert_eq!(entities_indices, {
+            let mut clone = entities_indices.clone();
+            clone.sort();
+            clone
+        });
+    }
+
     entities_to_insert
         .into_iter()
         .zip(entities_indices)
-        .rev()
+        .rev() // insert reverse
         .for_each(|(entities, insert_index)| {
+            // no need for the entity at insert_index, just remove it
+            // it is the original gchimp_map2mdl entity
+            // make sure to delete it only once
+            map.entities.remove(insert_index);
+
             entities.into_iter().for_each(|entity| {
                 map.entities.insert(insert_index, entity);
             });
@@ -224,7 +227,7 @@ pub fn convert_all_map2mdl_entities(
     // write models
     let output_base_path = PathBuf::from(gchimp_info.hl_path()).join(gchimp_info.gamedir());
 
-    let error_paths: Vec<PathBuf> = map2mdl_results
+    let error_reports: Vec<_> = map2mdl_results
         .into_par_iter()
         .flat_map(|(mdls, option)| {
             let base_output_path = output_base_path.join(option.output);
@@ -233,18 +236,56 @@ pub fn convert_all_map2mdl_entities(
                 .flat_map(|(file_name, mdl)| {
                     let output_path = base_output_path.with_file_name(file_name);
 
+                    // try to create the folder to store model
+                    let Some(model_parent) = output_path.parent() else {
+                        let output_path_display = output_path.to_string_lossy().to_string();
+
+                        return Some((
+                            output_path,
+                            Map2MdlError::GenericError {
+                                value: format!(
+                                    "Cannot create folder for model {}",
+                                    output_path_display
+                                ),
+                            },
+                        ));
+                    };
+
+                    if let Err(e) = std::fs::create_dir_all(model_parent) {
+                        let model_parent = model_parent.to_path_buf();
+
+                        return Some((
+                            output_path,
+                            Map2MdlError::GenericError {
+                                value: format!(
+                                    "Cannot create folder {} ({})",
+                                    model_parent.display(),
+                                    e
+                                ),
+                            },
+                        ));
+                    }
+
                     match mdl.write_to_file(&output_path) {
-                        Ok(_) => None,
-                        Err(_) => Some(output_path),
+                        Ok(_) => {
+                            println!("Writing {}", output_path.display());
+                            None
+                        }
+                        Err(e) => Some((
+                            output_path,
+                            Map2MdlError::GenericError {
+                                value: e.to_string(),
+                            },
+                        )),
                     }
                 })
-                .collect::<Vec<PathBuf>>()
+                .collect::<Vec<(PathBuf, Map2MdlError)>>()
         })
         .collect();
 
-    if !error_paths.is_empty() {
+    if !error_reports.is_empty() {
         return Err(Map2MdlError::GenericError {
-            value: format!("Failed to write models: {:?}", error_paths),
+            value: format!("Failed to write models: {:?}", error_reports),
         });
     }
 
@@ -320,7 +361,8 @@ fn convert_entity_to_triangles(
 
     if option
         .spawnflags
-        .contains(Map2MdlEntitySpawnflag::AsCelShade | Map2MdlEntitySpawnflag::WithCelShade)
+        // use intersects here because AND
+        .intersects(Map2MdlEntitySpawnflag::AsCelShade | Map2MdlEntitySpawnflag::WithCelShade)
     {
         // SAFETY: the previous entity_to_triangulated_smd should throw error if there are not brushes in this entity
         let mut celshade_res =
@@ -333,9 +375,13 @@ fn convert_entity_to_triangles(
             // as celshade will remove original brush
             // as celshade takes precedence
             triangles = celshade_res.mesh;
-        } else {
+        } else if option
+            .spawnflags
+            .contains(Map2MdlEntitySpawnflag::WithCelShade)
+        {
             triangles.append(&mut celshade_res.mesh);
         }
+
         celshade_custom_texture.push((celshade_res.texture_name, celshade_res.image));
     }
 
@@ -395,13 +441,7 @@ fn convert_map2mdl_entity(
         exts,
     );
 
-    Ok((
-        mdls.into_iter()
-            .zip(entities)
-            .map(|((name, mdl), entity)| (name, mdl, entity))
-            .collect(),
-        entity_option,
-    ))
+    Ok((mdls, entities, entity_option))
 }
 
 fn modify_mesh_origin(
@@ -590,7 +630,7 @@ fn generate_models(
                             custom_texture.dimensions,
                         )
                     } else {
-                        unreachable!("should have textures")
+                        unreachable!("Should have textures. Are you using textures that are not inside WAD files?")
                     }
                 };
 
@@ -634,6 +674,8 @@ fn generate_models(
         .collect()
 }
 
+// Process entity.
+// Should own the entity for a more correct memory model
 fn touch_entities(
     option: &Map2MdlOption,
     entity: &Entity,
@@ -718,15 +760,18 @@ fn touch_entities(
     // now generate all the model displayinng entities
     // the only difference is the "model" key
     model_names.iter().for_each(|model_name| {
-        let mut to_insert = base_entity.clone();
+        let mut model_displaying_entity = base_entity.clone();
 
         let path = option.output.with_file_name(model_name);
 
-        to_insert
+        model_displaying_entity
             .attributes
             .insert("model".into(), path.display().to_string());
 
-        entities_to_insert.push(to_insert);
+        // also no brush
+        model_displaying_entity.brushes = None;
+
+        entities_to_insert.push(model_displaying_entity);
     });
 
     entities_to_insert
@@ -801,14 +846,14 @@ fn generate_celshade(
     brushes: &Vec<Brush>,
     options: &Map2MdlEntityCelShadeOption,
 ) -> Result<CelShadeResult, Map2MdlError> {
-    let texture_name = format!(
+    let celshade_texture_name = format!(
         "{:03}{:03}{:03}",
         options.color[0], options.color[1], options.color[2]
     );
 
     let mut simple_wad = SimpleWad::new();
     simple_wad.insert(
-        &texture_name,
+        &celshade_texture_name,
         (0, 0),
         (CELSHADE_TEXTURE_DIMENSION, CELSHADE_TEXTURE_DIMENSION),
     );
@@ -816,25 +861,37 @@ fn generate_celshade(
     let triangulated_smds = brushes
         .iter()
         .cloned()
+        // expand the original brush
         .map(|mut x| {
-            x.planes
-                .iter_mut()
-                .for_each(|x| x.texture_name = map::TextureName::new(texture_name.clone()));
-
-            x.expand(options.distance as f64);
-
+            x.expand_mut(options.distance as f64);
             x
         })
+        // triangulate the brush
         .map(|brush| {
-            brush_to_triangulated_smd(&brush, &simple_wad, false).map_err(|x| {
-                Map2MdlError::FailToConvertBrushToTriangles {
-                    reason: x.to_string(),
-                }
+            brush_to_triangulated_smd(
+                &brush,
+                &simple_wad,
+                false,
+                true, // important, ignore WADs
+            )
+            .map_err(|x| Map2MdlError::FailToConvertBrushToTriangles {
+                reason: x.to_string(),
             })
         })
         .collect::<Result<Vec<Vec<smd::Triangle>>, Map2MdlError>>()?
         .into_iter()
         .flatten()
+        // remove no render textures
+        .filter(|triangle| !NoRenderTexture.contains(&triangle.material))
+        // some processing
+        .map(|mut triangle| {
+            // flip winding order so it is inside out
+            triangle.flip_winding_order_mut();
+            // change texture name to celshade color
+            triangle.material = celshade_texture_name.clone();
+
+            triangle
+        })
         .collect();
 
     const CELSHADE_TEXTURE_DIMENSION: u32 = 16;
@@ -847,7 +904,7 @@ fn generate_celshade(
 
     Ok(CelShadeResult {
         mesh: triangulated_smds,
-        texture_name,
+        texture_name: celshade_texture_name,
         image: wad_image,
     })
 }

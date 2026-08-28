@@ -26,6 +26,12 @@ pub struct Triangle {
     pub vertices: Vec<Vertex>,
 }
 
+impl Triangle {
+    pub fn flip_winding_order_mut(&mut self) {
+        self.vertices.swap(0, 1);
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Vertex {
     pub parent: i32,

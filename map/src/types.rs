@@ -28,7 +28,7 @@ impl BrushPlane {
     }
 
     pub fn move_along_normal(&mut self, distance: f64) {
-        let offset = self.normal() * distance;
+        let offset = self.normal() * distance * -1.; // normal points inward, i think
 
         // change pos
         self.p1 += offset;
@@ -81,7 +81,7 @@ pub struct Brush {
 }
 
 impl Brush {
-    pub fn expand(&mut self, distance: f64) {
+    pub fn expand_mut(&mut self, distance: f64) {
         self.planes.iter_mut().for_each(|plane| {
             plane.move_along_normal(distance);
         });
