@@ -30,7 +30,7 @@ egui_tiles = "0.15.0"
 egui_extras = {version = "0.34.1", features = ["all_loaders", "http"]}
 egui-wgpu = "0.34.1"
 
-rfd = "0.14.1"
+rfd = "0.17.2"
 walkdir = "2.5.0"
 cgmath = "0.18.0"
 bytemuck = "1.24.0"
