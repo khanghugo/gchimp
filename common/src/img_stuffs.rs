@@ -136,7 +136,7 @@ fn format_quantette_palette(palette: Palette) -> Vec<[u8; 3]> {
 }
 
 fn rgb8_to_8bpp(img: RgbImage, palette: &[[u8; 3]]) -> Vec<u8> {
-    img.chunks_exact(3)
+    img.chunks(3)
         .map(|p| {
             // unwrap is guaranteed because img uses palette colors
             let index_for_color = palette
@@ -685,13 +685,13 @@ pub fn adjust_hdri_exposure(hdri: &RgbaImage, exposure: f32) -> RgbaImage {
 
     for pixel in adjusted.pixels_mut() {
         // Leave the Alpha channel (index 3) untouched
-        for i in 0..3 {
-            let original_val = pixel.0[i] as f32;
+        for pix_val in pixel.0.iter_mut().take(3) {
+            let original_val = *pix_val as f32;
 
             // Apply exposure and clamp to valid u8 bounds [0, 255]
             let new_val = (original_val * multiplier).clamp(0.0, 255.0);
 
-            pixel.0[i] = new_val as u8;
+            *pix_val = new_val as u8;
         }
     }
 

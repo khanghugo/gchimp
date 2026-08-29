@@ -28,9 +28,9 @@ pub enum MdlError {
 
     #[error("Intermediate mesh is not built. Try invoking [`Mdl.maybe_build_agnostic_data()`]")]
     AgnosticMeshNotBuilt,
-    #[error("IOError: {source}")]
+    #[error("IOError: {from}")]
     IOError {
         #[from]
-        source: std::io::Error,
+        from: std::io::Error,
     },
 }

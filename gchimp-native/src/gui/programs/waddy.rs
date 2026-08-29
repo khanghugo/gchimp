@@ -912,9 +912,8 @@ impl WaddyGui {
             .waddy
             .wad()
             .entries
-            .iter()
-            .nth(access_entry_index)
-            .unwrap();
+            .get(access_entry_index)
+            .expect("should have access_entry_index");
 
         let texture_name = access_entry.directory_entry.texture_name.get_string();
         let dimensions = if let FileEntry::MipTex(miptex) = &access_entry.file_entry {
@@ -1379,14 +1378,10 @@ impl TabProgram for WaddyGui {
                             egui::CentralPanel::default().show_inside(ui, |ui| {
                                 self.instance_ui(ui, *instance_index);
 
-                                if ui.input(|i| {
+                                ui.input(|i| {
                                     i.viewport().close_requested()
                                         || i.key_pressed(egui::Key::Escape)
-                                }) {
-                                    return true;
-                                };
-
-                                false
+                                })
                             })
                         },
                     )

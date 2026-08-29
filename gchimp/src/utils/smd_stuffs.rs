@@ -73,7 +73,7 @@ pub fn maybe_split_triangles(mut triangles: Vec<Triangle>) -> Vec<Vec<Triangle>>
         let mut curr_smd_triangles: Vec<Triangle> = vec![];
         // vertex can repeat
         let mut curr_smd_vertices: HashSet<String> = HashSet::new();
-        let mut curr_smd_normals: HashSet<String> = HashSet::new();
+        let mut curr_smd_normals: Vec<String> = vec![];
 
         while let Some(curr_triangle) = triangles.pop() {
             let vert0_hash = curr_triangle.vertices[0].bad_pos_hash();
@@ -88,11 +88,12 @@ pub fn maybe_split_triangles(mut triangles: Vec<Triangle>) -> Vec<Vec<Triangle>>
             curr_smd_vertices.insert(vert1_hash);
             curr_smd_vertices.insert(vert2_hash);
 
-            curr_smd_normals.insert(norm0_hash);
-            curr_smd_normals.insert(norm1_hash);
-            curr_smd_normals.insert(norm2_hash);
+            curr_smd_normals.push(norm0_hash);
+            curr_smd_normals.push(norm1_hash);
+            curr_smd_normals.push(norm2_hash);
 
-            if curr_smd_vertices.len() > MAX_SMD_VERTEX || curr_smd_normals.len() > MAX_SMD_VERTEX {
+            if curr_smd_vertices.len() >= MAX_SMD_VERTEX || curr_smd_normals.len() >= MAX_SMD_VERTEX
+            {
                 // if after adding those 3 vertices and the vertex count is exceeded
                 // return the triangle back to the list and we are done with the current smd
                 triangles.push(curr_triangle);

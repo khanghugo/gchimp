@@ -16,9 +16,9 @@ pub enum WadError {
     MismatchedEntryCount { expect: usize, have: usize },
     #[error("{message}")]
     GenericError { message: String },
-    #[error("IOError: {source}")]
+    #[error("IOError: {from}")]
     IOError {
         #[from]
-        source: std::io::Error,
+        from: std::io::Error,
     },
 }

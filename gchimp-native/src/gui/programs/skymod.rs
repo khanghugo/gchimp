@@ -364,7 +364,7 @@ impl TabProgram for SkyModGui {
                     );
 
                     for (suffix, img) in cubemap {
-                        let _ = img.save(output_folder.join(format!("{}_{}",&file_name, suffix)).with_extension("png"));
+                        let _ = img.save(output_folder.join(format!("{}_{}",file_name, suffix)).with_extension("png"));
                     }
                 }
 

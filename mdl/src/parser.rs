@@ -26,11 +26,11 @@ impl Mdl {
         let mut file = OpenOptions::new()
             .read(true)
             .open(path)
-            .map_err(|op| MdlError::IOError { source: op })?;
+            .map_err(|op| MdlError::IOError { from: op })?;
         let mut bytes = vec![];
 
         file.read_to_end(&mut bytes)
-            .map_err(|op| MdlError::IOError { source: op })?;
+            .map_err(|op| MdlError::IOError { from: op })?;
 
         Self::open_from_bytes(&bytes)
     }
@@ -319,7 +319,7 @@ fn parse_blend<'a>(
                 // not sure why, but i have to offset this by this
                 // thanks to newbspguy for easy compilation so that i can debug this
                 // the reason why we offset by "bone_idx * 12" is because panimvalue run
-                // starts from panim. 
+                // starts from panim.
                 // panim is previously read to check offsets.
                 // this means, panimvalue starts at offset from the beginning of that bone offset pos
                 // if it is bone 2, then it starts from "bone 2 offset position"

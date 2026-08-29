@@ -107,7 +107,7 @@ fn convert_map(map: &map::Map, entity_option: &Map2MdlOption) -> Result<(), Map2
                     })
                 },
                 &map.entities[0],
-                &entity_option,
+                entity_option,
             )
         })
         .try_fold((Vec::new(), Vec::new()), |(mut tris, mut texs), res| {
@@ -298,7 +298,7 @@ pub fn convert_all_map2mdl_entities(
 }
 
 fn generate_wad_info(map: &map::Map) -> Result<(SimpleWad, Vec<Wad>), Map2MdlError> {
-    let entity0 = map.entities.get(0).ok_or(Map2MdlError::EmptyMap)?;
+    let entity0 = map.entities.first().ok_or(Map2MdlError::EmptyMap)?;
     let wad_value = entity0
         .attributes
         .get("wad")
@@ -322,7 +322,6 @@ fn generate_wad_info(map: &map::Map) -> Result<(SimpleWad, Vec<Wad>), Map2MdlErr
 
                         if new_path.exists() {
                             path_as_string = new_path_string;
-                            return;
                         }
                     });
                 }
@@ -334,7 +333,7 @@ fn generate_wad_info(map: &map::Map) -> Result<(SimpleWad, Vec<Wad>), Map2MdlErr
 
     let wads = wads_paths
         .into_iter()
-        .map(|path| Wad::from_file(path))
+        .map(Wad::from_file)
         .collect::<Result<Vec<_>, WadError>>()
         .map_err(|x| Map2MdlError::GenericError {
             value: x.to_string(),
@@ -385,7 +384,7 @@ fn convert_entity_to_triangles(
         celshade_custom_texture.push((celshade_res.texture_name, celshade_res.image));
     }
 
-    let triangles = process_special_textures(&option, triangles)?;
+    let triangles = process_special_textures(option, triangles)?;
 
     Ok((triangles, celshade_custom_texture))
 }
@@ -399,7 +398,7 @@ fn convert_map2mdl_entity(
     map: &map::Map,
     entity: &Entity,
     simple_wad: &SimpleWad,
-    wads: &Vec<Wad>,
+    wads: &[Wad],
 ) -> Result<Map2MdlConvertEntityResult, Map2MdlError> {
     let entity_option = verify_and_get_entity_options(entity)?;
     let (triangles, celshade_texture) = convert_entity_to_triangles(
@@ -483,7 +482,7 @@ fn modify_mesh_origin(
     let brush_world_centroid = if !origin_brush_triangles.is_empty() {
         find_aabb_center_from_triangles(&origin_brush_triangles).unwrap()
     } else if let Some(target_origin) = maybe_target_origin {
-        target_origin.into()
+        target_origin
     } else {
         find_aabb_center_from_triangles(&triangles).unwrap()
     };
@@ -577,7 +576,7 @@ fn partition_mesh2(triangles: Vec<smd::Triangle>) -> Vec<(Vec<String>, Vec<smd::
 fn generate_models(
     option: &Map2MdlOption,
     simple_wad: &SimpleWad,
-    wads: &Vec<Wad>,
+    wads: &[Wad],
     triangle_chunks: Vec<(Vec<String>, Vec<Triangle>)>,
     custom_texture: Vec<CustomTexture>,
 ) -> Vec<(String, mdl::Mdl)> {
@@ -693,9 +692,9 @@ fn touch_entities(
         let mut base_entity = entity.clone();
 
         // set basic stuffs
-        base_entity
-            .classname_mut()
-            .map(|x| *x = option.model_entity.clone());
+        if let Some(x) = base_entity.classname_mut() {
+            *x = option.model_entity.clone()
+        }
         base_entity
             .attributes
             .insert("angles".into(), "0 0 0".into());
@@ -843,7 +842,7 @@ struct CelShadeResult {
 }
 
 fn generate_celshade(
-    brushes: &Vec<Brush>,
+    brushes: &[Brush],
     options: &Map2MdlEntityCelShadeOption,
 ) -> Result<CelShadeResult, Map2MdlError> {
     let celshade_texture_name = format!(

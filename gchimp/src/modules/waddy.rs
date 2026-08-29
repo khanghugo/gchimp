@@ -419,7 +419,7 @@ impl Waddy {
             })
             .collect();
 
-        miptex.mip_images = vec![vec![mip0.into()], rest].concat();
+        miptex.mip_images = [vec![mip0.into()], rest].concat();
         miptex.palette = new_palette.into();
 
         Ok(())
