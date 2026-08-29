@@ -478,7 +478,7 @@ Recommeded to leave it checked for uniformly lit texture.",
             let items = i.raw.dropped_files.clone();
             items
                 .iter()
-                .filter_map(|e| e.path.clone())
+                .map(|e| e.path().to_path_buf())
                 .collect::<Vec<PathBuf>>()
         });
 

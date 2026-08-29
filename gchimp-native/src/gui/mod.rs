@@ -164,7 +164,7 @@ impl eframe::App for MyApp {
 
         ctx.options_mut(|option| option.theme_preference = self.theme);
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             if let Some(tree) = &mut self.tree {
                 let mut behavior = TreeBehavior {};
                 tree.ui(&mut behavior, ui);
@@ -186,7 +186,7 @@ impl eframe::App for MyApp {
 
                 ctx.input(|i| {
                     for dropped_file in i.raw.dropped_files.iter() {
-                        if let Some(path) = &dropped_file.path
+                        if let path = &dropped_file.path()
                             && path.extension().unwrap() == "toml"
                         {
                             self.update_from_config(path);

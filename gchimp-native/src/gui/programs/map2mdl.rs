@@ -263,7 +263,7 @@ impl TabProgram for Map2MdlGui {
         ctx.input(|i| {
             if i.raw.dropped_files.len() == 1 {
                 let item = i.raw.dropped_files[0].clone();
-                if let Some(item) = item.path
+                if let item = item.path()
                     && item.is_file()
                     && item.extension().is_some_and(|ext| ext == "map")
                 {

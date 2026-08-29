@@ -701,7 +701,7 @@ impl WaddyGui {
 
         // search bar
         if self.instances[instance_index].search.enable {
-            egui::Panel::bottom(format!("search_bar{}", instance_index)).show_inside(ui, |ui| {
+            egui::Panel::bottom(format!("search_bar{}", instance_index)).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     let text_edit =
                         egui::TextEdit::singleline(&mut self.instances[instance_index].search.text)
@@ -866,28 +866,28 @@ impl WaddyGui {
         let dropped_files = ui.input(|i| i.raw.dropped_files.clone());
 
         for item in &dropped_files {
-            if let Some(path) = &item.path {
-                if path.is_dir() {
-                    continue;
-                }
+            let path = item.path();
 
-                if let Some(ext) = path.extension() {
-                    // if new wad file is dropped, we open that wad file instead
-                    if ext == "wad" || ext == "bsp" {
-                        if let Err(err) = self.start_waddy_instance(ui, Some(path)) {
-                            // TODO TOAST
-                            println!("{}", err);
-                        }
-                    // if an image file is dropped, we will add that to the current wad file
-                    } else if IMAGE_FORMATS.contains(&ext.to_str().unwrap()) {
-                        if let Err(err) = self.instances[instance_index]
-                            .waddy
-                            .add_texture_from_image_path(path)
-                        {
-                            println!("{}", err);
-                        } else {
-                            self.update_after_add_image(ui, instance_index);
-                        }
+            if path.is_dir() {
+                continue;
+            }
+
+            if let Some(ext) = path.extension() {
+                // if new wad file is dropped, we open that wad file instead
+                if ext == "wad" || ext == "bsp" {
+                    if let Err(err) = self.start_waddy_instance(ui, Some(path)) {
+                        // TODO TOAST
+                        println!("{}", err);
+                    }
+                // if an image file is dropped, we will add that to the current wad file
+                } else if IMAGE_FORMATS.contains(&ext.to_str().unwrap()) {
+                    if let Err(err) = self.instances[instance_index]
+                        .waddy
+                        .add_texture_from_image_path(path)
+                    {
+                        println!("{}", err);
+                    } else {
+                        self.update_after_add_image(ui, instance_index);
                     }
                 }
             }
@@ -1279,18 +1279,18 @@ impl WaddyGui {
         let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
 
         for item in &dropped_files {
-            if let Some(path) = &item.path {
-                if path.is_dir() {
-                    continue;
-                }
+            let path = &item.path();
 
-                if let Some(ext) = path.extension()
-                    && (ext == "wad" || ext == "bsp")
-                    && let Err(err) = self.start_waddy_instance(ui, Some(path))
-                {
-                    // TODO TOAST
-                    println!("{}", err);
-                }
+            if path.is_dir() {
+                continue;
+            }
+
+            if let Some(ext) = path.extension()
+                && (ext == "wad" || ext == "bsp")
+                && let Err(err) = self.start_waddy_instance(ui, Some(path))
+            {
+                // TODO TOAST
+                println!("{}", err);
             }
         }
     }
@@ -1375,7 +1375,7 @@ impl TabProgram for WaddyGui {
                                 [PROGRAM_WIDTH, PROGRAM_HEIGHT], // border :()
                             ),
                         |ui, _class| {
-                            egui::CentralPanel::default().show_inside(ui, |ui| {
+                            egui::CentralPanel::default().show(ui, |ui| {
                                 self.instance_ui(ui, *instance_index);
 
                                 ui.input(|i| {

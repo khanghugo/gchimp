@@ -254,18 +254,16 @@ Recommended to have it on so textures will be uniformly lit",
         ctx.input(|i| {
             if i.raw.dropped_files.len() == 1 {
                 let item = i.raw.dropped_files[0].clone();
-                if let Some(item) = item.path {
-                    if item.is_file() {
-                        self.drag_and_drop.file_path = item.display().to_string();
-                        self.drag_and_drop.use_file = true;
-                        self.drag_and_drop.use_folder = false;
-                    } else if item.is_dir() {
-                        self.drag_and_drop.folder_path = item.display().to_string();
-                        self.drag_and_drop.use_folder = true;
-                        self.drag_and_drop.use_file = false;
-                    }
-                } else {
-                    todo!("Do something about file not being recognizable or just don't")
+                let item = item.path();
+
+                if item.is_file() {
+                    self.drag_and_drop.file_path = item.display().to_string();
+                    self.drag_and_drop.use_file = true;
+                    self.drag_and_drop.use_folder = false;
+                } else if item.is_dir() {
+                    self.drag_and_drop.folder_path = item.display().to_string();
+                    self.drag_and_drop.use_folder = true;
+                    self.drag_and_drop.use_file = false;
                 }
             }
         });

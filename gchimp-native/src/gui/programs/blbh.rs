@@ -226,7 +226,7 @@ All materials in the mesh file are replaced by bake texture.",
         // Collect dropped files:
         ctx.input(|i| {
             for item in i.raw.dropped_files.clone() {
-                if let Some(item) = item.path
+                if let item = item.path()
                     && item.is_file()
                 {
                     if item.extension().is_some_and(|ext| ext == "smd") {

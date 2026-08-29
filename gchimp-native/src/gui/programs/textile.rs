@@ -131,7 +131,7 @@ Space seperated",
                     .on_hover_text(
                         "\
 The threshold to decide whether a texture is transparent. \n
-If the dominant color of an image exceeds this threshold, 
+If the dominant color of an image exceeds this threshold,
 it will be chosen as transparent mask.",
                     );
 
@@ -240,9 +240,7 @@ Append \"_<scalar>\" if tiling",
         // Collect dropped files:
         ctx.input(|i| {
             for item in &i.raw.dropped_files {
-                if let Some(path) = &item.path {
-                    self.add_item(path);
-                }
+                self.add_item(item.path());
             }
         });
 

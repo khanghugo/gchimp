@@ -398,7 +398,7 @@ impl TabProgram for Misc {
         // Collect dropped files:
         ctx.input(|i| {
             for item in i.raw.dropped_files.clone() {
-                if let Some(item) = item.path
+                if let item = item.path()
                     && item.is_file()
                     && let Some(ext) = item.extension()
                 {
