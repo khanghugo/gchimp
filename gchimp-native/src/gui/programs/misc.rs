@@ -23,20 +23,41 @@ use crate::{
     gui::{TabProgram, utils::preview_file_being_dropped},
 };
 
+type ThreadedString = Arc<Mutex<String>>;
+
+struct StatusText {
+    split_model: ThreadedString,
+    loop_wave: ThreadedString,
+    resmake: ThreadedString,
+    smd_compile: ThreadedString,
+    studiomdl_compile: ThreadedString,
+}
+
+impl Default for StatusText {
+    fn default() -> Self {
+        let new_string = || Arc::new(Mutex::new(String::from("Idle")));
+
+        Self {
+            split_model: new_string(),
+            loop_wave: new_string(),
+            resmake: new_string(),
+            smd_compile: new_string(),
+            studiomdl_compile: new_string(),
+        }
+    }
+}
+
 pub struct Misc {
     config: Config,
     qc: String,
     wav: String,
     bsp: String,
     smd: String,
+    mdl: String,
+    status: StatusText,
     resmake_options: ResMakeOptions,
-    split_model_status: Arc<Mutex<String>>,
     loop_wave_loop: bool,
     loop_wave_16_bit: bool,
-    loop_wave_status: Arc<Mutex<String>>,
-    resmake_status: Arc<Mutex<String>>,
-    smd_compile_status: Arc<Mutex<String>>,
-    studiomdl_compile_status: Arc<Mutex<String>>,
 }
 
 impl Misc {
@@ -47,12 +68,9 @@ impl Misc {
             wav: Default::default(),
             bsp: Default::default(),
             smd: Default::default(),
+            mdl: Default::default(),
+            status: Default::default(),
             resmake_options: Default::default(),
-            split_model_status: Arc::new(Mutex::new(String::from("Idle"))),
-            loop_wave_status: Arc::new(Mutex::new(String::from("Idle"))),
-            resmake_status: Arc::new(Mutex::new(String::from("Idle"))),
-            smd_compile_status: Arc::new(Mutex::new(String::from("Idle"))),
-            studiomdl_compile_status: Arc::new(Mutex::new(String::from("Idle"))),
             loop_wave_loop: true,
             loop_wave_16_bit: true,
         }
@@ -82,7 +100,7 @@ impl Misc {
                     self.run_split_model();
                 }
 
-                let binding = self.split_model_status.lock().unwrap();
+                let binding = self.status.split_model.lock().unwrap();
                 let mut status_text = binding.as_str();
                 ui.text_edit_singleline(&mut status_text)
             });
@@ -117,7 +135,7 @@ impl Misc {
                 self.run_loop_wave()
             }
 
-            let binding = self.loop_wave_status.lock().unwrap();
+            let binding = self.status.loop_wave.lock().unwrap();
             let mut status_text = binding.as_str();
             ui.text_edit_singleline(&mut status_text)
         });
@@ -188,7 +206,7 @@ If there are external WADs found, this option will create a new WAD file contain
                 self.run_resmake()
             }
 
-            let binding = self.resmake_status.lock().unwrap();
+            let binding = self.status.resmake.lock().unwrap();
             let mut status_text = binding.as_str();
             ui.text_edit_singleline(&mut status_text);
         });
@@ -217,7 +235,7 @@ If there are external WADs found, this option will create a new WAD file contain
                     self.run_smd_compile();
                 }
 
-                let binding = self.smd_compile_status.lock().unwrap();
+                let binding = self.status.smd_compile.lock().unwrap();
                 let mut status_text = binding.as_str();
                 ui.text_edit_singleline(&mut status_text)
             });
@@ -244,7 +262,7 @@ If there are external WADs found, this option will create a new WAD file contain
                     self.run_studiomdl_compile();
                 }
 
-                let binding = self.studiomdl_compile_status.lock().unwrap();
+                let binding = self.status.studiomdl_compile.lock().unwrap();
                 let mut status_text = binding.as_str();
                 ui.text_edit_singleline(&mut status_text)
             });
@@ -252,7 +270,7 @@ If there are external WADs found, this option will create a new WAD file contain
 
     fn run_split_model(&mut self) {
         let qc = self.qc.clone();
-        let status = self.split_model_status.clone();
+        let status = self.status.split_model.clone();
         "Running".clone_into(&mut status.lock().unwrap());
 
         thread::spawn(move || {
@@ -267,7 +285,7 @@ If there are external WADs found, this option will create a new WAD file contain
     fn run_loop_wave(&mut self) {
         let wav = self.wav.clone();
         let wav_path = PathBuf::from(wav);
-        let status = self.loop_wave_status.clone();
+        let status = self.status.loop_wave.clone();
         let loop_ = self.loop_wave_loop;
         let sixteen_bit = self.loop_wave_16_bit;
         "Running".clone_into(&mut status.lock().unwrap());
@@ -284,7 +302,7 @@ If there are external WADs found, this option will create a new WAD file contain
     fn run_resmake(&mut self) {
         let bsp = self.bsp.clone();
         let bsp_path = PathBuf::from(bsp);
-        let status = self.resmake_status.clone();
+        let status = self.status.resmake.clone();
         let ResMakeOptions {
             wad_check,
             include_default_resource,
@@ -320,7 +338,7 @@ If there are external WADs found, this option will create a new WAD file contain
 
     fn run_smd_compile(&mut self) {
         let smd = self.smd.clone();
-        let status = self.smd_compile_status.clone();
+        let status = self.status.smd_compile.clone();
         "Running".clone_into(&mut status.lock().unwrap());
 
         thread::spawn(move || {
@@ -334,7 +352,7 @@ If there are external WADs found, this option will create a new WAD file contain
 
     fn run_studiomdl_compile(&mut self) {
         let qc = self.qc.clone();
-        let status = self.studiomdl_compile_status.clone();
+        let status = self.status.studiomdl_compile.clone();
         "Running".clone_into(&mut status.lock().unwrap());
 
         let studiomdl = self.config.studiomdl.clone();
@@ -367,6 +385,8 @@ If there are external WADs found, this option will create a new WAD file contain
             }
         };
     }
+
+    fn run_mdl_compile(&mut self) {}
 }
 
 impl TabProgram for Misc {
