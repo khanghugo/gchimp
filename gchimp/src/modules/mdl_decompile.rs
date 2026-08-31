@@ -1,7 +1,6 @@
 use std::{ffi::CStr, path::Path};
 
 use common::img_stuffs::{GoldSrcBmp, write_8bpp_to_file};
-use image::EncodableLayout;
 use mdl::Mdl;
 use rayon::prelude::*;
 use smd::Smd;
@@ -64,7 +63,7 @@ pub fn mdl_decompile(mdl: &Mdl) -> MdlDecompileResult {
         .enumerate()
         .map(|(bone_idx, bone)| smd::Node {
             id: bone_idx as i32,
-            bone_name: arr_to_string(bone.name.as_bytes()),
+            bone_name: arr_to_string(&bone.name),
             parent: bone.parent,
         })
         .collect();
