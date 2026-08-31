@@ -11,6 +11,7 @@ pub mod join_mdl;
 pub mod light_scale;
 pub mod loop_wave;
 pub mod map2mdl;
+pub mod mdl_decompile;
 pub mod rename_texture;
 pub mod resmake;
 pub mod rotate_prop_static;

@@ -51,14 +51,7 @@ impl Smd {
                 bone_name: "static_prop".to_string(),
                 parent: -1,
             }],
-            skeleton: vec![Skeleton {
-                time: 0,
-                bones: vec![BonePos {
-                    id: 0,
-                    pos: [0., 0., 0.].into(),
-                    rot: [0., 0., 0.].into(),
-                }],
-            }],
+            skeleton: vec![Skeleton::new_basic()],
             triangles: vec![],
             vertex_anim: vec![],
         }

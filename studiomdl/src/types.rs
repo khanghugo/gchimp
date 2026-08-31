@@ -27,7 +27,7 @@ impl Mesh {
         });
     }
 
-    pub fn fix_uv(&mut self) {
+    pub fn normalized_smd_uv_to_mdl_uv(&mut self) {
         self.mesh.iter_mut().for_each(|tri| {
             tri.vertices
                 .iter_mut()

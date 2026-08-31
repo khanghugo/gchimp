@@ -15,6 +15,8 @@ pub use types::Mdl;
 pub use types::*;
 pub use utils::TrivertAffineTransformation;
 
+pub use utils::model_to_smd::mdl_to_meshes;
+
 #[cfg(test)]
 mod test {
     use std::mem;

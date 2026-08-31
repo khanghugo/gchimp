@@ -13,6 +13,19 @@ pub struct Skeleton {
     pub bones: Vec<BonePos>,
 }
 
+impl Skeleton {
+    pub fn new_basic() -> Self {
+        Self {
+            time: 0,
+            bones: vec![BonePos {
+                id: 0,
+                pos: [0., 0., 0.].into(),
+                rot: [0., 0., 0.].into(),
+            }],
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct BonePos {
     pub id: i32,
@@ -29,6 +42,14 @@ pub struct Triangle {
 impl Triangle {
     pub fn flip_winding_order_mut(&mut self) {
         self.vertices.swap(0, 1);
+    }
+
+    // opposite of /home/khang/gchimp/studiomdl/src/types.rs Mesh::normalized_smd_uv_to_mdl_uv
+    // which is exact same thing because of math
+    pub fn mdl_uv_to_normalized_smd_uv(&mut self) {
+        self.vertices
+            .iter_mut()
+            .for_each(|vert| vert.uv = (vert.uv.x, 1.0 - vert.uv.y).into());
     }
 }
 

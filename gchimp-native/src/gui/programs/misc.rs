@@ -1,5 +1,5 @@
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     thread,
 };
@@ -9,6 +9,7 @@ use eframe::egui;
 use gchimp::{
     modules::{
         loop_wave::loop_wave,
+        mdl_decompile::mdl_decompile_native,
         resmake::{ResMake, ResMakeOptions},
         split_model::split_model,
     },
@@ -31,6 +32,7 @@ struct StatusText {
     resmake: ThreadedString,
     smd_compile: ThreadedString,
     studiomdl_compile: ThreadedString,
+    mdl_decompile: ThreadedString,
 }
 
 impl Default for StatusText {
@@ -43,6 +45,7 @@ impl Default for StatusText {
             resmake: new_string(),
             smd_compile: new_string(),
             studiomdl_compile: new_string(),
+            mdl_decompile: new_string(),
         }
     }
 }
@@ -268,6 +271,35 @@ If there are external WADs found, this option will create a new WAD file contain
             });
     }
 
+    fn mdl_decompile(&mut self, ui: &mut eframe::egui::Ui) {
+        ui.label("MDL Decompile")
+            .on_hover_text("Decompiles a model into SMD and texture files");
+        egui::Grid::new("mdl_decompile")
+            .num_columns(2)
+            .show(ui, |ui| {
+                ui.label("MDL:");
+                ui.add(egui::TextEdit::singleline(&mut self.mdl).hint_text("Choose .mdl file"));
+                if ui.button("Add").clicked()
+                    && let Some(path) = rfd::FileDialog::new()
+                        .add_filter("mdl", &["mdl"])
+                        .pick_file()
+                    && path.extension().is_some_and(|ext| ext == "mdl")
+                {
+                    self.mdl = path.display().to_string();
+                }
+
+                ui.end_row();
+
+                if ui.button("Run").clicked() {
+                    self.run_mdl_decompile();
+                }
+
+                let binding = self.status.mdl_decompile.lock().unwrap();
+                let mut status_text = binding.as_str();
+                ui.text_edit_singleline(&mut status_text)
+            });
+    }
+
     fn run_split_model(&mut self) {
         let qc = self.qc.clone();
         let status = self.status.split_model.clone();
@@ -386,7 +418,19 @@ If there are external WADs found, this option will create a new WAD file contain
         };
     }
 
-    fn run_mdl_compile(&mut self) {}
+    fn run_mdl_decompile(&mut self) {
+        let status = self.status.mdl_decompile.clone();
+        "Running".clone_into(&mut status.lock().unwrap());
+
+        match mdl_decompile_native(Path::new(&self.mdl)) {
+            Ok(_) => {
+                "OK".clone_into(&mut status.lock().unwrap());
+            }
+            Err(e) => {
+                e.clone_into(&mut status.lock().unwrap());
+            }
+        }
+    }
 }
 
 impl TabProgram for Misc {
@@ -412,6 +456,9 @@ impl TabProgram for Misc {
         self.studiomdl_compile(ui);
         ui.separator();
 
+        self.mdl_decompile(ui);
+        ui.separator();
+
         let ctx = ui.ctx();
         preview_file_being_dropped(ctx);
 
@@ -430,6 +477,8 @@ impl TabProgram for Misc {
                         self.bsp = item.to_str().unwrap().to_string();
                     } else if ext == "smd" {
                         self.smd = item.to_str().unwrap().to_string();
+                    } else if ext == "mdl" {
+                        self.mdl = item.to_str().unwrap().to_string();
                     }
                 };
             }

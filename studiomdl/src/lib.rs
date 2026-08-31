@@ -119,7 +119,7 @@ impl StudioMdl {
                     new_model.set_name(&mesh.name);
 
                     mesh.reverse_winding_order(); // must reverse order
-                    mesh.fix_uv(); // y coordinate is different
+                    mesh.normalized_smd_uv_to_mdl_uv(); // y coordinate is different
 
                     new_model.agnostic_mesh = Some(mesh.mesh.clone());
 

@@ -3,7 +3,7 @@ use glam::{Mat3, Vec3};
 use crate::{AnimValues, Bone, Header, Hitbox, MeshTriangles, SequenceGroup, Trivert};
 use crate::{Mdl, Sequence, SequenceHeader};
 
-mod model_to_smd;
+pub mod model_to_smd;
 
 impl Bone {
     pub fn new_empty() -> Self {
