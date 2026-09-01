@@ -386,7 +386,7 @@ impl Plane3D {
     }
 
     pub fn normal(&self) -> Point3D {
-        Point3D::from([self.x, self.y, self.z])
+        Point3D::from([self.x, self.y, self.z]).normalize()
     }
 
     pub fn distance(&self) -> f64 {
