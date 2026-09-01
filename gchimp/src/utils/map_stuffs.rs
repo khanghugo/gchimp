@@ -234,7 +234,8 @@ pub fn solid3d_to_triangulated_smd(
                     // ~map normal vector points toward the texture.~
                     // Don't trust the UV coordinate to give the correct normal
                     // let norm = brush_plane.u.xyz().cross(brush_plane.v.xyz()) * -1.;
-                    let norm = triangle_3d.normal().to_dvec3();
+                    // MUST NORMALIZE otherwise lighting is all messed up
+                    let norm = triangle_3d.normal().to_dvec3().normalize();
 
                     // make sure to check the texture exists before running the function
                     // seems very inefficient to do check here instead
