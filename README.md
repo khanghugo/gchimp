@@ -32,7 +32,11 @@ Usually it would just work out of the box. If there is any problem, try starting
 
 - [Command line interface: Some other features that don't deserve GUI treatment (or do deserve CLI treatment)](https://github.com/khanghugo/gchimp/wiki/Command%E2%80%90line-interface)
 
-- [Miscellaneous stuffs such as .wav looper, .smd splitter,...](https://github.com/khanghugo/gchimp/wiki/Misc)
+- [Miscallenous stuffs](https://github.com/khanghugo/gchimp/wiki/Misc)
+  - `.res` generation and map files archiver
+  - GoldSrc `.mdl` decompiler
+  - `.wav` looper
+  - And some other random thinngs
 
 - [Custom Scripting: Write your own functionality](https://github.com/khanghugo/gchimp/wiki/Custom-Scripting)
 
