@@ -19,13 +19,8 @@ impl GchimpInfo {
         self.spawnflags().contains(GchimpInfoOption::JoinMDL)
     }
 
-    pub fn is_map2mdl_conversion_enabled(&self) -> bool {
-        self.spawnflags()
-            .contains(GchimpInfoOption::Map2MdlConversion)
-    }
-
-    pub fn is_map2mdl_export_enabled(&self) -> bool {
-        self.spawnflags().contains(GchimpInfoOption::Map2MdlExport)
+    pub fn is_map2mdl_enabled(&self) -> bool {
+        self.spawnflags().contains(GchimpInfoOption::Map2Mdl)
     }
 }
 
@@ -127,13 +122,11 @@ bitflags! {
     #[derive(Default, Debug, Clone, Copy)]
     pub struct GchimpInfoOption: u32 {
         const None = 0;
+        // FIXME unused flag
         /// Converts map file to a model
-        const Map2MdlConversion = 1 << 0;
-        /// Exports map2mdl entity into normal map entity
-        ///
-        /// Keep this option enabled if the model is already converted and does not need updating.
-        /// By doing that, model will not be re-converted on every compile.
-        const Map2MdlExport = 1 << 1;
+        /// const Map2MdlConversion = 1 << 0;
+        /// Enables Map2Mdl
+        const Map2Mdl = 1 << 1;
         /// Enables JoinMDL
         const JoinMDL = 1 << 2;
     }

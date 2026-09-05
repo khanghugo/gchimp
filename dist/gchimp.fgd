@@ -4,14 +4,12 @@
     gamedir(string) : "Game mod directory name" : "cstrike"
     spawnflags(Flags) =
 	[
-		// Converts brushes into models
-		1: "map2mdl Conversion" : 1
-		// Exports model entity into the map. Can be used without "conversion" option to avoid redoing conversion.
-		2: "map2mdl Export" : 1
-		// Enables JoinMDL functionality
+        // Enables Map2Mdl
+		2: "map2mdl Enable" : 1
+		// Enables JoinMDL
 		4: "jmdl Enable": 1
 	]
-] 
+]
 
 @SolidClass base(Targetname, Angles, RenderFields, ZHLT, TexLightType) = gchimp_map2mdl : "Converts brush to model"
 [

@@ -156,13 +156,17 @@ pub fn convert_all_map2mdl_entities(
             value: op.to_string(),
         })?;
 
-    // convert all map used textures to uppercase for best compatibility
-    convert_used_texture_to_uppercase(&mut map);
-
     // find gchimp_info
     let gchimp_info = GchimpInfo::from_map(&map).map_err(|x| Map2MdlError::GenericError {
         value: x.to_string(),
     })?;
+
+    if !gchimp_info.is_map2mdl_enabled() {
+        return Ok(());
+    }
+
+    // convert all map used textures to uppercase for best compatibility
+    convert_used_texture_to_uppercase(&mut map);
 
     // find map2mdl entities
     let entities_indices = map.get_entities_by_classname_all(MAP2MDL_ENTITY_NAME);
