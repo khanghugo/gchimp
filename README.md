@@ -38,8 +38,6 @@ Usually it would just work out of the box. If there is any problem, try starting
   - `.wav` looper
   - And some other random thinngs
 
-- [Custom Scripting: Write your own functionality](https://github.com/khanghugo/gchimp/wiki/Custom-Scripting)
-
 ### Planned features
 
 - [ ] Radiosity compiler. This will take a while.

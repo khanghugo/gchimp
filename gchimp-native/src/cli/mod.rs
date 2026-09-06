@@ -2,7 +2,6 @@ use map::Map;
 
 mod check_illegal_brush;
 mod check_missing_texture;
-mod custom_script;
 mod join_mdl;
 mod light_scale;
 mod loop_wave;
@@ -63,7 +62,6 @@ pub fn cli() -> CliRes {
 
     // Add new modules here.
     let modules: &[&dyn Cli] = &[
-        &custom_script::CustomScript,
         &light_scale::LightScale,
         &rotate_prop_static::RotatePropStatic,
         &texture_scale::TextureScale,
