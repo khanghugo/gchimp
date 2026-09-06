@@ -1788,7 +1788,6 @@ dependencies = [
  "common",
  "dem 0.2.3 (git+https://github.com/khanghugo/dem.git)",
  "eframe",
- "egui-wgpu",
  "egui_extras",
  "egui_tiles",
  "eyre",

@@ -3,8 +3,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use egui_wgpu::wgpu;
-
 use eframe::egui::{self, ThemePreference};
 use egui_tiles::Tree;
 use utils::preview_file_being_dropped;
@@ -107,12 +105,12 @@ pub fn gui() -> eyre::Result<()> {
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
 
-            let wgpu_render_state = cc.wgpu_render_state.as_ref().unwrap();
-            let wgpu_context = WgpuContext {
-                device: Arc::new(wgpu_render_state.device.clone()),
-                queue: Arc::new(wgpu_render_state.queue.clone()),
-                target_format: wgpu_render_state.target_format,
-            };
+            // let wgpu_render_state = cc.wgpu_render_state.as_ref().unwrap();
+            // let wgpu_context = WgpuContext {
+            //     device: Arc::new(wgpu_render_state.device.clone()),
+            //     queue: Arc::new(wgpu_render_state.queue.clone()),
+            //     target_format: wgpu_render_state.target_format,
+            // };
 
             // wgpu_render_state.renderer.read().callback_resources
 
@@ -120,7 +118,7 @@ pub fn gui() -> eyre::Result<()> {
                 config_res,
                 persistent_storage,
                 theme_preference,
-                wgpu_context,
+                // wgpu_context,
             )))
         }),
     );
@@ -140,13 +138,13 @@ pub struct CustomRenderer {
     // pub mdlscrub_renderer: MdlScrubRenderer,
 }
 
-#[allow(unused)]
-#[derive(Debug, Clone)]
-pub struct WgpuContext {
-    device: Arc<wgpu::Device>,
-    queue: Arc<wgpu::Queue>,
-    target_format: wgpu::TextureFormat,
-}
+// #[allow(unused)]
+// #[derive(Debug, Clone)]
+// pub struct WgpuContext {
+//     device: Arc<wgpu::Device>,
+//     queue: Arc<wgpu::Queue>,
+//     target_format: wgpu::TextureFormat,
+// }
 
 pub struct MyApp {
     tree: Option<Tree<Pane>>,
@@ -154,7 +152,7 @@ pub struct MyApp {
     // duplicated because create_tree should have been a struct method
     persistent_storage: Arc<Mutex<PersistentStorage>>,
     theme: ThemePreference,
-    wgpu_context: WgpuContext,
+    // wgpu_context: WgpuContext,
     // custom_renderer: CustomRenderer,
 }
 
@@ -203,7 +201,7 @@ impl MyApp {
         config_res: eyre::Result<Config>,
         persistent_storage: Arc<Mutex<PersistentStorage>>,
         theme: ThemePreference,
-        wgpu_context: WgpuContext,
+        // wgpu_context: WgpuContext,
     ) -> Self {
         let custom_renderer = CustomRenderer {
             // mdlscrub_renderer: MdlScrubRenderer::new(wgpu_context.clone()),
@@ -215,7 +213,7 @@ impl MyApp {
                 _no_config_status: format!("Error with parsing config.toml: {}", err),
                 persistent_storage,
                 theme,
-                wgpu_context,
+                // wgpu_context,
                 // custom_renderer,
             };
         }
@@ -229,7 +227,7 @@ impl MyApp {
             _no_config_status: "".to_string(),
             persistent_storage,
             theme,
-            wgpu_context,
+            // wgpu_context,
             // custom_renderer,
         }
     }
@@ -241,7 +239,7 @@ impl MyApp {
             config_res,
             self.persistent_storage.clone(),
             self.theme,
-            self.wgpu_context.clone(),
+            // self.wgpu_context.clone(),
         );
 
         *self = new_app;

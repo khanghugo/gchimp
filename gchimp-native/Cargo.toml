@@ -27,8 +27,7 @@ rayon = "1.10.0"
 # egui stuffs
 eframe = { version = "0.36.1", features = ["accesskit", "default_fonts", "wayland", "x11", "wgpu"] }
 egui_tiles = "0.17.1"
-egui_extras = {version = "0.36.1", features = ["all_loaders", "http"]}
-egui-wgpu = "0.36.1"
+egui_extras = {version = "0.36.1", features = ["all_loaders"]}
 
 rfd = "0.17.2"
 walkdir = "2.5.0"
