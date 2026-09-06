@@ -162,6 +162,7 @@ pub fn convert_all_map2mdl_entities(
     })?;
 
     if !gchimp_info.is_map2mdl_enabled() {
+        println!("Map2Mdl is not enabled!");
         return Ok(());
     }
 
