@@ -6,6 +6,8 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 
 // copied from bxt-rs
 pub fn setup_logging_hooks() {
+    let timer_fmt = tracing_subscriber::fmt::time::LocalTime::rfc_3339;
+
     // Only write the message to the terminal (skipping span arguments) so it's less spammy.
     let only_message = tracing_subscriber::fmt::format::debug_fn(|writer, field, value| {
         if field.name() == "message" {
@@ -14,12 +16,14 @@ pub fn setup_logging_hooks() {
             Ok(())
         }
     });
-    let term_layer = tracing_subscriber::fmt::layer().fmt_fields(only_message.clone());
+    let term_layer = tracing_subscriber::fmt::layer()
+        .with_timer(timer_fmt())
+        .fmt_fields(only_message.clone());
 
     // Disable ANSI colors on Windows as they don't work properly in the legacy console window.
     // https://github.com/tokio-rs/tracing/issues/445
     // #[cfg(windows)]
-    let term_layer = term_layer.with_ansi(false);
+    let term_layer = term_layer.with_timer(timer_fmt()).with_ansi(false);
 
     let current_dir_path = env::current_exe().expect("cannot locate gchimp binary");
     const LOG_FILE_NAME: &str = "gchimp.log";
@@ -34,6 +38,7 @@ pub fn setup_logging_hooks() {
             tracing_subscriber::fmt::layer()
                 .with_writer(file)
                 .with_ansi(false)
+                .with_timer(timer_fmt())
         });
 
     let level_filter = LevelFilter::DEBUG;
