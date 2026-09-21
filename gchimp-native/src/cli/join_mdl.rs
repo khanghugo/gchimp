@@ -1,4 +1,5 @@
 use gchimp::modules::join_mdl::join_model;
+use tracing::{error, info};
 
 use crate::cli::{Cli, CliRes};
 
@@ -21,22 +22,22 @@ impl Cli for JoinMdl {
         let map_path = args[0].clone();
 
         let Ok(mut map) = map::Map::from_file(&map_path) else {
-            println!("Cannot open map file");
+            error!("Cannot open map file");
             return CliRes::Err;
         };
 
         let count = match join_model(&mut map) {
             Ok(x) => x,
             Err(err) => {
-                println!("Error joining models: {err}");
+                error!("Error joining models: {err}");
                 return CliRes::Err;
             }
         };
 
-        println!("Generated {count} combined models.");
+        info!("Generated {count} combined models.");
 
         if let Err(err) = map.write(map_path) {
-            println!("Error writing map: {err}");
+            error!("Error writing map: {err}");
             return CliRes::Err;
         }
 

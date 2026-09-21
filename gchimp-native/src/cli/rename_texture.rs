@@ -1,4 +1,5 @@
 use gchimp::modules::rename_texture::rename_texture;
+use tracing::{error, info};
 
 use crate::cli::{Cli, CliRes};
 
@@ -21,16 +22,16 @@ impl Cli for RenameTexture {
         let map_path = args[0].clone();
 
         let Ok(mut map) = map::Map::from_file(&map_path) else {
-            println!("Cannot open map file");
+            error!("Cannot open map file");
             return CliRes::Err;
         };
 
         let count = rename_texture(&mut map);
 
-        println!("Renamed {count} faces");
+        info!("Renamed {count} faces");
 
         if let Err(err) = map.write(map_path) {
-            println!("Error writing map: {err}");
+            error!("Error writing map: {err}");
             return CliRes::Err;
         }
 

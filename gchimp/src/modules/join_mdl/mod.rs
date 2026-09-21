@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use glam::DVec3;
 use map::Map;
 use mdl::Mdl;
+use tracing::warn;
 
 use crate::{
     gchimp_info::GchimpInfo,
@@ -36,7 +37,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
 
     // is enabled beause i want this to be standard
     if !gchimp_info.is_jmdl_enabled() {
-        println!("JoinMDL is not enabled.");
+        warn!("JoinMDL is not enabled.");
         return Ok(0);
     }
 
@@ -194,7 +195,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
                     .map(|prefix| prefix.join(path))
                     .find(|full_path| full_path.exists())
                     .or_else(|| {
-                        println!("Cannot find any model for `{}`", path);
+                        warn!("Cannot find any model for `{}`", path);
                         None
                     })
             })
@@ -206,7 +207,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
             .filter_map(|path| match Mdl::open_from_file(path) {
                 Ok(x) => Some(x),
                 Err(x) => {
-                    println!("Failed to open {:?} {}", path, x);
+                    warn!("Failed to open {:?} {}", path, x);
                     None
                 }
             })

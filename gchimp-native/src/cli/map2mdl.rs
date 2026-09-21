@@ -1,4 +1,5 @@
 use gchimp::modules::map2mdl::{convert_all_map2mdl_entities, entity::MAP2MDL_ENTITY_NAME};
+use tracing::error;
 
 use super::*;
 
@@ -20,7 +21,7 @@ impl Cli for Map2MdlCli {
         let map_path = &args[0];
 
         if let Err(err) = convert_all_map2mdl_entities(map_path) {
-            println!("{}", err);
+            error!("{}", err);
             return CliRes::Err;
         }
 

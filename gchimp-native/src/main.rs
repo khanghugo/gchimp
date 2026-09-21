@@ -5,10 +5,17 @@ mod config;
 mod gui;
 mod persistent_storage;
 
+#[cfg(target_arch = "x86_64")]
+mod tracing;
+
 use std::process::ExitCode;
 
 #[cfg(target_arch = "x86_64")]
 fn main() -> ExitCode {
+    use crate::tracing::setup_logging_hooks;
+
+    setup_logging_hooks();
+
     let cli_res = cli::cli();
 
     let err_exit = ExitCode::from(1);

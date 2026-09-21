@@ -14,6 +14,7 @@ use glam::DVec3;
 use map::{Brush, Entity};
 use smd::Triangle;
 use studiomdl::StudioMdl;
+use tracing::{info, warn};
 use wad::{error::WadError, types::Wad};
 
 use rayon::prelude::*;
@@ -162,7 +163,7 @@ pub fn convert_all_map2mdl_entities(
     })?;
 
     if !gchimp_info.is_map2mdl_enabled() {
-        println!("Map2Mdl is not enabled!");
+        warn!("Map2Mdl is not enabled!");
         return Ok(());
     }
 
@@ -173,7 +174,7 @@ pub fn convert_all_map2mdl_entities(
     let entities_indices = map.get_entities_by_classname_all(MAP2MDL_ENTITY_NAME);
     let entities: Vec<&Entity> = entities_indices.iter().map(|x| &map.entities[*x]).collect();
 
-    println!("Found {} {} entities", entities.len(), MAP2MDL_ENTITY_NAME);
+    info!("Found {} {} entities", entities.len(), MAP2MDL_ENTITY_NAME);
 
     // generate wad info
     let (simple_wad, wads) = generate_wad_info(&map)?;
@@ -188,7 +189,7 @@ pub fn convert_all_map2mdl_entities(
     let total_model_count = convert_results.iter().fold(0, |acc, e| e.0.len() + acc);
     let total_entity_count = convert_results.iter().fold(0, |acc, e| e.1.len() + acc);
 
-    println!(
+    info!(
         "Writing ({}) models and ({}) entities",
         total_model_count, total_entity_count
     );
@@ -273,7 +274,7 @@ pub fn convert_all_map2mdl_entities(
 
                     match mdl.write_to_file(&output_path) {
                         Ok(_) => {
-                            println!("Writing {}", output_path.display());
+                            info!("Writing {}", output_path.display());
                             None
                         }
                         Err(e) => Some((
@@ -458,6 +459,7 @@ fn modify_mesh_origin(
         .filter(|tri| tri.material == ORIGIN_TEXTURE)
         .cloned()
         .collect::<Vec<smd::Triangle>>();
+
     let maybe_target_origin = if let Some(target_origin) = &option.target_origin {
         // exclusive keyword "origin" to make it 0 0 0 without adding an extra entity
         if target_origin == "origin" {
@@ -471,12 +473,14 @@ fn modify_mesh_origin(
                 let res = entity_attributes
                     .origin()
                     .ok_or(Map2MdlError::GenericError {
-                        value: "Target entity does not have origin".into(),
+                        value: format!("Target entity `{}` does not have origin", target_origin),
                     })?;
 
                 Some(res)
             } else {
-                None
+                return Err(Map2MdlError::GenericError {
+                    value: format!("Cannot find target entity `{}` for origin", target_origin),
+                });
             }
         }
     } else {
@@ -484,12 +488,17 @@ fn modify_mesh_origin(
     };
 
     // at the moment, the model is offset from origin (0, 0), need to move it back to center
+    let empty_target_origin = option.target_origin.is_none()
+        || option.target_origin.as_ref().is_some_and(|x| x.is_empty());
+
     let brush_world_centroid = if !origin_brush_triangles.is_empty() {
         find_aabb_center_from_triangles(&origin_brush_triangles).unwrap()
+    } else if empty_target_origin {
+        find_aabb_center_from_triangles(&triangles).unwrap()
     } else if let Some(target_origin) = maybe_target_origin {
         target_origin
     } else {
-        find_aabb_center_from_triangles(&triangles).unwrap()
+        unreachable!()
     };
 
     // do the actual moving
