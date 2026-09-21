@@ -131,6 +131,8 @@ fn convert_map(map: &map::Map, entity_option: &Map2MdlOption) -> Result<(), Map2
         // there is no need for gchimp_info in this case
         // usually, the caller should supply the output path in that option as welel
         let output_path = entity_option.output.with_file_name(file_name);
+
+        info!("Writing {}", output_path.display());
         mdl.write_to_file(output_path)
             .expect("cannot write model file"); // TODO: too fatigued to handle error here
     });
@@ -295,6 +297,7 @@ pub fn convert_all_map2mdl_entities(
         });
     }
 
+    info!("Writing {}", map_path.as_ref().display());
     map.write(map_path.as_ref())
         .map_err(|x| Map2MdlError::GenericError {
             value: x.to_string(),

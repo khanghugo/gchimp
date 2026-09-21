@@ -36,6 +36,7 @@ impl Cli for JoinMdl {
 
         info!("Generated {count} combined models.");
 
+        info!("Writing {}", map_path);
         if let Err(err) = map.write(map_path) {
             error!("Error writing map: {err}");
             return CliRes::Err;

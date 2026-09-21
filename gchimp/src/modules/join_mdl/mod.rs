@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use glam::DVec3;
 use map::Map;
 use mdl::Mdl;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::{
     gchimp_info::GchimpInfo,
@@ -305,6 +305,7 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
         );
         combined_model.rebuild_data_for_export();
 
+        info!("Writing {}", output_absolute_path.display());
         combined_model.write_to_file(output_absolute_path)?;
 
         work_count += 1;
