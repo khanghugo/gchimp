@@ -396,7 +396,7 @@ impl Plane3D {
     pub fn from_three_points(p1: Point3D, p2: Point3D, p3: Point3D) -> Self {
         let l1 = p2 - p1;
         let l2 = p3 - p1;
-        let normal = l1.cross(l2);
+        let normal = l1.cross(l2).normalize(); // better normalize this shit because jack or whatever doesn't do that
         let w = normal.dot(p1);
 
         Self {
