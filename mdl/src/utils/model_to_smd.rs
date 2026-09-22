@@ -31,7 +31,7 @@ impl Model {
     // eventually, this piece of code will end up in studiomdl crate
     // by then, remember that this function should flip the UV to correctly extract smd mesh
     pub fn build_agnostic_data(&mut self, textures: &[Texture]) {
-        self.agnostic_mesh = Some(model_to_triangles(&self, textures));
+        self.agnostic_mesh = Some(model_to_triangles(self, textures));
     }
 }
 
