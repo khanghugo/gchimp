@@ -60,6 +60,10 @@ pub fn setup_logging_hooks() {
     info!(
         "{} version {}",
         env!("CARGO_PKG_NAME"),
-        git_version!(cargo_prefix = "cargo:", fallback = "unknown")
+        git_version!(
+            args = ["--tags", "--always", "--dirty=-modified"],
+            cargo_prefix = "cargo:",
+            fallback = "unknown"
+        )
     );
 }
