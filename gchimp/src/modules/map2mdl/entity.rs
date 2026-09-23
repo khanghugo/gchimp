@@ -6,6 +6,7 @@ pub const MAP2MDL_ATTR_OUTPUT: &str = "output";
 pub const MAP2MDL_ATTR_MODEL_ENTITY: &str = "model_entity";
 
 pub const MAP2MDL_ATTR_CLIPTYPE: &str = "cliptype";
+pub const MAP2MDL_ATTR_CLIP_TEXTURE: &str = "clip_texture";
 
 pub const MAP2MDL_ATTR_TARGET_ORIGIN: &str = "target_origin";
 

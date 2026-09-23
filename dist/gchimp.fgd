@@ -21,6 +21,7 @@
 		1 : "Same as Brush"
 		2 : "Biggest Box"
 	]
+	clip_texture(string) : "Clip brush texture" : "NULL"
 	target_origin(target_destination) : "Origin of the model is based on this targetname"
 	spawnflags(Flags) =
 	[

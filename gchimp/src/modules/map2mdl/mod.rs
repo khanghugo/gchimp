@@ -26,9 +26,9 @@ use crate::{
     gchimp_info::GchimpInfo,
     modules::map2mdl::{
         entity::{
-            MAP2MDL_ATTR_CELSHADE_COLOR, MAP2MDL_ATTR_CELSHADE_DISTANCE, MAP2MDL_ATTR_CLIPTYPE,
-            MAP2MDL_ATTR_MODEL_ENTITY, MAP2MDL_ATTR_OUTPUT, MAP2MDL_ATTR_TARGET_ORIGIN,
-            MAP2MDL_ENTITY_NAME,
+            MAP2MDL_ATTR_CELSHADE_COLOR, MAP2MDL_ATTR_CELSHADE_DISTANCE, MAP2MDL_ATTR_CLIP_TEXTURE,
+            MAP2MDL_ATTR_CLIPTYPE, MAP2MDL_ATTR_MODEL_ENTITY, MAP2MDL_ATTR_OUTPUT,
+            MAP2MDL_ATTR_TARGET_ORIGIN, MAP2MDL_ENTITY_NAME,
         },
         types::{
             Map2MdlEntityCelShadeOption, Map2MdlEntityCliptype, Map2MdlEntitySpawnflag,
@@ -395,6 +395,12 @@ fn convert_entity_to_triangles(
 
     let triangles = process_special_textures(option, triangles)?;
 
+    info!(
+        "Generated {} triangles for model {}",
+        triangles.len(),
+        option.output.display()
+    );
+
     Ok((triangles, celshade_custom_texture))
 }
 
@@ -732,6 +738,7 @@ fn touch_entities(
 
         base_entity.attributes.remove(MAP2MDL_ATTR_OUTPUT);
         base_entity.attributes.remove(MAP2MDL_ATTR_CLIPTYPE);
+        base_entity.attributes.remove(MAP2MDL_ATTR_CLIP_TEXTURE);
         base_entity.attributes.remove(MAP2MDL_ATTR_MODEL_ENTITY);
         base_entity.attributes.remove(MAP2MDL_ATTR_TARGET_ORIGIN);
         base_entity
@@ -754,7 +761,7 @@ fn touch_entities(
             if let Some(brushes) = &mut clip_brush_entity.brushes {
                 brushes.iter_mut().for_each(|brush| {
                     brush.planes.iter_mut().for_each(|plane| {
-                        plane.texture_name = map::TextureName::new(CLIP_TEXTURE.to_owned());
+                        plane.texture_name = map::TextureName::new(option.clip_texture.clone());
                     });
                 });
             }
@@ -766,7 +773,7 @@ fn touch_entities(
 
             clip_brush_entity.to_func_detail();
 
-            let new_brush = brush_from_mins_maxs(min, max, "CLIP");
+            let new_brush = brush_from_mins_maxs(min, max, &option.clip_texture);
 
             clip_brush_entity.brushes = Some(vec![new_brush]);
             entities_to_insert.push(clip_brush_entity);
@@ -814,6 +821,11 @@ fn verify_and_get_entity_options(entity: &Entity) -> Result<Map2MdlOption, Map2M
         .ok_or(Map2MdlError::NoCliptype)?;
 
     let cliptype = Map2MdlEntityCliptype::try_from(cliptype.as_str())?;
+    let clip_texture = entity
+        .attributes
+        .get(MAP2MDL_ATTR_CLIP_TEXTURE)
+        .cloned()
+        .unwrap_or(CLIP_TEXTURE.to_string()); // default to something because i don't want breaking change
 
     let target_origin = entity.attributes.get(MAP2MDL_ATTR_TARGET_ORIGIN);
 
@@ -842,6 +854,7 @@ fn verify_and_get_entity_options(entity: &Entity) -> Result<Map2MdlOption, Map2M
         output: output.into(),
         model_entity: model_entity.into(),
         cliptype,
+        clip_texture,
         target_origin: target_origin.cloned(),
         spawnflags,
         celshade_options: Map2MdlEntityCelShadeOption {

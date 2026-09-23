@@ -46,6 +46,7 @@ pub struct Map2MdlOption {
     pub output: PathBuf,
     pub model_entity: String,
     pub cliptype: Map2MdlEntityCliptype,
+    pub clip_texture: String,
     /// Without target_origin, model origin will be the center of the model AABB
     ///
     /// target_origin can be "origin", which is (0 0 0)
@@ -61,6 +62,7 @@ impl Default for Map2MdlOption {
             output: "models/map2mdl.mdl".into(),
             model_entity: "cycler_sprite".into(),
             cliptype: Map2MdlEntityCliptype::NoClip,
+            clip_texture: "NULL".into(),
             target_origin: None,
             spawnflags: Map2MdlEntitySpawnflag::empty(),
             celshade_options: Map2MdlEntityCelShadeOption {
