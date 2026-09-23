@@ -1819,6 +1819,7 @@ dependencies = [
  "gchimp",
  "git-version-macro",
  "image",
+ "lazy_static",
  "map",
  "mdl",
  "qc",

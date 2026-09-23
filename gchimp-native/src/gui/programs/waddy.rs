@@ -6,7 +6,10 @@ use std::{
 use eframe::egui::{self, Modifiers, RichText, ScrollArea, Sense, Ui, scroll_area::ScrollSource};
 use gchimp::{modules::waddy::Waddy, utils::misc::find_files_recursively};
 use image::{ImageBuffer, RgbaImage};
+use tracing::warn;
 use wad::types::FileEntry;
+
+use lazy_static::lazy_static;
 
 use rayon::prelude::*;
 
@@ -102,6 +105,10 @@ const BASE_IMAGE_TILE_SIZE: f32 = 96.0;
 
 const PERSISTENT_STORAGE_RECENTLY_USED_UPDATE_ERROR: &str =
     "cannot update recently used wad for Waddy";
+
+lazy_static! {
+    static ref IMPORT_FORMATS: Vec<&'static str> = [IMAGE_FORMATS, &["bsp", "wad"]].concat();
+}
 
 impl WaddyGui {
     pub fn new(persistent_storage: Arc<Mutex<PersistentStorage>>) -> Self {
@@ -297,7 +304,7 @@ impl WaddyGui {
                 });
 
             if let Some(instance_to_add_idx) = instance_to_add_idx {
-                let to_add = if self.instances[instance_index].selected.is_empty() {
+                let mut to_add = if self.instances[instance_index].selected.is_empty() {
                     vec![
                         self.instances[instance_index].waddy.wad().entries[effective_tile_index]
                             .clone(),
@@ -312,24 +319,18 @@ impl WaddyGui {
                         .collect()
                 };
 
-                // manually add seems very sad
-                to_add.into_iter().for_each(|new_entry| {
-                    self.instances[instance_to_add_idx]
-                        .waddy
-                        .wad_mut()
-                        .entries
-                        .push(new_entry);
-
-                    // update num_dirs
-                    // TODO don't do this and have the writer write the numbers for us
-                    self.instances[instance_to_add_idx]
-                        .waddy
-                        .wad_mut()
-                        .header
-                        .num_dirs += 1;
-
-                    self.update_after_add_image(ui, instance_to_add_idx);
-                });
+                // add all of them
+                self.instances[instance_to_add_idx]
+                    .waddy
+                    .wad_mut()
+                    .header
+                    .num_dirs += to_add.len() as i32;
+                self.instances[instance_to_add_idx]
+                    .waddy
+                    .wad_mut()
+                    .entries
+                    .append(&mut to_add);
+                self.update_after_add_many_image(ui, instance_to_add_idx);
             }
         });
 
@@ -746,7 +747,7 @@ impl WaddyGui {
                         .waddy
                         .add_texture_from_rgba_image("pasted_texture", rgba_image)
                         .unwrap();
-                    self.update_after_add_image(ui, instance_index);
+                    self.update_after_add_many_image(ui, instance_index);
                 } else if let Ok(uri) = clipboard.get_text()
                     && uri.starts_with("file://")
                     && let Ok(image) = image::open(uri.replace("file://", ""))
@@ -757,7 +758,7 @@ impl WaddyGui {
                         .waddy
                         .add_texture_from_rgba_image("pasted_texture", rgba_image)
                         .unwrap();
-                    self.update_after_add_image(ui, instance_index);
+                    self.update_after_add_many_image(ui, instance_index);
                 }
             }
         }
@@ -883,25 +884,26 @@ impl WaddyGui {
                 } else if IMAGE_FORMATS.contains(&ext.to_str().unwrap()) {
                     if let Err(err) = self.instances[instance_index]
                         .waddy
-                        .add_texture_from_image_path(path)
+                        .add_texture_from_path(path)
                     {
                         println!("{}", err);
                     } else {
-                        self.update_after_add_image(ui, instance_index);
+                        self.update_after_add_many_image(ui, instance_index);
                     }
                 }
             }
         }
     }
 
-    // call it right after adding ONE image to the underlying WAD file to add new tile
-    fn update_after_add_image(&mut self, ui: &mut Ui, instance_index: usize) {
-        // after adding a new texture, we have to update the gui to include that new file
-        self.update_tile(
-            ui,
-            instance_index,
-            self.instances[instance_index].waddy.wad().entries.len(),
-        );
+    // call it right after adding MANY images to the underlying WAD file
+    // with this, the GUI only generates views for newly added textures
+    fn update_after_add_many_image(&mut self, ui: &mut Ui, instance_index: usize) {
+        let old_len = self.instances[instance_index].texture_tiles.len();
+        let new_len = self.instances[instance_index].waddy.wad().entries.len();
+
+        for tile_idx in old_len..new_len {
+            self.update_tile(ui, instance_index, tile_idx);
+        }
     }
 
     fn update_tile(&mut self, ui: &mut Ui, instance_index: usize, tile_index: usize) {
@@ -1082,17 +1084,17 @@ impl WaddyGui {
                 // TODO this is not consistent with drag and drop behavior
                 // this does not filter out file extension
                 if let Some(paths) = rfd::FileDialog::new()
-                    .add_filter("Image", IMAGE_FORMATS)
+                    .add_filter("Image/BSP/WAD", &IMPORT_FORMATS)
                     .pick_files()
                 {
                     for path in &paths {
                         if let Err(err) = self.instances[instance_index]
                             .waddy
-                            .add_texture_from_image_path(path)
+                            .add_texture_from_path(path)
                         {
-                            println!("{}", err);
+                            warn!("{}", err);
                         } else {
-                            self.update_after_add_image(ui, instance_index);
+                            self.update_after_add_many_image(ui, instance_index);
                         }
                     }
                 }
@@ -1108,11 +1110,11 @@ impl WaddyGui {
                         for path in images_paths {
                             if let Err(err) = self.instances[instance_index]
                                 .waddy
-                                .add_texture_from_image_path(&path)
+                                .add_texture_from_path(&path)
                             {
                                 println!("{}", err);
                             } else {
-                                self.update_after_add_image(ui, instance_index);
+                                self.update_after_add_many_image(ui, instance_index);
                             }
                         }
                     }

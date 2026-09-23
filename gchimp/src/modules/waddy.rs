@@ -11,6 +11,7 @@ use image::RgbaImage;
 use rayon::prelude::*;
 
 use eyre::eyre;
+use tracing::info;
 use wad::types::{Entry, FileEntry, Wad};
 
 use common::img_stuffs::{
@@ -363,14 +364,39 @@ impl Waddy {
         Ok(())
     }
 
-    pub fn add_texture_from_image_path(
+    pub fn add_texture_from_path(
         &mut self,
         path: impl AsRef<Path> + Into<PathBuf>,
     ) -> eyre::Result<()> {
+        let file_extension = path.as_ref().extension().ok_or(eyre!(
+            "Imported file {} has no extension",
+            path.as_ref().display()
+        ))?;
+
+        // special case of importing bsp file
+        if file_extension == "bsp" || file_extension == "wad" {
+            let mut to_add_waddy = if file_extension == "bsp" {
+                Waddy::from_bsp_file(path.as_ref())?
+            } else if file_extension == "wad" {
+                Waddy::from_wad_file(path.as_ref())?
+            } else {
+                unreachable!()
+            };
+
+            info!(
+                "Appending {} textures from {} to current WAD file",
+                to_add_waddy.wad.header.num_dirs,
+                path.as_ref().display()
+            );
+
+            self.wad.header.num_dirs += to_add_waddy.wad.header.num_dirs;
+            self.wad.entries.append(&mut to_add_waddy.wad.entries);
+
+            return Ok(());
+        }
+
         let res = generate_mipmaps_from_path(path.as_ref())?;
-
         let texture_name = path.as_ref().file_stem().unwrap().to_str().unwrap();
-
         self.add_texture_from_generated_mipmaps(texture_name, res)?;
 
         Ok(())
