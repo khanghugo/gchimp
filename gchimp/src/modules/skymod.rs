@@ -364,21 +364,16 @@ pub fn map_index_to_suffix(i: u32) -> String {
 }
 
 pub fn map_file_name_to_index(p: &Path) -> u32 {
-    // funny non ascii crash
-    fn take_last_n_chars(s: &str, n: usize) -> String {
-        match s.char_indices().rev().nth(n - 1) {
-            Some((char_idx, _)) => s[char_idx..].to_lowercase(),
-            None => s.to_string(), // If s has fewer than n characters, return the whole string
-        }
-    }
+    let file_stem = p.file_stem().unwrap().to_string_lossy().to_lowercase();
+    let ends_with = |suffixes: &[&str]| suffixes.iter().any(|&s| file_stem.ends_with(s));
 
-    match take_last_n_chars(&p.file_stem().unwrap().to_string_lossy(), 2).as_str() {
-        "up" => 0,
-        "lf" => 1,
-        "ft" => 2,
-        "rt" => 3,
-        "bk" => 4,
-        "dn" => 5,
+    match () {
+        _ if ends_with(&["up", "top"]) => 0,
+        _ if ends_with(&["lf", "left"]) => 1,
+        _ if ends_with(&["ft", "front", "forward"]) => 2,
+        _ if ends_with(&["rt", "right"]) => 3,
+        _ if ends_with(&["bk", "back", "rear"]) => 4,
+        _ if ends_with(&["dn", "down", "bottom"]) => 5,
         _ => 0,
     }
 }

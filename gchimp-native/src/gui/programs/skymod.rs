@@ -11,6 +11,7 @@ use common::{constants::MAX_GOLDSRC_TEXTURE_SIZE, img_stuffs::hdri_to_cubemap};
 
 use gchimp::modules::skymod::{self, SkyModOptions, map_file_name_to_index, skymod};
 use image::{Rgba32FImage, RgbaImage};
+use tracing::{error, info};
 
 use crate::{
     config::Config,
@@ -158,23 +159,26 @@ impl SkyModGui {
         match res {
             Ok(mdls) => {
                 mdls.into_iter().enumerate().for_each(|(idx, x)| {
-                    let res = x.write_to_file(
-                        first_img_path
-                            .with_file_name(format!("{}{}", self.options.output_name, idx))
-                            .with_extension("mdl"),
-                    );
+                    let out_file_path = first_img_path
+                        .with_file_name(format!("{}{}", self.options.output_name, idx))
+                        .with_extension("mdl");
+
+                    info!("Writing {}", out_file_path.display());
+                    let res = x.write_to_file(out_file_path);
 
                     match res {
                         Ok(_) => {
                             "OK".clone_into(&mut output.lock().unwrap());
                         }
                         Err(err) => {
+                            error!("{}", err);
                             format!("{}", err).clone_into(&mut output.lock().unwrap());
                         }
                     }
                 });
             }
             Err(err) => {
+                error!("{}", err);
                 format!("{}", err).clone_into(&mut output.lock().unwrap());
             }
         }
@@ -347,7 +351,7 @@ impl TabProgram for SkyModGui {
 
             let hdri_exposure_value = hdri.exposure; // copy
 
-            let slider = egui::Slider::new(&mut hdri.exposure, -15.0..=15.0).max_decimals(3);
+            let slider = egui::Slider::new(&mut hdri.exposure, (0.0)..=32.0).max_decimals(3);
 
             let res = ui.add(slider);
 
@@ -364,7 +368,10 @@ impl TabProgram for SkyModGui {
                     );
 
                     for (suffix, img) in cubemap {
-                        let _ = img.save(output_folder.join(format!("{}_{}",file_name, suffix)).with_extension("png"));
+                        let out_file_path = output_folder.join(format!("{}_{}",file_name, suffix)).with_extension("png");
+                        info!("Writing {}", out_file_path.display());
+
+                        let _ = img.save(out_file_path);
                     }
                 }
 
@@ -436,15 +443,17 @@ Recommeded to leave it checked for uniformly lit texture.",
                             && let Ok((first_img_path, cubemap)) = self.turn_to_cubemap(Some(256))
                         {
                             cubemap.into_iter().enumerate().for_each(|(idx, x)| {
-                                let _ = x.save(
-                                    first_img_path
-                                        .with_file_name(format!(
-                                            "{}{}",
-                                            self.options.output_name,
-                                            skymod::map_index_to_suffix(idx as u32)
-                                        ))
-                                        .with_extension("tga"),
-                                );
+                                let out_file_path = first_img_path
+                                    .with_file_name(format!(
+                                        "{}{}",
+                                        self.options.output_name,
+                                        skymod::map_index_to_suffix(idx as u32)
+                                    ))
+                                    .with_extension("tga");
+
+                                info!("Writing {}", out_file_path.display());
+
+                                let _ = x.save(out_file_path);
                             });
 
                             let output = self.status.clone();
