@@ -33,11 +33,22 @@ pub fn join_model(map: &mut Map) -> Result<usize, JMdlError> {
     // verifies that there is gchimp_info
     // jmdl uses gchimp_info to find where the model is
     // will only search inside `basegame` and `basegame_downloads`
-    let gchimp_info = GchimpInfo::from_map(map)?;
+    let gchimp_info = match GchimpInfo::from_map(map) {
+        Ok(x) => x,
+        Err(err) => {
+            // if gchimp_info not added, don't return error, just skip the program
+            if matches!(err, crate::gchimp_info::GchimpInfoError::NoGchimpInfo) {
+                warn!("No gchimp_info found. Skip JoinMDL...");
+                return Ok(0);
+            }
+
+            return Err(err)?;
+        }
+    };
 
     // is enabled beause i want this to be standard
     if !gchimp_info.is_jmdl_enabled() {
-        warn!("JoinMDL is not enabled.");
+        warn!("JoinMDL is not enabled");
         return Ok(0);
     }
 

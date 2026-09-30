@@ -160,9 +160,20 @@ pub fn convert_all_map2mdl_entities(
         })?;
 
     // find gchimp_info
-    let gchimp_info = GchimpInfo::from_map(&map).map_err(|x| Map2MdlError::GenericError {
-        value: x.to_string(),
-    })?;
+    let gchimp_info = match GchimpInfo::from_map(&map) {
+        Ok(x) => x,
+        Err(err) => {
+            // if gchimp_info not added, don't return error, just skip the program
+            if matches!(err, crate::gchimp_info::GchimpInfoError::NoGchimpInfo) {
+                warn!("No gchimp_info found. Skip Map2Mdl...");
+                return Ok(());
+            }
+
+            return Err(Map2MdlError::GenericError {
+                value: err.to_string(),
+            })?;
+        }
+    };
 
     if !gchimp_info.is_map2mdl_enabled() {
         warn!("Map2Mdl is not enabled!");
