@@ -194,12 +194,33 @@ impl SkyModGui {
         path: &Path,
         index: usize,
     ) -> Option<()> {
-        let img = match image::open(path) {
-            Ok(img) => img,
-            Err(err) => {
-                let output = self.status.clone();
-                format!("{}", err).clone_into(&mut output.lock().unwrap());
-                return None;
+        // TODO return result please
+        let img = if path.extension().is_some_and(|x| x == "vtf") {
+            let vtf_file = match vtf::Vtf::from_file(path) {
+                Ok(vtf) => vtf,
+                Err(err) => {
+                    let output = self.status.clone();
+                    format!("Fail to open VTF: {}", err).clone_into(&mut output.lock().unwrap());
+                    return None;
+                }
+            };
+
+            match vtf_file.get_high_res_image() {
+                Ok(img) => img,
+                Err(err) => {
+                    let output = self.status.clone();
+                    format!("VTF image error: {}", err).clone_into(&mut output.lock().unwrap());
+                    return None;
+                }
+            }
+        } else {
+            match image::open(path) {
+                Ok(img) => img,
+                Err(err) => {
+                    let output = self.status.clone();
+                    format!("{}", err).clone_into(&mut output.lock().unwrap());
+                    return None;
+                }
             }
         };
 
