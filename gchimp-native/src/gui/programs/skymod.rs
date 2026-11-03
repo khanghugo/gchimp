@@ -474,7 +474,16 @@ Recommeded to leave it checked for uniformly lit texture.",
 
                                 info!("Writing {}", out_file_path.display());
 
-                                let _ = x.save(out_file_path);
+                                let mut resized = image::imageops::resize(
+                                    &x,
+                                    256,
+                                    256,
+                                    image::imageops::FilterType::Lanczos3,
+                                );
+
+                                image::imageops::flip_vertical_in_place(&mut resized);
+
+                                let _ = resized.save(out_file_path);
                             });
 
                             let output = self.status.clone();
