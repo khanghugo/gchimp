@@ -618,10 +618,10 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
                         #[cfg(target_os = "linux")]
                         let stdout = from_utf8(&output.stdout).unwrap_or(DEFAULT_STDOUT_ERROR);
 
-                        info!("StudioMDL output: {}", stdout);
-
                         #[cfg(target_os = "windows")]
                         let stdout = String::from_utf8_lossy(&output.stdout);
+
+                        info!("StudioMDL output: {}", stdout);
 
                         let maybe_err = stdout.find(STUDIOMDL_ERROR_PATTERN);
 
