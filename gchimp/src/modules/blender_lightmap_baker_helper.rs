@@ -100,7 +100,7 @@ pub fn blender_lightmap_baker_helper(blbh: &BLBH) -> eyre::Result<()> {
 
     // unless the user opts into using only bake texture
     if !options.use_only_bake_texture && !unique_textures.contains(texture_file_name) {
-        return Err(eyre!("Cannot find atlas file inside SMD. Make sure material name matches the image file name. 
+        return Err(eyre!("Cannot find atlas file inside SMD. Make sure material name matches the image file name.
 Found textures in SMD: {:?}
 Atlas file name: `{}`", unique_textures, texture_file_name));
     }
@@ -609,12 +609,16 @@ Atlas file name: `{}`", unique_textures, texture_file_name));
 
                 match handle.join() {
                     Ok(res) => {
+                        use tracing::info;
+
                         const DEFAULT_STDOUT_ERROR: &str =
                             "Cannot get stdout. This is not an error.";
 
                         let output = res?;
                         #[cfg(target_os = "linux")]
                         let stdout = from_utf8(&output.stdout).unwrap_or(DEFAULT_STDOUT_ERROR);
+
+                        info!("StudioMDL output: {}", stdout);
 
                         #[cfg(target_os = "windows")]
                         let stdout = String::from_utf8_lossy(&output.stdout);

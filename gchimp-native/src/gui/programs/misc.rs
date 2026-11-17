@@ -17,6 +17,7 @@ use gchimp::{
 };
 
 use common::constants::STUDIOMDL_ERROR_PATTERN;
+use tracing::info;
 
 use crate::{
     cli::{self},
@@ -400,6 +401,8 @@ If there are external WADs found, this option will create a new WAD file contain
             Ok(x) => {
                 let output = x.expect("should have output");
                 let stdout = str::from_utf8(&output.stdout).expect("should have utf8 output");
+
+                info!("StudioMDL output: {}", stdout);
 
                 let is_err = stdout.find(STUDIOMDL_ERROR_PATTERN).is_some();
 
